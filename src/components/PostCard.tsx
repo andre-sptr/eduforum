@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, Share2, Award, MoreHorizontal, Trash2, FileText } from "lucide-react";
+import { Heart, MessageCircle, Award, MoreHorizontal, Trash2, FileText } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "./UserAvatar";
 import { Badge } from "@/components/ui/badge";
@@ -284,15 +284,6 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
             <MessageCircle className="h-5 w-5 group-hover:text-primary" />
             <span className="group-hover:text-primary">Komentar</span>
           </Button>
-          <Button 
-          variant="ghost" 
-          size="sm" 
-          className="group flex items-center gap-2 text-muted-foreground"
-          onClick={handleShare}
-        >
-          <Share2 className="h-5 w-5 group-hover:text-primary" />
-          <span className="group-hover:text-primary">Bagikan</span>
-        </Button>
         </div>
         {showComments && <div className="mt-4"><CommentSection postId={post.id} currentUserName={currentUserName} currentUserInitials={currentUserInitials} currentUserId={currentUserId} /></div>}
       </div>
