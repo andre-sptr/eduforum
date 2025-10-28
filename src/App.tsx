@@ -8,6 +8,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import SearchPage from "./pages/SearchPage";
 import ProfileSettingsPage from "./pages/ProfileSettingsPage";
+import ChatPage from "./pages/ChatPage";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/settings/profile" element={<ProfileSettingsPage />} />
+          <Route path="/chat/:roomId" element={<ChatPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

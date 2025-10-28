@@ -1,4 +1,4 @@
-import { Moon, Sun, LogOut, Search, Bell, User, Heart, MessageCircle } from "lucide-react";
+import { Moon, Sun, LogOut, Search, Bell, User, Heart, MessageCircle, MessageSquare } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react"; 
@@ -16,6 +16,7 @@ interface Notification {
   type: string;
   is_read: boolean;
   created_at: string;
+  room_id: string | null;
   actor: {
     name: string;
     avatar_text: string;
@@ -42,9 +43,8 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
   const { signOut, user } = useAuth(); 
   const queryClient = useQueryClient();
   const [hasNewNotif, setHasNewNotif] = useState(false);
-
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState(""); 
-  const navigate = useNavigate(); // Inisialisasi hook navigasi
 
   const { data: notifications = [], isLoading: isLoadingNotifs } = useQuery<Notification[]>({
     queryKey: ['notifications', user?.id],
@@ -53,7 +53,7 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
       const { data, error } = await supabase
         .from('notifications')
         .select(`
-          id, type, is_read, created_at,
+          id, type, is_read, created_at, room_id,
           actor:profiles!actor_id (name, avatar_text)
         `)
         .eq('user_id', user.id)
@@ -102,6 +102,8 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
         return <>{actorName} menyukai postingan Anda.</>;
       case 'comment':
         return <>{actorName} mengomentari postingan Anda.</>;
+      case 'chat_message':
+        return <>{actorName} mengirimi Anda pesan.</>;
       default:
         return <>{actorName} mengirim notifikasi baru.</>;
     }
@@ -116,6 +118,12 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
     if (event.key === 'Enter' && searchQuery.trim()) {
       navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
       setSearchQuery(""); 
+    }
+  };
+
+  const handleNotificationClick = (notif: Notification) => {
+    if (notif.type === 'chat_message' && notif.room_id) {
+      navigate(`/chat/${notif.room_id}`);
     }
   };
 
@@ -167,13 +175,15 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
                   <p className="p-4 text-sm text-center text-muted-foreground">Tidak ada notifikasi.</p>
                 ) : (
                   notifications.map((notif, index) => (
-                    <div 
-                      key={notif.id} 
-                      className={`flex items-start gap-3 p-4 hover:bg-muted transition-colors ${index > 0 ? 'border-t' : ''}`}
+                    <div
+                      key={notif.id}
+                      className={`flex items-start gap-3 p-4 hover:bg-muted transition-colors ${index > 0 ? 'border-t' : ''} ${notif.type === 'chat_message' && notif.room_id ? 'cursor-pointer' : ''}`}
+                      onClick={() => handleNotificationClick(notif)}
                     >
                       <div className="mt-1 flex-shrink-0 w-4"> 
                         {notif.type === 'like' && <Heart className="h-4 w-4 text-red-500" />}
                         {notif.type === 'comment' && <MessageCircle className="h-4 w-4 text-blue-500" />}
+                        {notif.type === 'chat_message' && <MessageSquare className="h-4 w-4 text-green-500" />}
                       </div>
 
                       <UserAvatar name={notif.actor.name} initials={notif.actor.avatar_text} size="sm" />

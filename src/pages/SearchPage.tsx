@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar'; 
 import { LeftSidebar } from '@/components/LeftSidebar'; 
 import { RightSidebar } from '@/components/RightSidebar'; 
@@ -11,6 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Button } from '@/components/ui/button';
+import { Badge } from "@/components/ui/badge";
+import { toast } from 'sonner';
 
 interface Post {
   id: string;
@@ -26,6 +28,7 @@ interface Post {
 interface SearchedProfile {
   id: string;
   name: string;
+  bio: string | null
   avatar_text: string;
   role: string;
 }
@@ -35,6 +38,8 @@ const SearchPage = () => {
   const query = searchParams.get('q') || '';
   const { user, loading: authLoading } = useAuth();
   const [currentUserProfile, setCurrentUserProfile] = useState<{id: string, name: string, avatar_text: string} | null>(null);
+  const navigate = useNavigate();
+  const [loadingChat, setLoadingChat] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -69,7 +74,7 @@ const SearchPage = () => {
       if (!query) return [];
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, name, avatar_text, role')
+        .select('id, name, bio, avatar_text, role')
         .ilike('name', `%${query}%`)
         .limit(10);
 
@@ -78,6 +83,39 @@ const SearchPage = () => {
     },
     enabled: !!query && !!user,
   });
+
+  const startOrGoToChat = async (recipientId: string) => {
+    if (!currentUserProfile) {
+      toast.error("Gagal memulai chat: Profil pengguna tidak ditemukan.");
+      return;
+    }
+    const currentUserId = currentUserProfile.id;
+
+    if (currentUserId === recipientId) {
+        toast.info("Anda tidak bisa chat dengan diri sendiri.");
+        return;
+    }
+    
+    setLoadingChat(true); 
+
+    try {
+      const { data: roomId, error } = await supabase
+        .rpc('create_or_get_chat_room', { 
+            recipient_id: recipientId
+        });
+
+      if (error) throw error;
+      if (!roomId) throw new Error("Gagal mendapatkan ID room chat."); 
+
+      navigate(`/chat/${roomId}`);
+
+    } catch (error) {
+      console.error("Error memulai chat:", error);
+      toast.error(`Gagal memulai chat: ${(error as Error).message}`);
+    } finally {
+       setLoadingChat(false); 
+    }
+  };
 
   if (authLoading || !currentUserProfile) {
     return (
@@ -148,15 +186,33 @@ const SearchPage = () => {
                 <CardContent className="p-4 space-y-4">
                   {userResults.map((profile) => (
                     <div key={profile.id} className="flex items-center justify-between">
-                      <Link to={`/profile/${profile.id}`} className="flex items-center gap-3 group">
+                      <div className="flex items-start gap-3">
                         <UserAvatar name={profile.name} initials={profile.avatar_text} />
                         <div>
-                          <h4 className="font-semibold group-hover:underline">{profile.name}</h4>
-                          <p className="text-xs text-muted-foreground">{profile.role}</p>
+                          <div className="flex items-baseline gap-1">
+                            <h4 className="font-semibold">{profile.name}</h4>
+                            <Badge variant="secondary" className="px-1.5 py-0 text-xs font-medium h-fit">
+                              {profile.role}
+                            </Badge>
+                          </div>
+
+                          {profile.bio ? ( 
+                              <p className="text-xs text-muted-foreground mt-0.5">{profile.bio}</p>
+                          ) : (
+                              <p className="text-xs text-muted-foreground mt-0.5 italic">Tidak ada bio</p> 
+                          )}
                         </div>
-                      </Link>
+                      </div>
+
                       {profile.id !== currentUserProfile.id && (
-                          <Button size="sm" variant="outline"> Ikuti </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => startOrGoToChat(profile.id)}
+                          disabled={loadingChat}
+                        > 
+                          {loadingChat ? '...' : 'Chat'}
+                        </Button>
                       )}
                     </div>
                   ))}

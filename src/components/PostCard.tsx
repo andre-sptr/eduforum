@@ -4,12 +4,13 @@ import { Heart, MessageCircle, Share2, Award, MoreHorizontal, Trash2, FileText }
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "./UserAvatar";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState } from "react"; 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { CommentSection } from "./CommentSection";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
 
 interface PostCardProps {
   post: {
@@ -30,6 +31,8 @@ interface PostCardProps {
 export const PostCard = ({ post, currentUserName, currentUserInitials, currentUserId }: PostCardProps) => {
   const [showComments, setShowComments] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [loadingChat, setLoadingChat] = useState(false);
 
   const isAuthor = post.user_id === currentUserId;
 
@@ -112,6 +115,38 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
     }
   };
 
+  const startOrGoToChat = async (recipientId: string) => {
+    if (!currentUserId) {
+      toast.error("Gagal memulai chat: ID pengguna saat ini tidak ditemukan.");
+      return;
+    }
+
+    if (currentUserId === recipientId) {
+        toast.info("Anda tidak bisa chat dengan diri sendiri.");
+        return;
+    }
+
+    setLoadingChat(true);
+
+    try {
+      const { data: roomId, error } = await supabase
+        .rpc('create_or_get_chat_room', {
+            recipient_id: recipientId
+        });
+
+      if (error) throw error;
+      if (!roomId) throw new Error("Gagal mendapatkan ID room chat.");
+
+      navigate(`/chat/${roomId}`);
+
+    } catch (error) {
+      console.error("Error memulai chat:", error);
+      toast.error(`Gagal memulai chat: ${(error as Error).message}`);
+    } finally {
+       setLoadingChat(false);
+    }
+  };
+
   return (
     <Card className="overflow-hidden shadow-md">
       <div className="p-4">
@@ -134,24 +169,33 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
             </div>
           </div>
 
-          {isAuthor && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  className="flex gap-2 items-center text-red-500 focus:text-red-500 cursor-pointer"
-                  onClick={() => deletePostMutation.mutate(post.id)}
-                  disabled={deletePostMutation.isPending}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>{deletePostMutation.isPending ? "Menghapus..." : "Hapus Postingan"}</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          {isAuthor ? ( 
+              <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                          className="flex gap-2 items-center text-red-500 focus:text-red-500 cursor-pointer"
+                          onClick={() => deletePostMutation.mutate(post.id)}
+                          disabled={deletePostMutation.isPending}
+                      >
+                          <Trash2 className="h-4 w-4" />
+                          <span>{deletePostMutation.isPending ? "Menghapus..." : "Hapus Postingan"}</span>
+                      </DropdownMenuItem>
+                  </DropdownMenuContent>
+              </DropdownMenu>
+          ) : (
+              <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => startOrGoToChat(post.user_id)} 
+                  disabled={loadingChat} 
+              >
+                  {loadingChat ? '...' : 'Chat'}
+              </Button>
           )}
         </div>
         
