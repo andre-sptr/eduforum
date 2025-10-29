@@ -30,27 +30,41 @@ interface ChatPartner {
 
 const formatTime = (t: string | null | undefined): string => {
   if (!t) {
-    return 'Beberapa saat lalu';
+    return ''; 
   }
+
   try {
-    const dateObj = new Date(t);
-    if (isNaN(dateObj.getTime())) {
-        return 'Waktu tidak valid';
+    const date = new Date(t);
+    if (isNaN(date.getTime())) {
+      return 'Error';
     }
-    const diff = Date.now() - dateObj.getTime();
-    if (diff < 0) return "Baru saja";
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "Baru saja";
-    if (mins < 60) return `${mins} menit lalu`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours} jam lalu`;
-    return `${Math.floor(hours / 24)} hari lalu`;
+
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const timeString = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    const isToday = date.getDate() === now.getDate() &&
+                    date.getMonth() === now.getMonth() &&
+                    date.getFullYear() === now.getFullYear();
+    if (isToday) {
+      return timeString;
+    }
+
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday = date.getDate() === yesterday.getDate() &&
+                        date.getMonth() === yesterday.getMonth() &&
+                        date.getFullYear() === yesterday.getFullYear();
+    if (isYesterday) {
+      return `Kemarin, ${timeString}`;
+    }
+
+    return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+    
   } catch (error) {
-      console.error("Error formatting time:", error, "Input was:", t);
-      return 'Error waktu';
+    console.error("Error formatting chat time:", error, "Input was:", t);
+    return 'Error';
   }
 };
-
 
 const ChatPage = () => {
   const { roomId } = useParams<{ roomId: string }>();

@@ -29,13 +29,17 @@ interface NavbarProps {
 }
 
 const formatTime = (t: string) => {
-  const diff = Date.now() - new Date(t).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Baru saja";
-  if (mins < 60) return `${mins} menit lalu`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} jam lalu`;
-  return `${Math.floor(hours / 24)} hari lalu`;
+    const diff = Date.now() - new Date(t).getTime();
+    const mins = Math.floor(diff / 60000);
+    
+    if (mins < 1) return "Baru saja";
+    if (mins < 60) return `${mins} menit lalu`;
+    
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} jam lalu`;
+    
+    const days = Math.floor(hours / 24);
+    return `${days} hari lalu`;
 };
 
 export const Navbar = ({ userName, userInitials }: NavbarProps) => {
