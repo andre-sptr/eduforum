@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/Navbar";
 import { CreatePost } from "@/components/CreatePost";
-import { PostCard } from "@/components/PostCard";
+import { PostCard, PostWithAuthor } from "@/components/PostCard";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
@@ -28,11 +28,19 @@ const Index = () => {
     enabled: !!user,
   });
 
-  const { data: posts = [], isLoading } = useQuery({
+  const { data: posts = [], isLoading } = useQuery<PostWithAuthor[]>({
     queryKey: ["posts"],
     queryFn: async () => {
-      const { data } = await supabase.from("posts").select("id, user_id, content, image_url, likes_count, comments_count, created_at, profiles(name, avatar_text, role)").order("created_at", { ascending: false });
-      return data || [];
+      const { data } = await supabase
+        .from("posts")
+        .select(`
+          *,
+          profiles!user_id(name, avatar_text, role),
+          original_author:profiles!original_author_id(name, avatar_text, role)
+        `)
+        .order("created_at", { ascending: false });
+        
+      return (data as PostWithAuthor[]) || [];
     },
     enabled: !!user,
   });

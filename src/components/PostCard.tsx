@@ -1,10 +1,21 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, Award, MoreHorizontal, Trash2, FileText } from "lucide-react";
+import { Heart, MessageCircle, Award, MoreHorizontal, Trash2, FileText, Repeat } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { UserAvatar } from "./UserAvatar";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react"; 
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
@@ -12,17 +23,22 @@ import { CommentSection } from "./CommentSection";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 
+export type PostWithAuthor = {
+  id: string;
+  user_id: string;
+  content: string;
+  image_url: string | null;
+  likes_count: number;
+  comments_count: number;
+  created_at: string;
+  profiles: { name: string; avatar_text: string; role: string };
+  original_post_id: string | null;
+  original_author_id: string | null;
+  original_author: { name: string; avatar_text: string; role: string } | null;
+};
+
 interface PostCardProps {
-  post: {
-    id: string;
-    user_id: string;
-    content: string;
-    image_url: string | null;
-    likes_count: number;
-    comments_count: number;
-    created_at: string;
-    profiles: { name: string; avatar_text: string; role: string };
-  };
+  post: PostWithAuthor;
   currentUserName?: string;
   currentUserInitials?: string;
   currentUserId: string;
@@ -34,6 +50,10 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
   const navigate = useNavigate();
   const [loadingChat, setLoadingChat] = useState(false);
 
+  const isRepost = post.original_post_id !== null;
+  const displayAuthorProfile = isRepost ? post.original_author : post.profiles;
+  const displayAuthorId = isRepost ? post.original_author_id : post.user_id;
+  const reposterName = isRepost ? post.profiles.name : null;
   const isAuthor = post.user_id === currentUserId;
 
   const { data: userLike } = useQuery({
@@ -60,6 +80,9 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
       queryClient.invalidateQueries({ queryKey: ["posts"] });
       queryClient.invalidateQueries({ queryKey: ["userLike", post.id] });
     },
+    onError: (error) => {
+      toast.error(`Gagal: ${(error as Error).message}`);
+    }
   });
 
   const deletePostMutation = useMutation({
@@ -73,6 +96,33 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
     },
     onError: (error) => {
       toast.error(`Gagal menghapus: ${error.message}`);
+    }
+  });
+
+  const repostMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Anda harus login untuk me-repost.");
+
+      const idToRepost = post.original_post_id || post.id;
+
+      const { error } = await supabase.rpc('repost_post', {
+        post_id_to_repost: idToRepost,
+      });
+
+      if (error) {
+        if (error.code === '23505') {
+          throw new Error("Anda sudah me-repost postingan ini.");
+        }
+        throw new Error(error.message);
+      }
+    },
+    onSuccess: () => {
+      toast.success("Berhasil di-repost!");
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+    },
+    onError: (error) => {
+      toast.error(`Gagal me-repost: ${(error as Error).message}`);
     }
   });
 
@@ -101,7 +151,7 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
         }
       }
     } else {
-      if (navigator.clipboard && navigator.clipboard.writeText) { 
+      if (navigator.clipboard && navigator.clipboard.writeText) {
         try {
           await navigator.clipboard.writeText(shareData.url);
           toast.success("Link postingan disalin ke clipboard!");
@@ -110,7 +160,7 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
           toast.error("Gagal menyalin link ke clipboard.");
         }
       } else {
-        toast.error("Browser tidak mendukung fitur berbagi atau menyalin."); 
+        toast.error("Browser tidak mendukung fitur berbagi atau menyalin.");
       }
     }
   };
@@ -122,8 +172,8 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
     }
 
     if (currentUserId === recipientId) {
-        toast.info("Anda tidak bisa chat dengan diri sendiri.");
-        return;
+      toast.info("Anda tidak bisa chat dengan diri sendiri.");
+      return;
     }
 
     setLoadingChat(true);
@@ -131,7 +181,7 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
     try {
       const { data: roomId, error } = await supabase
         .rpc('create_or_get_chat_room', {
-            recipient_id: recipientId
+          recipient_id: recipientId
         });
 
       if (error) throw error;
@@ -143,64 +193,105 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
       console.error("Error memulai chat:", error);
       toast.error(`Gagal memulai chat: ${(error as Error).message}`);
     } finally {
-       setLoadingChat(false);
+      setLoadingChat(false);
     }
   };
 
+  const disableRepost = repostMutation.isPending ||
+                        displayAuthorId === currentUserId ||
+                        isAuthor;
+
   return (
     <Card className="overflow-hidden shadow-md">
+      {isRepost && (
+        <div className="flex items-center gap-2 px-4 pt-3 text-sm text-muted-foreground">
+          <Repeat className="h-4 w-4" />
+          <span className="font-medium">{reposterName || "Seseorang"}</span> me-repost
+        </div>
+      )}
+
       <div className="p-4">
         <div className="flex gap-3 justify-between items-start">
           <div className="flex gap-3">
-            <UserAvatar name={post.profiles.name} initials={post.profiles.avatar_text} />
+            <UserAvatar
+              name={displayAuthorProfile?.name || 'User'}
+              initials={displayAuthorProfile?.avatar_text || '??'}
+            />
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold">{post.profiles.name}</h3>
-                
-                {isAuthor && (
+                <h3 className="font-semibold">{displayAuthorProfile?.name || 'Pengguna Dihapus'}</h3>
+
+                {!isRepost && isAuthor && (
                   <Badge variant="secondary" className="px-2 py-0.5 text-xs font-medium">
                     Saya
                   </Badge>
                 )}
-                
-                {post.profiles.role === "Guru" && <Badge className="bg-accent"><Award className="h-3 w-3 mr-1" />Guru</Badge>}
+                {isRepost && displayAuthorId === currentUserId && (
+                  <Badge variant="outline" className="px-2 py-0.5 text-xs font-medium">
+                    Penulis Asli
+                  </Badge>
+                )}
+
+                {displayAuthorProfile?.role === "Guru" && <Badge className="bg-accent"><Award className="h-3 w-3 mr-1" />Guru</Badge>}
               </div>
               <p className="text-xs text-muted-foreground">{formatTime(post.created_at)}</p>
             </div>
           </div>
 
-          {isAuthor ? ( 
+          {isAuthor ? (
+            <AlertDialog>
               <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                          className="flex gap-2 items-center text-red-500 focus:text-red-500 cursor-pointer"
-                          onClick={() => deletePostMutation.mutate(post.id)}
-                          disabled={deletePostMutation.isPending}
-                      >
-                          <Trash2 className="h-4 w-4" />
-                          <span>{deletePostMutation.isPending ? "Menghapus..." : "Hapus Postingan"}</span>
-                      </DropdownMenuItem>
-                  </DropdownMenuContent>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <AlertDialogTrigger asChild>
+                    <DropdownMenuItem
+                      className="flex gap-2 items-center text-red-500 focus:text-red-500 cursor-pointer"
+                      onSelect={(e) => e.preventDefault()} 
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span>Hapus Postingan</span>
+                    </DropdownMenuItem>
+                  </AlertDialogTrigger>
+                </DropdownMenuContent>
               </DropdownMenu>
+              
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Anda yakin?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Tindakan ini tidak dapat dibatalkan dan akan menghapus postingan Anda.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Batal</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-red-500 hover:bg-red-600"
+                    onClick={() => deletePostMutation.mutate(post.id)}
+                    disabled={deletePostMutation.isPending}
+                  >
+                    {deletePostMutation.isPending ? "Menghapus..." : "Ya, Hapus"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           ) : (
-              <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => startOrGoToChat(post.user_id)} 
-                  disabled={loadingChat} 
-              >
-                  {loadingChat ? '...' : 'Chat'}
-              </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => startOrGoToChat(displayAuthorId!)}
+              disabled={loadingChat || !displayAuthorId}
+            >
+              {loadingChat ? '...' : 'Chat'}
+            </Button>
           )}
         </div>
-        
-        <p className="mt-3">{post.content}</p>
-        
+
+        <p className="mt-3" style={{ whiteSpace: 'pre-wrap' }}>{post.content}</p>
+
         {post.image_url && (() => {
           const urlParts = post.image_url.split('.');
           const extension = urlParts.pop()?.toLowerCase() || '';
@@ -213,48 +304,48 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
             return (
               <Dialog>
                 <DialogTrigger asChild>
-                  <div className="mt-3 aspect-video overflow-hidden rounded-lg border bg-muted cursor-pointer"> 
-                    <img 
-                      src={post.image_url} 
-                      alt="Post image" 
-                      className="w-full h-full object-cover" 
+                  <div className="mt-3 aspect-video overflow-hidden rounded-lg border bg-muted cursor-pointer">
+                    <img
+                      src={post.image_url}
+                      alt="Post image"
+                      className="w-full h-full object-cover"
                     />
                   </div>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl p-0 border-0"> 
-                  <img 
-                    src={post.image_url} 
-                    alt="Post image full size" 
+                <DialogContent className="max-w-4xl p-0 border-0">
+                  <img
+                    src={post.image_url}
+                    alt="Post image full size"
                     className="w-full h-auto max-h-[80vh] object-contain"
                   />
                 </DialogContent>
               </Dialog>
             );
           } else if (isVideo) {
-             return (
+            return (
               <div className="mt-3 aspect-video overflow-hidden rounded-lg border bg-black">
-                <video 
-                    src={post.image_url} 
-                    controls 
-                    className="w-full h-full object-contain" 
+                <video
+                  src={post.image_url}
+                  controls
+                  className="w-full h-full object-contain"
                 >
-                    Browser Anda tidak mendukung tag video.
+                  Browser Anda tidak mendukung tag video.
                 </video>
               </div>
             );
           } else {
             return (
-              <a 
-                href={post.image_url} 
-                download 
-                target="_blank" 
+              <a
+                href={post.image_url}
+                download
+                target="_blank"
                 rel="noopener noreferrer"
                 className="mt-3 block border rounded-lg p-3 hover:bg-muted transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <FileText className="h-6 w-6 text-primary flex-shrink-0" /> 
+                  <FileText className="h-6 w-6 text-primary flex-shrink-0" />
                   <div className="overflow-hidden">
-                    <p className="text-sm font-medium truncate">{decodeURIComponent(fileName)}</p> 
+                    <p className="text-sm font-medium truncate">{decodeURIComponent(fileName)}</p>
                     <p className="text-xs text-muted-foreground">Klik untuk mengunduh</p>
                   </div>
                 </div>
@@ -262,7 +353,7 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
             );
           }
         })()}
-        
+
         <div className="mt-4 text-sm text-muted-foreground">{post.likes_count} suka • {post.comments_count} komentar</div>
 
         <div className="mt-3 flex justify-around border-t pt-2">
@@ -271,6 +362,7 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
             size="sm"
             className={`group flex items-center gap-2 ${userLike ? "text-red-500" : "text-muted-foreground"}`}
             onClick={() => likeMutation.mutate()}
+            disabled={likeMutation.isPending}
           >
             <Heart className={`h-5 w-5 ${userLike ? "fill-current" : ""} ${!userLike ? "group-hover:text-red-500" : ""}`} />
             <span className={!userLike ? "group-hover:text-red-500" : ""}>Suka</span>
@@ -284,6 +376,20 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
             <MessageCircle className="h-5 w-5 group-hover:text-primary" />
             <span className="group-hover:text-primary">Komentar</span>
           </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="group flex items-center gap-2 text-muted-foreground"
+            onClick={() => repostMutation.mutate()}
+            disabled={disableRepost}
+          >
+            <Repeat className={`h-5 w-5 ${!disableRepost ? 'group-hover:text-green-500' : ''}`} />
+            <span className={`${!disableRepost ? 'group-hover:text-green-500' : ''}`}>
+              {repostMutation.isPending ? "..." : "Repost"}
+            </span>
+          </Button>
+
         </div>
         {showComments && <div className="mt-4"><CommentSection postId={post.id} currentUserName={currentUserName} currentUserInitials={currentUserInitials} currentUserId={currentUserId} /></div>}
       </div>

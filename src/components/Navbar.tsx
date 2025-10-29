@@ -1,4 +1,4 @@
-import { Moon, Sun, LogOut, Search, Bell, User, Heart, MessageCircle, MessageSquare } from "lucide-react";
+import { Moon, Sun, LogOut, Search, Bell, User, Heart, MessageCircle, MessageSquare, Repeat } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react"; 
@@ -100,6 +100,10 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
     switch (notif.type) {
       case 'like':
         return <>{actorName} menyukai postingan Anda.</>;
+      case 'comment_like':
+        return <>{actorName} menyukai komentar Anda.</>;
+      case 'repost':
+        return <>{actorName} me-repost postingan Anda.</>;
       case 'comment':
         return <>{actorName} mengomentari postingan Anda.</>;
       case 'chat_message':
@@ -182,6 +186,8 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
                     >
                       <div className="mt-1 flex-shrink-0 w-4"> 
                         {notif.type === 'like' && <Heart className="h-4 w-4 text-red-500" />}
+                        {notif.type === 'comment_like' && <Heart className="h-4 w-4 text-red-500" />}
+                        {notif.type === 'repost' && <Repeat className="h-4 w-4 text-green-500" />}
                         {notif.type === 'comment' && <MessageCircle className="h-4 w-4 text-blue-500" />}
                         {notif.type === 'chat_message' && <MessageSquare className="h-4 w-4 text-green-500" />}
                       </div>

@@ -3,7 +3,7 @@ import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar'; 
 import { LeftSidebar } from '@/components/LeftSidebar'; 
 import { RightSidebar } from '@/components/RightSidebar'; 
-import { PostCard } from '@/components/PostCard'; 
+import { PostCard, PostWithAuthor } from '@/components/PostCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/hooks/useAuth'; 
 import { useQuery } from '@tanstack/react-query'; 
@@ -51,19 +51,23 @@ const SearchPage = () => {
     fetchProfile();
   }, [user]);
 
-  const { data: searchResults = [], isLoading } = useQuery<Post[]>({
+  const { data: searchResults = [], isLoading } = useQuery<PostWithAuthor[]>({
     queryKey: ['searchPosts', query],
     queryFn: async () => {
       if (!query) return [];
 
       const { data, error } = await supabase
         .from('posts')
-        .select('*, profiles(name, avatar_text, role)')
+        .select(`
+          *,
+          profiles!user_id(name, avatar_text, role),
+          original_author:profiles!original_author_id(name, avatar_text, role)
+        `)
         .ilike('content', `%${query}%`) 
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data as PostWithAuthor[]) || [];
     },
     enabled: !!query && !!user,
   });
@@ -161,7 +165,7 @@ const SearchPage = () => {
                 <Skeleton className="h-40 w-full" />
               </>
             ) : searchResults.length === 0 ? (
-              <p className="text-center text-muted-foreground">Tidak ada hasil ditemukan.</p>
+              <p className="text-center text-muted-foreground">Tidak ada hasil postingan ditemukan.</p>
             ) : (
               searchResults.map((post) => (
                 <PostCard
