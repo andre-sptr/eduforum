@@ -11,6 +11,7 @@ const Auth = React.lazy(() => import("./pages/Auth"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
 const SearchPage = React.lazy(() => import("./pages/SearchPage"));
 const ProfileSettingsPage = React.lazy(() => import("./pages/ProfileSettingsPage"));
+const UserProfilePage = React.lazy(() => import("./pages/UserProfilePage"));
 const ChatPage = React.lazy(() => import("./pages/ChatPage"));
 
 const PageLoader = () => (
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/settings/profile" element={<ProfileSettingsPage />} />
+            <Route path="/profile/name/:name" element={<UserProfilePage />} />
             <Route path="/chat/:roomId" element={<ChatPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

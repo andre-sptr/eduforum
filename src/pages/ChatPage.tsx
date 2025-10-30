@@ -145,7 +145,6 @@ const ChatPage = () => {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `room_id=eq.${roomId}` },
         (payload) => {
-          console.log('Pesan baru diterima!', payload.new);
           queryClient.setQueryData<ChatMessage[]>(['chatMessages', roomId], (oldData = []) => [
             ...oldData,
             payload.new as ChatMessage,

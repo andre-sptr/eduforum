@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 interface UserAvatarProps {
   name: string;
   initials: string;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
 }
 
 export const UserAvatar = ({ name, initials, size = "md" }: UserAvatarProps) => {

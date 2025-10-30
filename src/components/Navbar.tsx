@@ -1,4 +1,4 @@
-import { Moon, Sun, LogOut, Search, Bell, User, Heart, MessageCircle, MessageSquare, Repeat } from "lucide-react";
+import { Moon, Sun, LogOut, Search, Bell, User, Heart, MessageCircle, MessageSquare, Repeat, AtSign } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react"; 
@@ -17,6 +17,7 @@ interface Notification {
   is_read: boolean;
   created_at: string;
   room_id: string | null;
+  post_id?: string | null;
   actor: {
     name: string;
     avatar_text: string;
@@ -28,18 +29,26 @@ interface NavbarProps {
   userInitials?: string;
 }
 
-const formatTime = (t: string) => {
-    const diff = Date.now() - new Date(t).getTime();
-    const mins = Math.floor(diff / 60000);
-    
-    if (mins < 1) return "Baru saja";
-    if (mins < 60) return `${mins} menit lalu`;
-    
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours} jam lalu`;
-    
-    const days = Math.floor(hours / 24);
-    return `${days} hari lalu`;
+interface UserProfileData {
+    id: string;
+    name: string;
+    avatar_text: string;
+}
+
+const formatTime = (t: string | null | undefined) => { 
+    if (!t) return "beberapa saat lalu";
+    try {
+        const diff = Date.now() - new Date(t).getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return "Baru saja";
+        if (mins < 60) return `${mins} menit lalu`;
+        const hours = Math.floor(mins / 60);
+        if (hours < 24) return `${hours} jam lalu`;
+        const days = Math.floor(hours / 24);
+        return `${days} hari lalu`;
+    } catch(e) {
+        return 'Waktu tidak valid';
+    }
 };
 
 export const Navbar = ({ userName, userInitials }: NavbarProps) => {
@@ -57,7 +66,7 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
       const { data, error } = await supabase
         .from('notifications')
         .select(`
-          id, type, is_read, created_at, room_id,
+          id, type, is_read, created_at, room_id, post_id, 
           actor:profiles!actor_id (name, avatar_text)
         `)
         .eq('user_id', user.id)
@@ -112,6 +121,10 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
         return <>{actorName} mengomentari postingan Anda.</>;
       case 'chat_message':
         return <>{actorName} mengirimi Anda pesan.</>;
+      case 'follow':
+        return <>{actorName} mulai mengikuti Anda.</>;
+      case 'mention':
+        return <>{actorName} menyebut Anda dalam postingan.</>;
       default:
         return <>{actorName} mengirim notifikasi baru.</>;
     }
@@ -132,8 +145,33 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
   const handleNotificationClick = (notif: Notification) => {
     if (notif.type === 'chat_message' && notif.room_id) {
       navigate(`/chat/${notif.room_id}`);
+    } 
+    else if (notif.post_id) {
+      navigate(`/post/${notif.post_id}`);
+    }
+    else if (notif.type === 'follow' && notif.actor) {
+        navigate(`/profile/name/${encodeURIComponent(notif.actor.name)}`);
     }
   };
+
+  const { data: currentUserProfile } = useQuery<UserProfileData | null>({
+    queryKey: ['currentUserProfileSidebar', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, name, avatar_text")
+        .eq("id", user.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user,
+    staleTime: Infinity,
+  });
+
+  const myProfileLink = currentUserProfile?.name 
+    ? `/profile/name/${encodeURIComponent(currentUserProfile.name)}` 
+    : `/settings/profile`;
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -194,6 +232,8 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
                         {notif.type === 'repost' && <Repeat className="h-4 w-4 text-green-500" />}
                         {notif.type === 'comment' && <MessageCircle className="h-4 w-4 text-blue-500" />}
                         {notif.type === 'chat_message' && <MessageSquare className="h-4 w-4 text-green-500" />}
+                        {notif.type === 'follow' && <User className="h-4 w-4 text-blue-500" />}  
+                        {notif.type === 'mention' && <AtSign className="h-4 w-4 text-indigo-500" />}
                       </div>
 
                       <UserAvatar name={notif.actor.name} initials={notif.actor.avatar_text} size="sm" />
@@ -235,7 +275,7 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild className="gap-2 cursor-pointer">
-                  <Link to="/settings/profile">
+                  <Link to={myProfileLink}> 
                     <User className="h-4 w-4" />
                     <span>Profil Saya</span>
                   </Link>

@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { CommentSection } from "./CommentSection";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 export type PostWithAuthor = {
   id: string;
@@ -203,45 +203,79 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
     }
   };
 
-  const disableRepost = repostMutation.isPending ||
-                        displayAuthorId === currentUserId ||
-                        isAuthor;
+  const renderContentWithMentions = (content: string | null, postData: any): React.ReactNode => {
+    if (!content) return null;
+
+    const mentionRegex = /@([a-zA-Z0-9_\s]+)/g; 
+    const parts = content.split(mentionRegex);
+
+    return parts.map((part, index) => {
+      if (index % 2 === 1) { 
+        const mentionedName = part.trim(); 
+        const encodedName = encodeURIComponent(mentionedName);
+        return (
+          <Link 
+            key={index} 
+            to={`/profile/name/${encodedName}`} 
+            className="text-primary hover:underline font-medium"
+          >
+            @{mentionedName}
+          </Link>
+        );
+      } 
+      return part;
+    });
+  };
+
+  const disableRepost = repostMutation.isPending || displayAuthorId === currentUserId || isAuthor;
+
+  const profileLink = `/profile/name/${encodeURIComponent(post.profiles.name)}`;
 
   return (
     <Card className="overflow-hidden shadow-md">
       {isRepost && (
-        <div className="flex items-center gap-2 px-4 pt-3 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 px-4 pt-3 text-sm text-muted-foreground"> 
           <Repeat className="h-4 w-4" />
-          <span className="font-medium">{reposterName || "Seseorang"}</span> me-repost
+          
+          <Link 
+            to={`/profile/name/${encodeURIComponent(post.profiles.name || 'Seseorang')}`}
+            className="font-medium hover:underline transition-colors"
+          >
+            {post.profiles.name || "Seseorang"}
+          </Link>
+          
+          <span>me-repost</span>
         </div>
       )}
 
       <div className="p-4">
         <div className="flex gap-3 justify-between items-start">
           <div className="flex gap-3">
-            <UserAvatar
-              name={displayAuthorProfile?.name || 'User'}
-              initials={displayAuthorProfile?.avatar_text || '??'}
-            />
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold">{displayAuthorProfile?.name || 'Pengguna Dihapus'}</h3>
+            <Link to={profileLink} className="flex gap-3 items-start group">
+              <UserAvatar
+                name={displayAuthorProfile?.name || 'User'}
+                initials={displayAuthorProfile?.avatar_text || '??'}
+              />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">{displayAuthorProfile?.name || 'Pengguna Dihapus'}</h3>
 
-                {!isRepost && isAuthor && (
-                  <Badge variant="secondary" className="px-2 py-0.5 text-xs font-medium">
-                    Saya
-                  </Badge>
-                )}
-                {isRepost && displayAuthorId === currentUserId && (
-                  <Badge variant="outline" className="px-2 py-0.5 text-xs font-medium">
-                    Penulis Asli
-                  </Badge>
-                )}
+                  {!isRepost && isAuthor && (
+                    <Badge variant="secondary" className="px-2 py-0.5 text-xs font-medium">
+                      Saya
+                    </Badge>
+                  )}
+                  {isRepost && displayAuthorId === currentUserId && (
+                    <Badge variant="outline" className="px-2 py-0.5 text-xs font-medium">
+                      Penulis Asli
+                    </Badge>
+                  )}
 
-                {displayAuthorProfile?.role === "Guru" && <Badge className="bg-accent"><Award className="h-3 w-3 mr-1" />Guru</Badge>}
+                  {displayAuthorProfile?.role === "Guru" && <Badge className="bg-accent"><Award className="h-3 w-3 mr-1" />Guru</Badge>}
+                </div>
+                <p className="text-xs text-muted-foreground">{formatTime(post.created_at)}</p>
               </div>
-              <p className="text-xs text-muted-foreground">{formatTime(post.created_at)}</p>
-            </div>
+            </Link>
           </div>
 
           {isAuthor ? (
@@ -296,7 +330,7 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
           )}
         </div>
 
-        <p className="mt-3" style={{ whiteSpace: 'pre-wrap' }}>{post.content}</p>
+        <p className="mt-3" style={{ whiteSpace: 'pre-wrap' }}>{renderContentWithMentions(post.content, post)}</p>
 
         {post.image_url && (() => {
           const urlParts = post.image_url.split('.');

@@ -154,7 +154,57 @@ const SearchPage = () => {
         <LeftSidebar />
 
         <section className="col-span-10 md:col-span-5 space-y-4">
-          <h2 className="text-xl font-semibold mb-4">
+          <div>
+            <h3 className="text-lg font-medium mb-3 border-b pb-2">Pengguna</h3>
+            {isLoadingUsers ? (
+              <Skeleton className="h-20 w-full" />
+            ) : userResults.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">Tidak ada pengguna ditemukan.</p>
+            ) : (
+              <Card>
+                <CardContent className="p-4 space-y-4">
+                  {userResults.map((profile) => (
+                    <div key={profile.id} className="flex items-center justify-between">
+                      <Link 
+                        to={`/profile/name/${encodeURIComponent(profile.name)}`}
+                        className="flex items-start gap-3 group"
+                      >
+                        <UserAvatar name={profile.name} initials={profile.avatar_text} />
+                        
+                        <div className="min-h-[2.5rem]"> 
+                          <div className="flex items-baseline gap-1">
+                            <h4 className="font-semibold">{profile.name}</h4> 
+                            <Badge variant="secondary" className="px-1.5 py-0 text-xs font-medium h-fit">
+                              {profile.role}
+                            </Badge>
+                          </div>
+
+                          {profile.bio ? ( 
+                            <p className="text-xs text-muted-foreground mt-0.5">{profile.bio}</p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground mt-0.5 italic">Tidak ada bio</p> 
+                          )}
+                        </div>
+                      </Link>
+
+                      {profile.id !== currentUserProfile.id && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => startOrGoToChat(profile.id)}
+                          disabled={loadingChat}
+                        > 
+                          {loadingChat ? '...' : 'Chat'}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <h2 className="text-lg font-medium mb-3 border-b pb-2">
             Hasil Pencarian untuk: "{query}"
           </h2>
 
@@ -176,52 +226,6 @@ const SearchPage = () => {
                   currentUserInitials={currentUserProfile.avatar_text}
                 />
               ))
-            )}
-          </div>
-
-          <div>
-            <h3 className="text-lg font-medium mb-3 border-b pb-2">Pengguna</h3>
-            {isLoadingUsers ? (
-              <Skeleton className="h-20 w-full" />
-            ) : userResults.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">Tidak ada pengguna ditemukan.</p>
-            ) : (
-              <Card>
-                <CardContent className="p-4 space-y-4">
-                  {userResults.map((profile) => (
-                    <div key={profile.id} className="flex items-center justify-between">
-                      <div className="flex items-start gap-3">
-                        <UserAvatar name={profile.name} initials={profile.avatar_text} />
-                        <div>
-                          <div className="flex items-baseline gap-1">
-                            <h4 className="font-semibold">{profile.name}</h4>
-                            <Badge variant="secondary" className="px-1.5 py-0 text-xs font-medium h-fit">
-                              {profile.role}
-                            </Badge>
-                          </div>
-
-                          {profile.bio ? ( 
-                              <p className="text-xs text-muted-foreground mt-0.5">{profile.bio}</p>
-                          ) : (
-                              <p className="text-xs text-muted-foreground mt-0.5 italic">Tidak ada bio</p> 
-                          )}
-                        </div>
-                      </div>
-
-                      {profile.id !== currentUserProfile.id && (
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={() => startOrGoToChat(profile.id)}
-                          disabled={loadingChat}
-                        > 
-                          {loadingChat ? '...' : 'Chat'}
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
             )}
           </div>
         </section>
