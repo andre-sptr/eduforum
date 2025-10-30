@@ -208,7 +208,7 @@ const SearchPage = () => {
             Hasil Pencarian untuk: "{query}"
           </h2>
 
-          <div>
+          <div className="flex flex-col gap-4">
             {isLoading ? (
               <>
                 <Skeleton className="h-40 w-full" />

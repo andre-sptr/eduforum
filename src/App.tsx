@@ -13,6 +13,8 @@ const SearchPage = React.lazy(() => import("./pages/SearchPage"));
 const ProfileSettingsPage = React.lazy(() => import("./pages/ProfileSettingsPage"));
 const UserProfilePage = React.lazy(() => import("./pages/UserProfilePage"));
 const ChatPage = React.lazy(() => import("./pages/ChatPage"));
+const UpdatePassword = React.lazy(() => import("./pages/UpdatePassword"));
+const PostPage = React.lazy(() => import("./pages/PostPage"));
 
 const PageLoader = () => (
   <div className="flex h-screen items-center justify-center bg-background">
@@ -35,6 +37,8 @@ const App = () => (
             <Route path="/search" element={<SearchPage />} />
             <Route path="/settings/profile" element={<ProfileSettingsPage />} />
             <Route path="/profile/name/:name" element={<UserProfilePage />} />
+            <Route path="/update-password" element={<UpdatePassword />} />
+            <Route path="/post/:postId" element={<PostPage />} />
             <Route path="/chat/:roomId" element={<ChatPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

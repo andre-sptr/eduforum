@@ -52,15 +52,34 @@ const formatTime = (t: string | null | undefined) => {
 };
 
 export const Navbar = ({ userName, userInitials }: NavbarProps) => {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(() => {
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme) {
+      return savedTheme === "dark";
+    }
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
+
+  useEffect(() => {
+    const theme = isDark ? "dark" : "light";
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+    localStorage.setItem("theme", theme);
+  }, [isDark]);
+
   const { signOut, user } = useAuth(); 
   const queryClient = useQueryClient();
-  const [hasNewNotif, setHasNewNotif] = useState(false);
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState(""); 
 
-  const { data: notifications = [], isLoading: isLoadingNotifs } = useQuery<Notification[]>({
-    queryKey: ['notifications', user?.id],
+  const [hasNewActivityNotif, setHasNewActivityNotif] = useState(false);
+  const [hasNewChatNotif, setHasNewChatNotif] = useState(false);
+
+  const { data: activityNotifications = [], isLoading: isLoadingActivityNotifs } = useQuery<Notification[]>({
+    queryKey: ['activity_notifications', user?.id],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase
@@ -70,6 +89,28 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
           actor:profiles!actor_id (name, avatar_text)
         `)
         .eq('user_id', user.id)
+        .neq('type', 'chat_message')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      if (error) throw new Error(error.message);
+      return data || [];
+    },
+    enabled: !!user,
+  });
+
+  const { data: chatNotifications = [], isLoading: isLoadingChatNotifs } = useQuery<Notification[]>({
+    queryKey: ['chat_notifications', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from('notifications')
+        .select(`
+          id, type, is_read, created_at, room_id, post_id, 
+          actor:profiles!actor_id (name, avatar_text)
+        `)
+        .eq('user_id', user.id)
+        .eq('type', 'chat_message')
         .order('created_at', { ascending: false })
         .limit(10);
       
@@ -80,31 +121,60 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
   });
 
   useEffect(() => {
-    if (notifications && notifications.length > 0) {
-      const hasUnread = notifications.some(notif => !notif.is_read);
-      setHasNewNotif(hasUnread);
+    if (activityNotifications && activityNotifications.length > 0) {
+      const hasUnread = activityNotifications.some(notif => !notif.is_read);
+      setHasNewActivityNotif(hasUnread);
     }
-  }, [notifications]);
+  }, [activityNotifications]);
 
-  const markAsReadMutation = useMutation({
+  useEffect(() => {
+    if (chatNotifications && chatNotifications.length > 0) {
+      const hasUnread = chatNotifications.some(notif => !notif.is_read);
+      setHasNewChatNotif(hasUnread);
+    }
+  }, [chatNotifications]);
+
+  const markActivityAsReadMutation = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Tidak ada user");
-      
       return await supabase
         .from('notifications')
         .update({ is_read: true }) 
         .eq('user_id', user.id)
-        .eq('is_read', false);
+        .eq('is_read', false)
+        .neq('type', 'chat_message');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['activity_notifications', user?.id] });
     }
   });
 
-  const handleOpenNotifs = (isOpen: boolean) => {
-    if (isOpen && hasNewNotif) {
-      setHasNewNotif(false); 
-      markAsReadMutation.mutate(); 
+  const markChatAsReadMutation = useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error("Tidak ada user");
+      return await supabase
+        .from('notifications')
+        .update({ is_read: true }) 
+        .eq('user_id', user.id)
+        .eq('is_read', false)
+        .eq('type', 'chat_message');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chat_notifications', user?.id] });
+    }
+  });
+
+  const handleOpenActivityNotifs = (isOpen: boolean) => {
+    if (isOpen && hasNewActivityNotif) {
+      setHasNewActivityNotif(false); 
+      markActivityAsReadMutation.mutate(); 
+    }
+  };
+
+  const handleOpenChatNotifs = (isOpen: boolean) => {
+    if (isOpen && hasNewChatNotif) {
+      setHasNewChatNotif(false); 
+      markChatAsReadMutation.mutate(); 
     }
   };
 
@@ -132,7 +202,6 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
 
   const toggleTheme = () => {
     setIsDark(!isDark);
-    document.documentElement.classList.toggle("dark");
   };
 
   const handleSearchSubmit = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -152,6 +221,13 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
     else if (notif.type === 'follow' && notif.actor) {
         navigate(`/profile/name/${encodeURIComponent(notif.actor.name)}`);
     }
+  };
+
+  const isNotificationClickable = (notif: Notification) => {
+    if (notif.type === 'chat_message' && notif.room_id) {return true;}
+    if (notif.post_id) {return true;}
+    if (notif.type === 'follow' && notif.actor) {return true;}
+    return false;
   };
 
   const { data: currentUserProfile } = useQuery<UserProfileData | null>({
@@ -198,11 +274,70 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
         </div>
 
         <div className="flex items-center gap-1">
-          <Popover onOpenChange={handleOpenNotifs}>
+          <Popover onOpenChange={handleOpenChatNotifs}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full relative">
+                <MessageSquare className="h-5 w-5" />
+                {hasNewChatNotif && (
+                  <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 p-0"> 
+              <div className="p-4 border-b"> 
+                <h4 className="font-medium leading-none">Pesan</h4>
+              </div>
+              <div className="max-h-[400px] overflow-y-auto"> 
+                {isLoadingChatNotifs ? (
+                  <p className="p-4 text-sm text-center text-muted-foreground">Memuat pesan...</p>
+                ) : chatNotifications.length === 0 ? (
+                  <p className="p-4 text-sm text-center text-muted-foreground">Tidak ada pesan baru.</p>
+                ) : (
+                  chatNotifications.map((notif, index) => {
+                    const clickable = isNotificationClickable(notif);
+                    return (
+                      <div
+                        key={notif.id}
+                        className={`flex items-start gap-3 p-4 transition-colors ${index > 0 ? 'border-t' : ''} ${
+                          clickable 
+                            ? 'hover:bg-muted cursor-pointer' 
+                            : 'cursor-default'
+                        }`}
+                        onClick={() => {
+                          if (clickable) {
+                            handleNotificationClick(notif);
+                          }
+                        }}
+                      >
+                        <div className="mt-1 flex-shrink-0 w-4"> 
+                          <MessageSquare className="h-4 w-4 text-green-500" />
+                        </div>
+                        <UserAvatar name={notif.actor.name} initials={notif.actor.avatar_text} size="sm" />
+                        <div className="flex-1">
+                          <p className={`text-sm ${!notif.is_read ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            {renderNotificationText(notif)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{formatTime(notif.created_at)}</p>
+                        </div>
+                        {!notif.is_read && (
+                          <span className="flex h-2 w-2 rounded-full bg-primary flex-shrink-0 mt-1.5" /> 
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Popover onOpenChange={handleOpenActivityNotifs}>
             <PopoverTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full relative">
                 <Bell className="h-5 w-5" />
-                {hasNewNotif && (
+                {hasNewActivityNotif && (
                   <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
@@ -215,39 +350,50 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
                 <h4 className="font-medium leading-none">Notifikasi</h4>
               </div>
               <div className="max-h-[400px] overflow-y-auto"> 
-                {isLoadingNotifs ? (
+                {isLoadingActivityNotifs ? (
                   <p className="p-4 text-sm text-center text-muted-foreground">Memuat...</p>
-                ) : notifications.length === 0 ? (
-                  <p className="p-4 text-sm text-center text-muted-foreground">Tidak ada notifikasi.</p>
+                ) : activityNotifications.length === 0 ? (
+                  <p className="p-4 text-sm text-center text-muted-foreground">Tidak ada aktivitas baru.</p>
                 ) : (
-                  notifications.map((notif, index) => (
-                    <div
-                      key={notif.id}
-                      className={`flex items-start gap-3 p-4 hover:bg-muted transition-colors ${index > 0 ? 'border-t' : ''} ${notif.type === 'chat_message' && notif.room_id ? 'cursor-pointer' : ''}`}
-                      onClick={() => handleNotificationClick(notif)}
-                    >
-                      <div className="mt-1 flex-shrink-0 w-4"> 
-                        {notif.type === 'like' && <Heart className="h-4 w-4 text-red-500" />}
-                        {notif.type === 'comment_like' && <Heart className="h-4 w-4 text-red-500" />}
-                        {notif.type === 'repost' && <Repeat className="h-4 w-4 text-green-500" />}
-                        {notif.type === 'comment' && <MessageCircle className="h-4 w-4 text-blue-500" />}
-                        {notif.type === 'chat_message' && <MessageSquare className="h-4 w-4 text-green-500" />}
-                        {notif.type === 'follow' && <User className="h-4 w-4 text-blue-500" />}  
-                        {notif.type === 'mention' && <AtSign className="h-4 w-4 text-indigo-500" />}
-                      </div>
+                  activityNotifications.map((notif, index) => {
+                    const clickable = isNotificationClickable(notif);
 
-                      <UserAvatar name={notif.actor.name} initials={notif.actor.avatar_text} size="sm" />
-                      <div className="flex-1">
-                        <p className={`text-sm ${!notif.is_read ? 'text-foreground' : 'text-muted-foreground'}`}>
-                          {renderNotificationText(notif)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{formatTime(notif.created_at)}</p>
+                    return (
+                      <div
+                        key={notif.id}
+                        className={`flex items-start gap-3 p-4 transition-colors ${index > 0 ? 'border-t' : ''} ${
+                          clickable 
+                            ? 'hover:bg-muted cursor-pointer' 
+                            : 'cursor-default'
+                        }`}
+                        onClick={() => {
+                          if (clickable) {
+                            handleNotificationClick(notif);
+                          }
+                        }}
+                      >
+                        <div className="mt-1 flex-shrink-0 w-4"> 
+                          {notif.type === 'like' && <Heart className="h-4 w-4 text-red-500" />}
+                          {notif.type === 'comment_like' && <Heart className="h-4 w-4 text-red-500" />}
+                          {notif.type === 'repost' && <Repeat className="h-4 w-4 text-green-500" />}
+                          {notif.type === 'comment' && <MessageCircle className="h-4 w-4 text-blue-500" />}
+                          {notif.type === 'follow' && <User className="h-4 w-4 text-blue-500" />}  
+                          {notif.type === 'mention' && <AtSign className="h-4 w-4 text-indigo-500" />}
+                        </div>
+
+                        <UserAvatar name={notif.actor.name} initials={notif.actor.avatar_text} size="sm" />
+                        <div className="flex-1">
+                          <p className={`text-sm ${!notif.is_read ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            {renderNotificationText(notif)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{formatTime(notif.created_at)}</p>
+                        </div>
+                        {!notif.is_read && (
+                          <span className="flex h-2 w-2 rounded-full bg-primary flex-shrink-0 mt-1.5" /> 
+                        )}
                       </div>
-                      {!notif.is_read && (
-                        <span className="flex h-2 w-2 rounded-full bg-primary flex-shrink-0 mt-1.5" /> 
-                      )}
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </PopoverContent>

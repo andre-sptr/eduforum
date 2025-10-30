@@ -431,7 +431,18 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
           </Button>
 
         </div>
-        {showComments && <div className="mt-4"><CommentSection postId={post.id} currentUserName={currentUserName} currentUserInitials={currentUserInitials} currentUserId={currentUserId} /></div>}
+        {showComments && currentUserId && currentUserName && currentUserInitials && (
+          <div className="mt-4">
+            <CommentSection
+              postId={post.id}
+              currentUserProfile={{
+                id: currentUserId,
+                name: currentUserName,
+                avatar_text: currentUserInitials
+              }}
+            />
+          </div>
+        )}
       </div>
     </Card>
   );

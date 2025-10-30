@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Send, Settings, Heart } from 'lucide-react';

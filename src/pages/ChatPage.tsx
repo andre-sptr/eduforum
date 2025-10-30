@@ -86,7 +86,6 @@ const ChatPage = () => {
               .limit(1)
               .maybeSingle();
           if (error) throw error;
-          // @ts-ignore
           return data?.profiles ?? null;
       },
       enabled: !!user && !!roomId,
@@ -192,12 +191,17 @@ const ChatPage = () => {
           <Button variant="ghost" size="icon" className="mr-2" asChild>
               <Link to="/"><ArrowLeft className="h-5 w-5"/></Link>
           </Button>
-          <Avatar className="h-9 w-9 mr-3">
-            <AvatarFallback className="bg-primary text-primary-foreground"> 
+          <Link 
+            to={`/profile/name/${encodeURIComponent(chatPartner.name)}`}
+            className="flex items-center gap-3"
+          >
+            <Avatar className="h-9 w-9">
+              <AvatarFallback className="bg-primary text-primary-foreground"> 
                 {chatPartner.avatar_text || '?'}
-            </AvatarFallback>
-          </Avatar>
-          <h2 className="font-semibold text-base">{chatPartner.name}</h2>
+              </AvatarFallback>
+            </Avatar>
+            <h2 className="font-semibold text-base">{chatPartner.name}</h2>
+          </Link>
         </header>
 
         <ScrollArea
@@ -215,7 +219,7 @@ const ChatPage = () => {
                return (
                 <div 
                     key={msg.id} 
-                    className={`flex items-start gap-2 ${isSender ? 'justify-end' : 'justify-start'} ${!isSameSenderAsPrev ? 'mt-3' : 'mt-1'}`} // Kurangi sedikit margin atas
+                    className={`flex items-start gap-2 ${isSender ? 'justify-end' : 'justify-start'} ${!isSameSenderAsPrev ? 'mt-3' : 'mt-1'}`}
                 >
                     {!isSender && chatPartner && (
                     <Avatar className={`h-6 w-6 flex-shrink-0 ${
@@ -227,7 +231,7 @@ const ChatPage = () => {
                     </Avatar>
                     )}
 
-                    <div className={`rounded-xl px-3 pt-1.5 pb-1 text-sm shadow relative ${
+                    <div className={`max-w-[75%] rounded-xl px-3 pt-1.5 pb-1 text-sm shadow relative ${
                       isSender 
                       ? 'bg-primary text-primary-foreground rounded-br-none' 
                       : 'bg-card text-card-foreground border rounded-bl-none'
