@@ -15,10 +15,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { UserAvatar } from "./UserAvatar";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CommentSection } from "./CommentSection";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useNavigate, Link } from "react-router-dom";
@@ -35,6 +35,7 @@ export type PostWithAuthor = {
   original_post_id: string | null;
   original_author_id: string | null;
   original_author: { name: string; avatar_text: string; role: string } | null;
+  viewer_has_liked?: boolean;
 };
 
 interface PostCardProps {
@@ -49,6 +50,8 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [loadingChat, setLoadingChat] = useState(false);
+  const [isLiked, setIsLiked] = useState(Boolean(post.viewer_has_liked));
+  const [likesCount, setLikesCount] = useState(post.likes_count ?? 0);
 
   const isRepost = post.original_post_id !== null;
   const displayAuthorProfile = isRepost ? post.original_author : post.profiles;
@@ -56,33 +59,45 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
   const reposterName = isRepost ? post.profiles.name : null;
   const isAuthor = post.user_id === currentUserId;
 
-  const { data: userLike } = useQuery({
-    queryKey: ["userLike", post.id],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      const { data } = await supabase.from("post_likes").select("id").eq("post_id", post.id).eq("user_id", user.id).maybeSingle();
-      return data;
-    },
-  });
+  useEffect(() => {
+    setIsLiked(Boolean(post.viewer_has_liked));
+    setLikesCount(post.likes_count ?? 0);
+  }, [post.id, post.viewer_has_liked, post.likes_count]);
 
   const likeMutation = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Login dulu");
-      if (userLike) {
-        await supabase.from("post_likes").delete().eq("post_id", post.id).eq("user_id", user.id);
+      if (!currentUserId) throw new Error("Login dulu");
+
+      if (isLiked) {
+        const { error } = await supabase
+          .from("post_likes")
+          .delete()
+          .eq("post_id", post.id)
+          .eq("user_id", currentUserId);
+        if (error) throw new Error(error.message);
       } else {
-        await supabase.from("post_likes").insert({ post_id: post.id, user_id: user.id });
+        const { error } = await supabase
+          .from("post_likes")
+          .insert({ post_id: post.id, user_id: currentUserId });
+        if (error) throw new Error(error.message);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-      queryClient.invalidateQueries({ queryKey: ["userLike", post.id] });
+    onMutate: async () => {
+      const previous = { liked: isLiked, count: likesCount };
+      setIsLiked((prev) => !prev);
+      setLikesCount((prev) => prev + (isLiked ? -1 : 1));
+      return previous;
     },
-    onError: (error) => {
+    onError: (error, _variables, previous) => {
+      if (previous) {
+        setIsLiked(previous.liked);
+        setLikesCount(previous.count);
+      }
       toast.error(`Gagal: ${(error as Error).message}`);
-    }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+    },
   });
 
   const deletePostMutation = useMutation({
@@ -203,7 +218,7 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
     }
   };
 
-  const renderContentWithMentions = (content: string | null, postData: any): React.ReactNode => {
+  const renderContentWithMentions = (content: string | null): React.ReactNode => {
     if (!content) return null;
 
     const mentionRegex = /@([a-zA-Z0-9_\s]+)/g; 
@@ -330,7 +345,7 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
           )}
         </div>
 
-        <p className="mt-3" style={{ whiteSpace: 'pre-wrap' }}>{renderContentWithMentions(post.content, post)}</p>
+        <p className="mt-3" style={{ whiteSpace: 'pre-wrap' }}>{renderContentWithMentions(post.content)}</p>
 
         {post.image_url && (() => {
           const urlParts = post.image_url.split('.');
@@ -394,18 +409,18 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
           }
         })()}
 
-        <div className="mt-4 text-sm text-muted-foreground">{post.likes_count} suka • {post.comments_count} komentar</div>
+        <div className="mt-4 text-sm text-muted-foreground">{likesCount} suka • {post.comments_count ?? 0} komentar</div>
 
         <div className="mt-3 flex justify-around border-t pt-2">
           <Button
             variant="ghost"
             size="sm"
-            className={`group flex items-center gap-2 ${userLike ? "text-red-500" : "text-muted-foreground"}`}
+            className={`group flex items-center gap-2 ${isLiked ? "text-red-500" : "text-muted-foreground"}`}
             onClick={() => likeMutation.mutate()}
             disabled={likeMutation.isPending}
           >
-            <Heart className={`h-5 w-5 ${userLike ? "fill-current" : ""} ${!userLike ? "group-hover:text-red-500" : ""}`} />
-            <span className={!userLike ? "group-hover:text-red-500" : ""}>Suka</span>
+            <Heart className={`h-5 w-5 ${isLiked ? "fill-current" : ""} ${!isLiked ? "group-hover:text-red-500" : ""}`} />
+            <span className={!isLiked ? "group-hover:text-red-500" : ""}>Suka</span>
           </Button>
           <Button
             variant="ghost"
