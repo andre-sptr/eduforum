@@ -7,6 +7,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { useComments } from "./useComments";
 
+vi.mock("@/lib/mentionHelpers", () => ({
+  resolveMentionsToIds: vi.fn(async () => []),
+}));
+
 declare module "@/integrations/supabase/client" {
   export const __setInsertFail: (flag: boolean) => void;
 }
@@ -113,7 +117,10 @@ describe("useComments", () => {
 
   it("paginates comments and stops when empty", async () => {
     const { wrapper } = createWrapper();
-    const { result } = renderHook(() => useComments("p1", "u1", 2), { wrapper });
+    const { result } = renderHook(
+      () => useComments("p1", { id: "u1", name: "U1", avatar_text: "U1" }, 2),
+      { wrapper }
+    );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.comments.length).toBe(2);
     await act(async () => {
@@ -130,7 +137,10 @@ describe("useComments", () => {
       postsList: { pages: [{ rows: [{ id: "p1", comments_count: 0 }, { id: "p2", comments_count: 5 }] }] },
     };
     const { wrapper, qc } = createWrapper(seed);
-    const { result } = renderHook(() => useComments("p1", "u1", 2), { wrapper });
+    const { result } = renderHook(
+      () => useComments("p1", { id: "u1", name: "U1", avatar_text: "U1" }, 2),
+      { wrapper }
+    );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     await act(async () => {
       await result.current.addComment.mutateAsync({ text: "New", file: null, parentId: null });
@@ -149,7 +159,10 @@ describe("useComments", () => {
     };
     const { wrapper, qc } = createWrapper(seed);
     __setInsertFail(true);
-    const { result } = renderHook(() => useComments("p1", "u1", 2), { wrapper });
+    const { result } = renderHook(
+      () => useComments("p1", { id: "u1", name: "U1", avatar_text: "U1" }, 2),
+      { wrapper }
+    );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     await act(async () => {
       try {

@@ -15,10 +15,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { UserAvatar } from "./UserAvatar";
 import { Badge } from "@/components/ui/badge";
-import React, { useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CommentSection } from "./CommentSection";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useNavigate, Link } from "react-router-dom";
@@ -49,26 +49,46 @@ const PostCardBase = ({ post, currentUserName, currentUserInitials, currentUserI
   const displayAuthorProfile = isRepost ? post.original_author : post.profiles;
   const displayAuthorId = isRepost ? post.original_author_id : post.user_id;
   const isAuthor = post.user_id === currentUserId;
+  const viewerHasLiked = post.viewer_has_liked ?? false;
 
-  const { data: userLike } = useQuery({
-    queryKey: ["userLike", post.id, currentUserId],
-    enabled: !!currentUserId && !!post.id,
-    staleTime: 30000,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("post_likes")
-        .select("id")
-        .eq("post_id", post.id)
-        .eq("user_id", currentUserId)
-        .maybeSingle();
-      return data;
-    },
-  });
+  const authorUsername = displayAuthorProfile?.username || undefined;
+  const authorName = displayAuthorProfile?.name || "Pengguna";
+  const authorLink = useMemo(() => profilePath(authorUsername, authorName), [authorUsername, authorName]);
+
+  const contentWithMentions = useMemo(() => {
+    if (!post.content) return null;
+    const mentionRegex = /@([a-z0-9]+(?:-[a-z0-9]+)*)/gi;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = mentionRegex.exec(post.content)) !== null) {
+      const [full, uname] = match;
+      const start = match.index;
+      const end = start + full.length;
+      if (start > lastIndex) parts.push(post.content.slice(lastIndex, start));
+      parts.push(
+        <Link key={`${start}-${end}`} to={profilePath(uname, undefined)} className="text-primary hover:underline font-medium">
+          @{uname}
+        </Link>
+      );
+      lastIndex = end;
+    }
+    if (parts.length === 0) return post.content;
+    if (lastIndex < post.content.length) parts.push(post.content.slice(lastIndex));
+    return parts;
+  }, [post.content]);
+
+  const { isImage, isVideo } = useMemo(() => {
+    const ext = (post.image_url || "").split(".").pop()?.toLowerCase()?.split("?")[0] || "";
+    const image = ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
+    const video = ["mp4", "webm", "ogg"].includes(ext);
+    return { isImage: image, isVideo: video };
+  }, [post.image_url]);
 
   const likeMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (alreadyLiked: boolean) => {
       if (!currentUserId) throw new Error("Login dulu");
-      if (userLike) {
+      if (alreadyLiked) {
         const { error } = await supabase.from("post_likes").delete().eq("post_id", post.id).eq("user_id", currentUserId);
         if (error) throw new Error(error.message);
       } else {
@@ -76,13 +96,13 @@ const PostCardBase = ({ post, currentUserName, currentUserInitials, currentUserI
         if (error) throw new Error(error.message);
       }
     },
-    onMutate: async () => {
+    onMutate: async (alreadyLiked) => {
+      const delta = alreadyLiked ? -1 : 1;
       await queryClient.cancelQueries({ queryKey: ["posts"] });
       await queryClient.cancelQueries({ queryKey: ["post", post.id] });
 
-      const prevLists = queryClient.getQueryData<any>(["posts"]);
-      const prevDetail = queryClient.getQueryData<any>(["post", post.id]);
-      const delta = userLike ? -1 : 1;
+      const prevLists = queryClient.getQueriesData({ queryKey: ["posts"] });
+      const prevDetail = queryClient.getQueryData<PostWithCounts | null>(["post", post.id, currentUserId ?? null]);
 
       queryClient.setQueriesData({ queryKey: ["posts"], exact: false }, (old: any) => {
         if (!old || !Array.isArray(old.pages)) return old;
@@ -92,34 +112,50 @@ const PostCardBase = ({ post, currentUserName, currentUserInitials, currentUserI
             ...pg,
             rows: Array.isArray(pg.rows)
               ? pg.rows.map((it: any) =>
-                  it.id === post.id ? { ...it, likes_count: Math.max(0, (it.likes_count || 0) + delta) } : it
+                  it.id === post.id
+                    ? {
+                        ...it,
+                        likes_count: Math.max(0, (it.likes_count || 0) + delta),
+                        viewer_has_liked: !alreadyLiked,
+                      }
+                    : it
                 )
               : pg.rows,
           })),
         };
       });
 
-      if (prevDetail) {
-        queryClient.setQueryData(["post", post.id], {
-          ...prevDetail,
-          likes_count: Math.max(0, (prevDetail.likes_count || 0) + delta),
-        });
-      }
+      queryClient.setQueriesData({ queryKey: ["post", post.id], exact: false }, (old: PostWithCounts | null) =>
+        old
+          ? {
+              ...old,
+              likes_count: Math.max(0, (old.likes_count || 0) + delta),
+              viewer_has_liked: !alreadyLiked,
+            }
+          : old
+      );
 
-      queryClient.setQueryData(["userLike", post.id, currentUserId], userLike ? null : { id: "optimistic" });
       return { prevLists, prevDetail };
     },
-    onError: (error, _, ctx) => {
-      if (ctx?.prevLists) queryClient.setQueryData(["posts"], ctx.prevLists);
-      if (ctx?.prevDetail) queryClient.setQueryData(["post", post.id], ctx.prevDetail);
-      queryClient.setQueryData(["userLike", post.id, currentUserId], userLike ?? null);
+    onError: (_error, _vars, ctx) => {
+      if (ctx?.prevLists) {
+        ctx.prevLists.forEach(([key, data]) => {
+          queryClient.setQueryData(key, data);
+        });
+      }
+      if (ctx?.prevDetail)
+        queryClient.setQueryData(["post", post.id, currentUserId ?? null], ctx.prevDetail as PostWithCounts | null);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["posts"] });
       queryClient.invalidateQueries({ queryKey: ["post", post.id] });
-      queryClient.invalidateQueries({ queryKey: ["userLike", post.id, currentUserId] });
     },
   });
+
+  const effectiveLiked =
+    likeMutation.isPending && typeof likeMutation.variables === "boolean"
+      ? !likeMutation.variables
+      : viewerHasLiked;
 
   const deletePostMutation = useMutation({
     mutationFn: async (postId: string) => {
@@ -145,50 +181,39 @@ const PostCardBase = ({ post, currentUserName, currentUserInitials, currentUserI
     },
   });
 
-  const startOrGoToChat = async (recipientId: string) => {
-    if (!currentUserId) return;
-    if (currentUserId === recipientId) return;
-    setLoadingChat(true);
-    try {
-      const { data: roomId, error } = await supabase.rpc("create_or_get_chat_room", { recipient_id: recipientId });
-      if (error) throw error;
-      if (!roomId) throw new Error("Gagal mendapatkan ID room chat.");
-      navigate(`/chat/${roomId}`);
-    } finally {
-      setLoadingChat(false);
-    }
-  };
+  const disableRepost = useMemo(
+    () =>
+      repostMutation.isPending ||
+      ((isRepost ? post.original_author_id : post.user_id) === currentUserId) ||
+      isAuthor,
+    [repostMutation.isPending, isRepost, post.original_author_id, post.user_id, currentUserId, isAuthor]
+  );
 
-  const renderContentWithMentions = (content: string | null): React.ReactNode => {
-    if (!content) return null;
-    const mentionRegex = /@([a-z0-9]+(?:-[a-z0-9]+)*)/g;
-    const parts: React.ReactNode[] = [];
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = mentionRegex.exec(content)) !== null) {
-      const [full, uname] = match;
-      const start = match.index;
-      const end = start + full.length;
-      if (start > lastIndex) parts.push(content.slice(lastIndex, start));
-      parts.push(
-        <Link key={`${start}-${end}`} to={profilePath(uname, undefined)} className="text-primary hover:underline font-medium">
-          @{uname}
-        </Link>
-      );
-      lastIndex = end;
-    }
-    if (lastIndex < content.length) parts.push(content.slice(lastIndex));
-    return parts;
-  };
-
-  const ext = (post.image_url || "").split(".").pop()?.toLowerCase()?.split("?")[0] || "";
-  const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
-  const isVideo = ["mp4", "webm", "ogg"].includes(ext);
-  const authorUsername = displayAuthorProfile?.username || undefined;
-  const authorName = displayAuthorProfile?.name || "Pengguna";
-  const authorLink = profilePath(authorUsername, authorName);
-  const disableRepost =
-    repostMutation.isPending || ((isRepost ? post.original_author_id : post.user_id) === currentUserId) || isAuthor;
+  const startOrGoToChat = useCallback(
+    async (recipientId?: string | null) => {
+      if (!recipientId) return;
+      if (!currentUserId) {
+        toast.error("Login untuk mulai chat.");
+        return;
+      }
+      if (currentUserId === recipientId) {
+        toast.info("Anda tidak bisa chat dengan diri sendiri.");
+        return;
+      }
+      setLoadingChat(true);
+      try {
+        const { data: roomId, error } = await supabase.rpc("create_or_get_chat_room", { recipient_id: recipientId });
+        if (error) throw error;
+        if (!roomId) throw new Error("Gagal mendapatkan ID room chat.");
+        navigate(`/chat/${roomId}`);
+      } catch (error: any) {
+        toast.error(error?.message ?? "Gagal membuka chat.");
+      } finally {
+        setLoadingChat(false);
+      }
+    },
+    [currentUserId, navigate]
+  );
 
   return (
     <Card className="overflow-hidden shadow-md">
@@ -275,7 +300,7 @@ const PostCardBase = ({ post, currentUserName, currentUserInitials, currentUserI
             <Button
               size="sm"
               variant="outline"
-              onClick={() => startOrGoToChat(displayAuthorId!)}
+              onClick={() => startOrGoToChat(displayAuthorId)}
               disabled={loadingChat || !displayAuthorId}
             >
               {loadingChat ? "..." : "Chat"}
@@ -283,7 +308,9 @@ const PostCardBase = ({ post, currentUserName, currentUserInitials, currentUserI
           )}
         </div>
 
-        <p className="mt-3" style={{ whiteSpace: "pre-wrap" }}>{renderContentWithMentions(post.content)}</p>
+        {contentWithMentions && (
+          <p className="mt-3 whitespace-pre-wrap break-words">{contentWithMentions}</p>
+        )}
 
         {post.image_url && (isImage || isVideo) && (
           <Dialog>
@@ -336,18 +363,20 @@ const PostCardBase = ({ post, currentUserName, currentUserInitials, currentUserI
           <Button
             variant="ghost"
             size="sm"
-            className={`group flex items-center gap-2 ${userLike ? "text-red-500" : "text-muted-foreground"}`}
-            onClick={() => likeMutation.mutate()}
+            className={`group flex items-center gap-2 ${effectiveLiked ? "text-red-500" : "text-muted-foreground"}`}
+            onClick={() => likeMutation.mutate(viewerHasLiked)}
             disabled={likeMutation.isPending}
           >
-            <Heart className={`h-5 w-5 ${userLike ? "fill-current" : ""} ${!userLike ? "group-hover:text-red-500" : ""}`} />
-            <span className={!userLike ? "group-hover:text-red-500" : ""}>Suka</span>
+            <Heart
+              className={`h-5 w-5 ${effectiveLiked ? "fill-current" : ""} ${!effectiveLiked ? "group-hover:text-red-500" : ""}`}
+            />
+            <span className={!effectiveLiked ? "group-hover:text-red-500" : ""}>Suka</span>
           </Button>
           <Button
             variant="ghost"
             size="sm"
             className="group flex items-center gap-2 text-muted-foreground"
-            onClick={() => setShowComments(!showComments)}
+            onClick={() => setShowComments((prev) => !prev)}
           >
             <MessageCircle className="h-5 w-5 group-hover:text-primary" />
             <span className="group-hover:text-primary">Komentar</span>

@@ -45,16 +45,26 @@ vi.mock("@/integrations/supabase/client", () => {
   ];
   return {
     supabase: {
-      from: vi.fn(() => ({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        order: vi.fn().mockReturnThis(),
-        range: vi.fn(async () => {
-          const res = callIndex < pages.length ? pages[callIndex] : pages[pages.length - 1];
-          callIndex += 1;
-          return res;
-        }),
-      })),
+      from: vi.fn((table: string) => {
+        if (table === "post_likes") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            in: vi.fn(async () => ({ data: [], error: null })),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+          range: vi.fn(async () => {
+            const res = callIndex < pages.length ? pages[callIndex] : pages[pages.length - 1];
+            callIndex += 1;
+            return res;
+          }),
+          limit: vi.fn().mockReturnThis(),
+        };
+      }),
     },
     __resetSupabaseMock: () => {
       callIndex = 0;
@@ -86,6 +96,7 @@ describe("useInfinitePosts", () => {
     expect(result.current.posts[0].id).toBe("p1");
     expect(result.current.posts[0].likes_count).toBe(2);
     expect(result.current.posts[1].id).toBe("p2");
+    expect(result.current.posts.every((item) => item.viewer_has_liked === false)).toBe(true);
   });
 
   it("loads next page and stops when empty", async () => {

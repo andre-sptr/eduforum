@@ -1,4 +1,4 @@
-import React, { useState, useRef, ChangeEvent, useCallback } from "react";
+import React, { useState, useRef, ChangeEvent, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "./UserAvatar";
@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Send, Image as ImageIcon, X } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 interface CommentFormProps {
   onSubmit: (data: { text: string; file: File | null }) => void;
@@ -37,20 +38,29 @@ export const CommentForm = ({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [activeMention, setActiveMention] = useState<string | null>(null);
 
+  useEffect(() => {
+    setContent(initialMention);
+  }, [initialMention]);
+
+  const debouncedMention = useDebouncedValue(activeMention, 250);
+
   const { data: suggestedUsers = [], isLoading: isSearching } = useQuery<SuggestedUser[]>({
-    queryKey: ["suggestedUsersInComment", activeMention, currentUserId],
-    enabled: !!activeMention && activeMention.length > 1,
+    queryKey: ["suggestedUsersInComment", debouncedMention, currentUserId],
+    enabled: Boolean(debouncedMention && debouncedMention.length > 1),
     queryFn: async () => {
+      if (!debouncedMention) return [];
       const { data, error } = await supabase
         .from("profiles")
         .select("id, name, avatar_text, role")
-        .ilike("name", `${activeMention}%`)
+        .ilike("name", `${debouncedMention}%`)
         .neq("id", currentUserId)
         .limit(5);
       if (error) throw error;
       return data || [];
     },
-    staleTime: 0,
+    staleTime: 120000,
+    gcTime: 600000,
+    refetchOnWindowFocus: false,
   });
 
   const handleContentChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,13 +107,13 @@ export const CommentForm = ({
     setImagePreviewUrl(URL.createObjectURL(file));
   };
 
-  const triggerImageInput = () => imageInputRef.current?.click();
+  const triggerImageInput = useCallback(() => imageInputRef.current?.click(), []);
 
-  const clearImageSelection = () => {
+  const clearImageSelection = useCallback(() => {
     setCommentImageFile(null);
     setImagePreviewUrl(null);
     if (imageInputRef.current) imageInputRef.current.value = "";
-  };
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

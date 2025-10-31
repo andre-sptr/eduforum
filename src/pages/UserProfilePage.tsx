@@ -192,6 +192,7 @@ export default function UserProfilePage(): JSX.Element {
     posts,
   } = useInfinitePosts({
     userFilterId: viewedProfile?.id ?? null,
+    currentUserId: currentUserProfile?.id ?? null,
   });
 
   const allPosts = useMemo(

@@ -1,39 +1,49 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export type ChatMessage = { id: string; room_id: string; sender_id: string; content: string; created_at: string };
 
-type PageResult = { rows: ChatMessage[]; nextOffset: number | null };
+type PageResult = { rows: ChatMessage[]; nextCursor: string | null };
 
-async function fetchMessagesPage(roomId: string, offset: number, pageSize: number): Promise<PageResult> {
-  const { data, error } = await supabase
+async function fetchMessagesPage(roomId: string, cursor: string | null, pageSize: number): Promise<PageResult> {
+  let query = supabase
     .from("chat_messages")
     .select("*")
     .eq("room_id", roomId)
-    .order("created_at", { ascending: true })
-    .range(offset, offset + pageSize - 1);
+    .order("created_at", { ascending: false })
+    .limit(pageSize);
+
+  if (cursor) {
+    query = query.lt("created_at", cursor);
+  }
+
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
-  const rows = (data ?? []) as ChatMessage[];
-  const nextOffset = rows.length < pageSize ? null : offset + pageSize;
-  return { rows, nextOffset };
+
+  const rowsDesc = (data ?? []) as ChatMessage[];
+  const rows = rowsDesc.slice().reverse();
+  const nextCursor = rowsDesc.length < pageSize ? null : rowsDesc[rowsDesc.length - 1]?.created_at ?? null;
+  return { rows, nextCursor };
 }
+
+const MAX_CACHED_PAGES = 10;
 
 export function useChat(roomId: string, userId: string | null | undefined, pageSize = 50) {
   const qc = useQueryClient();
   const subscribedRef = useRef(false);
 
-  const query = useInfiniteQuery<PageResult, Error, InfiniteData<PageResult>, [string, string, { pageSize: number }], number>({
+  const query = useInfiniteQuery<PageResult, Error, InfiniteData<PageResult>, [string, string, { pageSize: number }], string | null>({
     queryKey: ["chatMessages", roomId, { pageSize }],
     enabled: !!roomId,
-    initialPageParam: 0,
-    getNextPageParam: (lastPage: PageResult) => lastPage.nextOffset,
-    queryFn: async ({ pageParam }) => fetchMessagesPage(roomId, pageParam as number, pageSize),
+    initialPageParam: null,
+    getNextPageParam: (lastPage: PageResult) => lastPage.nextCursor,
+    queryFn: async ({ pageParam }) => fetchMessagesPage(roomId, pageParam as string | null, pageSize),
     staleTime: 15000,
     gcTime: 300000,
   });
 
-  const messages = (query.data?.pages ?? []).flatMap((p) => p.rows);
+  const messages = useMemo(() => (query.data?.pages ?? []).flatMap((p) => p.rows), [query.data]);
 
   useEffect(() => {
     if (!roomId || subscribedRef.current) return;
@@ -44,12 +54,28 @@ export function useChat(roomId: string, userId: string | null | undefined, pageS
         const incoming = payload.new as ChatMessage;
         qc.setQueriesData({ queryKey: ["chatMessages", roomId], exact: false }, (old: InfiniteData<PageResult> | undefined) => {
           if (!old?.pages) return old;
-          const exists = old.pages.some((pg) => pg.rows.some((m) => m.id === incoming.id));
-          if (exists) return old;
-          const lastIdx = old.pages.length - 1;
-          const newPages = old.pages.slice();
-          newPages[lastIdx] = { ...newPages[lastIdx], rows: [...newPages[lastIdx].rows, incoming] };
-          return { ...old, pages: newPages, pageParams: old.pageParams };
+          if (old.pages.some((pg) => pg.rows.some((m) => m.id === incoming.id))) return old;
+          const pages = old.pages.map((pg) => ({ ...pg, rows: [...pg.rows] }));
+          const pageParams = [...old.pageParams];
+          if (pages.length === 0) {
+            return {
+              pages: [{ rows: [incoming], nextCursor: null }],
+              pageParams: [null],
+            } as InfiniteData<PageResult>;
+          }
+          const lastIndex = pages.length - 1;
+          const lastPage = pages[lastIndex];
+          if (lastPage.rows.length >= pageSize) {
+            pages.push({ rows: [incoming], nextCursor: lastPage.nextCursor });
+            pageParams.push(lastPage.nextCursor ?? null);
+          } else {
+            pages[lastIndex] = { ...lastPage, rows: [...lastPage.rows, incoming] };
+          }
+          while (pages.length > MAX_CACHED_PAGES) {
+            pages.shift();
+            pageParams.shift();
+          }
+          return { pages, pageParams };
         });
       })
       .subscribe();
@@ -81,11 +107,27 @@ export function useChat(roomId: string, userId: string | null | undefined, pageS
         created_at: new Date().toISOString(),
       };
       qc.setQueryData<InfiniteData<PageResult>>(["chatMessages", roomId, { pageSize }], (old) => {
-        if (!old?.pages) return old as any;
-        const lastIdx = old.pages.length - 1;
-        const newPages = old.pages.slice();
-        newPages[lastIdx] = { ...newPages[lastIdx], rows: [...newPages[lastIdx].rows, temp] };
-        return { ...old, pages: newPages };
+        if (!old?.pages) {
+          return {
+            pages: [{ rows: [temp], nextCursor: null }],
+            pageParams: [null],
+          } as InfiniteData<PageResult>;
+        }
+        const pages = old.pages.map((pg) => ({ ...pg, rows: [...pg.rows] }));
+        const pageParams = [...old.pageParams];
+        const lastIndex = pages.length - 1;
+        const lastPage = pages[lastIndex];
+        if (lastPage.rows.length >= pageSize) {
+          pages.push({ rows: [temp], nextCursor: lastPage.nextCursor });
+          pageParams.push(lastPage.nextCursor ?? null);
+        } else {
+          pages[lastIndex] = { ...lastPage, rows: [...lastPage.rows, temp] };
+        }
+        while (pages.length > MAX_CACHED_PAGES) {
+          pages.shift();
+          pageParams.shift();
+        }
+        return { ...old, pages, pageParams };
       });
       return { prev, tempId: temp.id };
     },
@@ -95,11 +137,11 @@ export function useChat(roomId: string, userId: string | null | undefined, pageS
     onSuccess: (serverMsg, _v, ctx) => {
       qc.setQueryData<InfiniteData<PageResult>>(["chatMessages", roomId, { pageSize }], (old) => {
         if (!old?.pages) return old as any;
-        const newPages = old.pages.map((pg) => ({
+        const pages = old.pages.map((pg) => ({
           ...pg,
           rows: pg.rows.map((m) => (m.id === ctx?.tempId ? serverMsg : m)),
         }));
-        return { ...old, pages: newPages };
+        return { ...old, pages };
       });
     },
   });
