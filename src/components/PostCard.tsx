@@ -15,26 +15,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { UserAvatar } from "./UserAvatar";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import React, { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { CommentSection } from "./CommentSection";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useNavigate, Link } from "react-router-dom";
+import { LazyMedia } from "./LazyMedia";
+import { profilePath } from "@/utils/profilePath";
+import type { PostWithCounts } from "@/pages/PostPage";
+import { formatTime } from "@/lib/time";
 
-export type PostWithAuthor = {
-  id: string;
-  user_id: string;
-  content: string;
-  image_url: string | null;
-  likes_count: number;
-  comments_count: number;
-  created_at: string;
-  profiles: { name: string; avatar_text: string; role: string };
-  original_post_id: string | null;
-  original_author_id: string | null;
-  original_author: { name: string; avatar_text: string; role: string } | null;
+export type PostWithAuthor = PostWithCounts & {
+  profiles: { name: string | null; username?: string | null; avatar_text: string | null; role: string | null } | null;
+  original_author: { name: string | null; username?: string | null; avatar_text: string | null; role: string | null } | null;
 };
 
 interface PostCardProps {
@@ -44,7 +39,7 @@ interface PostCardProps {
   currentUserId: string;
 }
 
-export const PostCard = ({ post, currentUserName, currentUserInitials, currentUserId }: PostCardProps) => {
+const PostCardBase = ({ post, currentUserName, currentUserInitials, currentUserId }: PostCardProps) => {
   const [showComments, setShowComments] = useState(false);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -53,197 +48,156 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
   const isRepost = post.original_post_id !== null;
   const displayAuthorProfile = isRepost ? post.original_author : post.profiles;
   const displayAuthorId = isRepost ? post.original_author_id : post.user_id;
-  const reposterName = isRepost ? post.profiles.name : null;
   const isAuthor = post.user_id === currentUserId;
 
   const { data: userLike } = useQuery({
-    queryKey: ["userLike", post.id],
+    queryKey: ["userLike", post.id, currentUserId],
+    enabled: !!currentUserId && !!post.id,
+    staleTime: 30000,
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      const { data } = await supabase.from("post_likes").select("id").eq("post_id", post.id).eq("user_id", user.id).maybeSingle();
+      const { data } = await supabase
+        .from("post_likes")
+        .select("id")
+        .eq("post_id", post.id)
+        .eq("user_id", currentUserId)
+        .maybeSingle();
       return data;
     },
   });
 
   const likeMutation = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Login dulu");
+      if (!currentUserId) throw new Error("Login dulu");
       if (userLike) {
-        await supabase.from("post_likes").delete().eq("post_id", post.id).eq("user_id", user.id);
+        const { error } = await supabase.from("post_likes").delete().eq("post_id", post.id).eq("user_id", currentUserId);
+        if (error) throw new Error(error.message);
       } else {
-        await supabase.from("post_likes").insert({ post_id: post.id, user_id: user.id });
+        const { error } = await supabase.from("post_likes").insert({ post_id: post.id, user_id: currentUserId });
+        if (error) throw new Error(error.message);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-      queryClient.invalidateQueries({ queryKey: ["userLike", post.id] });
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["posts"] });
+      await queryClient.cancelQueries({ queryKey: ["post", post.id] });
+
+      const prevLists = queryClient.getQueryData<any>(["posts"]);
+      const prevDetail = queryClient.getQueryData<any>(["post", post.id]);
+      const delta = userLike ? -1 : 1;
+
+      queryClient.setQueriesData({ queryKey: ["posts"], exact: false }, (old: any) => {
+        if (!old || !Array.isArray(old.pages)) return old;
+        return {
+          ...old,
+          pages: old.pages.map((pg: any) => ({
+            ...pg,
+            rows: Array.isArray(pg.rows)
+              ? pg.rows.map((it: any) =>
+                  it.id === post.id ? { ...it, likes_count: Math.max(0, (it.likes_count || 0) + delta) } : it
+                )
+              : pg.rows,
+          })),
+        };
+      });
+
+      if (prevDetail) {
+        queryClient.setQueryData(["post", post.id], {
+          ...prevDetail,
+          likes_count: Math.max(0, (prevDetail.likes_count || 0) + delta),
+        });
+      }
+
+      queryClient.setQueryData(["userLike", post.id, currentUserId], userLike ? null : { id: "optimistic" });
+      return { prevLists, prevDetail };
     },
-    onError: (error) => {
-      toast.error(`Gagal: ${(error as Error).message}`);
-    }
+    onError: (error, _, ctx) => {
+      if (ctx?.prevLists) queryClient.setQueryData(["posts"], ctx.prevLists);
+      if (ctx?.prevDetail) queryClient.setQueryData(["post", post.id], ctx.prevDetail);
+      queryClient.setQueryData(["userLike", post.id, currentUserId], userLike ?? null);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      queryClient.invalidateQueries({ queryKey: ["post", post.id] });
+      queryClient.invalidateQueries({ queryKey: ["userLike", post.id, currentUserId] });
+    },
   });
 
   const deletePostMutation = useMutation({
     mutationFn: async (postId: string) => {
-      const { error } = await supabase.from('posts').delete().eq('id', postId);
+      const { error } = await supabase.from("posts").delete().eq("id", postId);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      toast.success("Postingan berhasil dihapus.");
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
     },
-    onError: (error) => {
-      toast.error(`Gagal menghapus: ${error.message}`);
-    }
   });
 
   const repostMutation = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Anda harus login untuk me-repost.");
-
       const idToRepost = post.original_post_id || post.id;
-
-      const { error } = await supabase.rpc('repost_post', {
-        post_id_to_repost: idToRepost,
-      });
-
+      const { error } = await supabase.rpc("repost_post", { post_id_to_repost: idToRepost });
       if (error) {
-        if (error.code === '23505') {
-          throw new Error("Anda sudah me-repost postingan ini.");
-        }
+        if ((error as any).code === "23505") throw new Error("Anda sudah me-repost postingan ini.");
         throw new Error(error.message);
       }
     },
     onSuccess: () => {
-      toast.success("Berhasil di-repost!");
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
     },
-    onError: (error) => {
-      toast.error(`Gagal me-repost: ${(error as Error).message}`);
-    }
   });
 
-  const formatTime = (t: string) => {
-    const diff = Date.now() - new Date(t).getTime();
-    const mins = Math.floor(diff / 60000);
-    
-    if (mins < 1) return "Baru saja";
-    if (mins < 60) return `${mins} menit lalu`;
-    
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours} jam lalu`;
-    
-    const days = Math.floor(hours / 24);
-    return `${days} hari lalu`;
-  };
-
-  const handleShare = async () => {
-    const shareData = {
-      title: "Lihat postingan ini di EduForum",
-      text: `"${post.content}" - oleh ${post.profiles.name}`,
-      url: `${window.location.origin}/post/${post.id}`
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch (err) {
-        if ((err as Error).name !== 'AbortError') {
-          console.error("Error saat berbagi:", err);
-          toast.error("Gagal berbagi postingan.");
-        }
-      }
-    } else {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        try {
-          await navigator.clipboard.writeText(shareData.url);
-          toast.success("Link postingan disalin ke clipboard!");
-        } catch (err) {
-          console.error("Gagal menyalin link:", err);
-          toast.error("Gagal menyalin link ke clipboard.");
-        }
-      } else {
-        toast.error("Browser tidak mendukung fitur berbagi atau menyalin.");
-      }
-    }
-  };
-
   const startOrGoToChat = async (recipientId: string) => {
-    if (!currentUserId) {
-      toast.error("Gagal memulai chat: ID pengguna saat ini tidak ditemukan.");
-      return;
-    }
-
-    if (currentUserId === recipientId) {
-      toast.info("Anda tidak bisa chat dengan diri sendiri.");
-      return;
-    }
-
+    if (!currentUserId) return;
+    if (currentUserId === recipientId) return;
     setLoadingChat(true);
-
     try {
-      const { data: roomId, error } = await supabase
-        .rpc('create_or_get_chat_room', {
-          recipient_id: recipientId
-        });
-
+      const { data: roomId, error } = await supabase.rpc("create_or_get_chat_room", { recipient_id: recipientId });
       if (error) throw error;
       if (!roomId) throw new Error("Gagal mendapatkan ID room chat.");
-
       navigate(`/chat/${roomId}`);
-
-    } catch (error) {
-      console.error("Error memulai chat:", error);
-      toast.error(`Gagal memulai chat: ${(error as Error).message}`);
     } finally {
       setLoadingChat(false);
     }
   };
 
-  const renderContentWithMentions = (content: string | null, postData: any): React.ReactNode => {
+  const renderContentWithMentions = (content: string | null): React.ReactNode => {
     if (!content) return null;
-
-    const mentionRegex = /@([a-zA-Z0-9_\s]+)/g; 
-    const parts = content.split(mentionRegex);
-
-    return parts.map((part, index) => {
-      if (index % 2 === 1) { 
-        const mentionedName = part.trim(); 
-        const encodedName = encodeURIComponent(mentionedName);
-        return (
-          <Link 
-            key={index} 
-            to={`/profile/name/${encodedName}`} 
-            className="text-primary hover:underline font-medium"
-          >
-            @{mentionedName}
-          </Link>
-        );
-      } 
-      return part;
-    });
+    const mentionRegex = /@([a-z0-9]+(?:-[a-z0-9]+)*)/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = mentionRegex.exec(content)) !== null) {
+      const [full, uname] = match;
+      const start = match.index;
+      const end = start + full.length;
+      if (start > lastIndex) parts.push(content.slice(lastIndex, start));
+      parts.push(
+        <Link key={`${start}-${end}`} to={profilePath(uname, undefined)} className="text-primary hover:underline font-medium">
+          @{uname}
+        </Link>
+      );
+      lastIndex = end;
+    }
+    if (lastIndex < content.length) parts.push(content.slice(lastIndex));
+    return parts;
   };
 
-  const disableRepost = repostMutation.isPending || displayAuthorId === currentUserId || isAuthor;
-
-  const profileLink = `/profile/name/${encodeURIComponent(post.profiles.name)}`;
+  const ext = (post.image_url || "").split(".").pop()?.toLowerCase()?.split("?")[0] || "";
+  const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
+  const isVideo = ["mp4", "webm", "ogg"].includes(ext);
+  const authorUsername = displayAuthorProfile?.username || undefined;
+  const authorName = displayAuthorProfile?.name || "Pengguna";
+  const authorLink = profilePath(authorUsername, authorName);
+  const disableRepost =
+    repostMutation.isPending || ((isRepost ? post.original_author_id : post.user_id) === currentUserId) || isAuthor;
 
   return (
     <Card className="overflow-hidden shadow-md">
       {isRepost && (
-        <div className="flex items-center gap-2 px-4 pt-3 text-sm text-muted-foreground"> 
+        <div className="flex items-center gap-2 px-4 pt-3 text-sm text-muted-foreground">
           <Repeat className="h-4 w-4" />
-          
-          <Link 
-            to={`/profile/name/${encodeURIComponent(post.profiles.name || 'Seseorang')}`}
-            className="font-medium hover:underline transition-colors"
-          >
-            {post.profiles.name || "Seseorang"}
+          <Link to={profilePath(post.profiles?.username || undefined, post.profiles?.name || undefined)} className="font-medium hover:underline transition-colors">
+            {post.profiles?.name || "Seseorang"}
           </Link>
-          
           <span>me-repost</span>
         </div>
       )}
@@ -251,27 +205,27 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
       <div className="p-4">
         <div className="flex gap-3 justify-between items-start">
           <div className="flex gap-3">
-            <Link to={profileLink} className="flex gap-3 items-start group">
-              <UserAvatar
-                name={displayAuthorProfile?.name || 'User'}
-                initials={displayAuthorProfile?.avatar_text || '??'}
-              />
+            <Link to={authorLink} className="flex gap-3 items-start group">
+              <UserAvatar name={displayAuthorProfile?.name || "User"} initials={displayAuthorProfile?.avatar_text || "??"} />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">{displayAuthorProfile?.name || 'Pengguna Dihapus'}</h3>
-
+                  <h3 className="font-semibold">{displayAuthorProfile?.name || "Pengguna Dihapus"}</h3>
                   {!isRepost && isAuthor && (
                     <Badge variant="secondary" className="px-2 py-0.5 text-xs font-medium">
                       Saya
                     </Badge>
                   )}
-                  {isRepost && displayAuthorId === currentUserId && (
+                  {isRepost && post.original_author_id === currentUserId && (
                     <Badge variant="outline" className="px-2 py-0.5 text-xs font-medium">
                       Penulis Asli
                     </Badge>
                   )}
-
-                  {displayAuthorProfile?.role === "Guru" && <Badge className="bg-accent"><Award className="h-3 w-3 mr-1" />Guru</Badge>}
+                  {displayAuthorProfile?.role === "Guru" && (
+                    <Badge className="bg-accent">
+                      <Award className="h-3 w-3 mr-1" />
+                      Guru
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">{formatTime(post.created_at)}</p>
               </div>
@@ -290,7 +244,7 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
                   <AlertDialogTrigger asChild>
                     <DropdownMenuItem
                       className="flex gap-2 items-center text-red-500 focus:text-red-500 cursor-pointer"
-                      onSelect={(e) => e.preventDefault()} 
+                      onSelect={(e) => e.preventDefault()}
                     >
                       <Trash2 className="h-4 w-4" />
                       <span>Hapus Postingan</span>
@@ -298,7 +252,6 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
                   </AlertDialogTrigger>
                 </DropdownMenuContent>
               </DropdownMenu>
-              
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Anda yakin?</AlertDialogTitle>
@@ -325,76 +278,59 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
               onClick={() => startOrGoToChat(displayAuthorId!)}
               disabled={loadingChat || !displayAuthorId}
             >
-              {loadingChat ? '...' : 'Chat'}
+              {loadingChat ? "..." : "Chat"}
             </Button>
           )}
         </div>
 
-        <p className="mt-3" style={{ whiteSpace: 'pre-wrap' }}>{renderContentWithMentions(post.content, post)}</p>
+        <p className="mt-3" style={{ whiteSpace: "pre-wrap" }}>{renderContentWithMentions(post.content)}</p>
 
-        {post.image_url && (() => {
-          const urlParts = post.image_url.split('.');
-          const extension = urlParts.pop()?.toLowerCase() || '';
-          const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension);
-          const isVideo = ['mp4', 'webm', 'ogg'].includes(extension);
-          const fileNameWithParams = post.image_url.substring(post.image_url.lastIndexOf('/') + 1);
-          const fileName = fileNameWithParams.split('?')[0];
-
-          if (isImage) {
-            return (
-              <Dialog>
-                <DialogTrigger asChild>
-                  <div className="mt-3 aspect-video overflow-hidden rounded-lg border bg-muted cursor-pointer">
-                    <img
-                      src={post.image_url}
-                      alt="Post image"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </DialogTrigger>
-                <DialogContent className="max-w-4xl p-0 border-0">
-                  <img
-                    src={post.image_url}
-                    alt="Post image full size"
-                    className="w-full h-auto max-h-[80vh] object-contain"
-                  />
-                </DialogContent>
-              </Dialog>
-            );
-          } else if (isVideo) {
-            return (
-              <div className="mt-3 aspect-video overflow-hidden rounded-lg border bg-black">
-                <video
-                  src={post.image_url}
-                  controls
-                  className="w-full h-full object-contain"
-                >
-                  Browser Anda tidak mendukung tag video.
-                </video>
+        {post.image_url && (isImage || isVideo) && (
+          <Dialog>
+            <DialogTrigger asChild>
+              <div className="mt-3">
+                <LazyMedia url={post.image_url} aspect="video" objectFit={isVideo ? "contain" : "cover"} />
               </div>
-            );
-          } else {
-            return (
-              <a
-                href={post.image_url}
-                download
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 block border rounded-lg p-3 hover:bg-muted transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <FileText className="h-6 w-6 text-primary flex-shrink-0" />
-                  <div className="overflow-hidden">
-                    <p className="text-sm font-medium truncate">{decodeURIComponent(fileName)}</p>
-                    <p className="text-xs text-muted-foreground">Klik untuk mengunduh</p>
-                  </div>
-                </div>
-              </a>
-            );
-          }
-        })()}
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl p-0 border-0">
+              {isImage ? (
+                <img
+                  src={post.image_url}
+                  alt=""
+                  className="w-full h-auto max-h-[80vh] object-contain"
+                  loading="lazy"
+                  decoding="async"
+                />
+              ) : (
+                <video src={post.image_url} controls className="w-full h-auto max-h-[80vh] bg-black" preload="metadata" />
+              )}
+            </DialogContent>
+          </Dialog>
+        )}
 
-        <div className="mt-4 text-sm text-muted-foreground">{post.likes_count} suka • {post.comments_count} komentar</div>
+        {post.image_url && !isImage && !isVideo && (
+          <a
+            href={post.image_url}
+            download
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 block border rounded-lg p-3 hover:bg-muted transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <FileText className="h-6 w-6 text-primary flex-shrink-0" />
+              <div className="overflow-hidden">
+                <p className="text-sm font-medium truncate">
+                  {decodeURIComponent(post.image_url.substring(post.image_url.lastIndexOf("/") + 1).split("?")[0])}
+                </p>
+                <p className="text-xs text-muted-foreground">Klik untuk mengunduh</p>
+              </div>
+            </div>
+          </a>
+        )}
+
+        <div className="mt-4 text-sm text-muted-foreground">
+          {post.likes_count} suka • {post.comments_count} komentar
+        </div>
 
         <div className="mt-3 flex justify-around border-t pt-2">
           <Button
@@ -416,7 +352,6 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
             <MessageCircle className="h-5 w-5 group-hover:text-primary" />
             <span className="group-hover:text-primary">Komentar</span>
           </Button>
-
           <Button
             variant="ghost"
             size="sm"
@@ -424,13 +359,13 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
             onClick={() => repostMutation.mutate()}
             disabled={disableRepost}
           >
-            <Repeat className={`h-5 w-5 ${!disableRepost ? 'group-hover:text-green-500' : ''}`} />
-            <span className={`${!disableRepost ? 'group-hover:text-green-500' : ''}`}>
+            <Repeat className={`h-5 w-5 ${!disableRepost ? "group-hover:text-green-500" : ""}`} />
+            <span className={`${!disableRepost ? "group-hover:text-green-500" : ""}`}>
               {repostMutation.isPending ? "..." : "Repost"}
             </span>
           </Button>
-
         </div>
+
         {showComments && currentUserId && currentUserName && currentUserInitials && (
           <div className="mt-4">
             <CommentSection
@@ -438,7 +373,7 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
               currentUserProfile={{
                 id: currentUserId,
                 name: currentUserName,
-                avatar_text: currentUserInitials
+                avatar_text: currentUserInitials,
               }}
             />
           </div>
@@ -447,3 +382,5 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
     </Card>
   );
 };
+
+export const PostCard = React.memo(PostCardBase);

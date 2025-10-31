@@ -1,117 +1,90 @@
-import { Navbar } from "@/components/Navbar";
-import { CreatePost } from "@/components/CreatePost";
-import { PostCard, PostWithAuthor } from "@/components/PostCard";
-import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+// src/pages/Index.tsx
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Navbar } from "@/components/Navbar";
 import { LeftSidebar } from "@/components/LeftSidebar";
 import { RightSidebar } from "@/components/RightSidebar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { PostCard } from "@/components/PostCard";
+import { InfiniteScrollTrigger } from "@/components/InfiniteScrollTrigger";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useInfinitePosts } from "@/hooks/useInfinitePosts";
 
-const Index = () => {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
+type Profile = {
+  id: string;
+  name: string;
+  username: string;
+  avatar_text: string;
+  role?: string | null;
+  bio?: string | null;
+};
 
-  useEffect(() => {
-    if (!loading && !user) navigate("/auth");
-  }, [user, loading, navigate]);
+export default function Index(): JSX.Element {
+  const { user } = useAuth();
 
-  const { data: profile } = useQuery({
-    queryKey: ["profile", user?.id],
+  const { data: currentUserProfile } = useQuery<Profile | null>({
+    queryKey: ["currentUserProfile", user?.id],
+    enabled: !!user,
+    staleTime: 60000,
+    gcTime: 300000,
     queryFn: async () => {
-      if (!user) return null;
-      const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+      const { data, error } = await supabase.from("profiles").select("id,name,username,avatar_text,role,bio").eq("id", user!.id).single();
+      if (error) throw error;
       return data;
     },
-    enabled: !!user,
   });
 
-  const { data: posts = [], isLoading } = useQuery<PostWithAuthor[]>({
-    queryKey: ["posts"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("posts")
-        .select(`
-          *,
-          profiles!user_id(name, avatar_text, role),
-          original_author:profiles!original_author_id(name, avatar_text, role)
-        `)
-        .order("created_at", { ascending: false });
-        
-      return (data as PostWithAuthor[]) || [];
-    },
-    enabled: !!user,
-  });
+  const {
+    posts,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = useInfinitePosts({});
 
-  if (loading || !user || !profile) {
-    return (
-      <div className="min-h-screen bg-muted">
-        <Navbar />
-        <main className="container mx-auto grid grid-cols-10 gap-6 py-6">
-          <aside className="col-span-2 hidden md:block">
-            <Skeleton className="h-40 w-full rounded-lg" />
-          </aside>
-          
-          <section className="col-span-10 md:col-span-5 space-y-4">
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-64 w-full" />
-          </section>
-
-          <aside className="col-span-10 md:col-span-3 hidden md:block">
-            <Skeleton className="h-40 w-full rounded-lg" />
-          </aside>
-        </main>
-      </div>
-    );
-  }
+  const orderedPosts = useMemo(() => posts, [posts]);
 
   return (
     <div className="min-h-screen bg-muted">
-      <Navbar userName={profile.name} userInitials={profile.avatar_text} />
+      <Navbar userName={currentUserProfile?.name} userInitials={currentUserProfile?.avatar_text} />
       <main className="container mx-auto grid grid-cols-10 gap-6 py-6">
-        
         <LeftSidebar />
-
         <section className="col-span-10 md:col-span-5 space-y-4">
-          <CreatePost userName={profile.name} userInitials={profile.avatar_text} />
-          
-          {isLoading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : (
-            posts.map((post) => (
-              <PostCard 
-                key={post.id} 
-                post={post} 
-                currentUserName={profile.name} 
-                currentUserInitials={profile.avatar_text} 
-                currentUserId={profile.id}
-              />
-            ))
+          {isLoading && (
+            <>
+              <Skeleton className="h-64 w-full" />
+              <Skeleton className="h-64 w-full" />
+              <Skeleton className="h-64 w-full" />
+            </>
+          )}
+          {!isLoading && orderedPosts.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center">Belum ada postingan.</p>
+          )}
+          {orderedPosts.map((post) => (
+            <PostCard
+              key={post.id}
+              post={post}
+              currentUserId={currentUserProfile?.id || ""}
+              currentUserName={currentUserProfile?.name || ""}
+              currentUserInitials={currentUserProfile?.avatar_text || ""}
+            />
+          ))}
+          <InfiniteScrollTrigger onLoadMore={() => fetchNextPage()} disabled={!hasNextPage || isFetchingNextPage} />
+          {hasNextPage && (
+            <div className="flex justify-center">
+              <Button onClick={() => fetchNextPage()} disabled={isFetchingNextPage} variant="outline" size="sm">
+                {isFetchingNextPage ? "Memuat..." : "Muat lagi"}
+              </Button>
+            </div>
+          )}
+          {!hasNextPage && !isLoading && orderedPosts.length > 0 && (
+            <p className="text-center text-sm text-muted-foreground py-2">Tidak ada postingan lagi.</p>
           )}
         </section>
-
         <RightSidebar />
-        
       </main>
-
-      <footer className="border-t py-4 bg-muted/30">
-        <div className="container mx-auto px-4 text-center">
-          <p className="text-sm text-muted-foreground">
-            <a
-              href="https://flamyheart.site"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-primary hover:underline underline-offset-4"
-            >
-              © {new Date().getFullYear()} Andre Saputra
-            </a>
-          </p>
-        </div>
-      </footer>
     </div>
   );
-};
-
-export default Index;
+}

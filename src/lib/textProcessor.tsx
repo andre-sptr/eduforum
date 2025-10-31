@@ -1,41 +1,47 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React from "react";
+import { Link } from "react-router-dom";
+import { buildMentionRegex, extractMentions, getProfileUrl } from "./mentionHelpers";
 
-export const processCommentContent = (content: string, allUserNames: string[]) => {
-  if (!content || allUserNames.length === 0) return [content];
-  
-  const escapedNames = allUserNames
-    .map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) 
-    .join('|');
+export function linkifyMentionsToNodes(content: string, allUserNames: string[]): React.ReactNode[] {
+  if (!content) return [content];
+  if (!allUserNames.length) return [content];
+  const re = buildMentionRegex(allUserNames);
+  if (!re) return [content];
 
-  const DYNAMIC_MENTION_REGEX = new RegExp(`@(${escapedNames})`, 'g');
+  const mentions = extractMentions(content, allUserNames);
+  if (!mentions.length) return [content];
 
   const parts: React.ReactNode[] = [];
-  let lastIndex = 0;
-  
-  content.replace(DYNAMIC_MENTION_REGEX, (match, username, index) => {
-    if (index > lastIndex) {
-      parts.push(content.substring(lastIndex, index));
-    }
+  let cursor = 0;
 
-    const profileUrl = `/profile/name/${encodeURIComponent(username)}`;
+  mentions.forEach((m, idx) => {
+    if (m.index > cursor) parts.push(content.slice(cursor, m.index));
+    const matchText = content.slice(m.index, m.index + m.length);
     parts.push(
-      <Link 
-        key={index} 
-        to={profileUrl} 
-        className="text-blue-500 hover:underline font-semibold"
-      >
-        {match}
+      <Link key={`${m.index}-${m.length}-${idx}`} to={getProfileUrl(m.name)} className="text-primary hover:underline font-semibold">
+        {matchText}
       </Link>
     );
-
-    lastIndex = index + match.length;
-    return match;
+    cursor = m.index + m.length;
   });
 
-  if (lastIndex < content.length) {
-    parts.push(content.substring(lastIndex));
-  }
-
+  if (cursor < content.length) parts.push(content.slice(cursor));
   return parts;
-};
+}
+
+export function highlightMentionsAsText(content: string, allUserNames: string[], tagOpen = "[[", tagClose = "]]"): string {
+  if (!content || !allUserNames.length) return content;
+  const mentions = extractMentions(content, allUserNames);
+  if (!mentions.length) return content;
+
+  let out = "";
+  let cursor = 0;
+
+  for (const m of mentions) {
+    out += content.slice(cursor, m.index);
+    out += `${tagOpen}${content.slice(m.index, m.index + m.length)}${tagClose}`;
+    cursor = m.index + m.length;
+  }
+  if (cursor < content.length) out += content.slice(cursor);
+  return out;
+}

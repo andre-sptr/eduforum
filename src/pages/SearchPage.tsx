@@ -1,200 +1,220 @@
-import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import { Navbar } from '@/components/Navbar'; 
-import { LeftSidebar } from '@/components/LeftSidebar'; 
-import { RightSidebar } from '@/components/RightSidebar'; 
-import { PostCard, PostWithAuthor } from '@/components/PostCard';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useAuth } from '@/hooks/useAuth'; 
-import { useQuery } from '@tanstack/react-query'; 
-import { supabase } from '@/integrations/supabase/client'; 
-import { Card, CardContent } from '@/components/ui/card';
-import { UserAvatar } from '@/components/UserAvatar';
-import { Button } from '@/components/ui/button';
+import React, { useMemo, useState, useRef, useEffect } from "react";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Navbar } from "@/components/Navbar";
+import { LeftSidebar } from "@/components/LeftSidebar";
+import { RightSidebar } from "@/components/RightSidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { toast } from 'sonner';
+import { UserAvatar } from "@/components/UserAvatar";
+import { PostCard, PostWithAuthor } from "@/components/PostCard";
+import { useAuth } from "@/hooks/useAuth";
 
-interface Post {
-  id: string;
-  user_id: string;
-  content: string;
-  image_url: string | null;
-  likes_count: number;
-  comments_count: number;
-  created_at: string;
-  profiles: { name: string; avatar_text: string; role: string };
-}
-
-interface SearchedProfile {
+type SearchedProfile = {
   id: string;
   name: string;
-  bio: string | null
+  bio: string | null;
   avatar_text: string;
   role: string;
-}
+};
 
-const SearchPage = () => {
-  const [searchParams] = useSearchParams();
-  const query = searchParams.get('q') || '';
-  const { user, loading: authLoading } = useAuth();
-  const [currentUserProfile, setCurrentUserProfile] = useState<{id: string, name: string, avatar_text: string} | null>(null);
-  const navigate = useNavigate();
-  const [loadingChat, setLoadingChat] = useState(false);
+const PAGE_SIZE = 10;
+
+const InfiniteScrollTrigger: React.FC<{
+  onLoadMore: () => void;
+  disabled?: boolean;
+  rootMargin?: string;
+}> = ({ onLoadMore, disabled, rootMargin = "600px 0px" }) => {
+  const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (user) {
-        const { data } = await supabase.from("profiles").select("id, name, avatar_text").eq("id", user.id).maybeSingle();
-        setCurrentUserProfile(data);
-      }
-    };
-    fetchProfile();
-  }, [user]);
+    if (disabled) return;
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) onLoadMore();
+      },
+      { rootMargin }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [onLoadMore, disabled, rootMargin]);
 
-  const { data: searchResults = [], isLoading } = useQuery<PostWithAuthor[]>({
-    queryKey: ['searchPosts', query],
+  return <div ref={ref} className="h-8" />;
+};
+
+export default function SearchPage(): JSX.Element {
+  const [searchParams] = useSearchParams();
+  const query = (searchParams.get("q") || "").trim();
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
+
+  const { data: currentUserProfile, isLoading: isLoadingMe } = useQuery({
+    queryKey: ["me", user?.id],
+    enabled: !!user,
     queryFn: async () => {
-      if (!query) return [];
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, name, avatar_text")
+        .eq("id", user!.id)
+        .maybeSingle();
+      return data;
+    },
+  });
 
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
+  const enabledSearch = !!query && !!user;
+
+  const {
+    data: postPages,
+    isLoading: isLoadingPosts,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["searchPosts", query],
+    enabled: enabledSearch,
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const from = pageParam;
+      const to = pageParam + PAGE_SIZE - 1;
+      const { data, error, count } = await supabase
+        .from("posts")
+        .select(
+          `
           *,
           profiles!user_id(name, avatar_text, role),
           original_author:profiles!original_author_id(name, avatar_text, role)
-        `)
-        .ilike('content', `%${query}%`) 
-        .order('created_at', { ascending: false });
+        `,
+          { count: "exact" }
+        )
+        .ilike("content", `%${query}%`)
+        .order("created_at", { ascending: false })
+        .range(from, to);
 
       if (error) throw error;
-      return (data as PostWithAuthor[]) || [];
+      const items = (data as PostWithAuthor[]) || [];
+      return {
+        items,
+        nextOffset: from + items.length,
+        total: count ?? undefined,
+      };
     },
-    enabled: !!query && !!user,
+    getNextPageParam: (last, _pages, lastPageParam) => {
+      if (!last || last.items.length < PAGE_SIZE) return undefined;
+      return lastPageParam + PAGE_SIZE;
+    },
+    refetchOnWindowFocus: false,
+    staleTime: 30_000,
+    gcTime: 300_000,
   });
 
-  const { data: userResults = [], isLoading: isLoadingUsers } = useQuery<SearchedProfile[]>({
-    queryKey: ['searchUsers', query],
-    queryFn: async () => {
-      if (!query) return [];
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, name, bio, avatar_text, role')
-        .ilike('name', `%${query}%`)
-        .limit(10);
+  const posts = useMemo(
+    () => (postPages?.pages || []).flatMap((p) => p.items),
+    [postPages]
+  );
 
+  const { data: users = [], isLoading: isLoadingUsers } = useQuery<SearchedProfile[]>({
+    queryKey: ["searchUsers", query],
+    enabled: enabledSearch,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, name, bio, avatar_text, role")
+        .ilike("name", `%${query}%`)
+        .limit(10);
       if (error) throw error;
       return data || [];
     },
-    enabled: !!query && !!user,
   });
 
   const startOrGoToChat = async (recipientId: string) => {
-    if (!currentUserProfile) {
-      toast.error("Gagal memulai chat: Profil pengguna tidak ditemukan.");
-      return;
-    }
-    const currentUserId = currentUserProfile.id;
-
-    if (currentUserId === recipientId) {
-        toast.info("Anda tidak bisa chat dengan diri sendiri.");
-        return;
-    }
-    
-    setLoadingChat(true); 
-
+    if (!currentUserProfile) return toast.error("Profil tidak ditemukan.");
+    if (currentUserProfile.id === recipientId) return toast.info("Anda tidak bisa chat dengan diri sendiri.");
+    setLoadingUserId(recipientId);
     try {
-      const { data: roomId, error } = await supabase
-        .rpc('create_or_get_chat_room', { 
-            recipient_id: recipientId
-        });
-
+      const { data: roomId, error } = await supabase.rpc("create_or_get_chat_room", { recipient_id: recipientId });
       if (error) throw error;
-      if (!roomId) throw new Error("Gagal mendapatkan ID room chat."); 
-
+      if (!roomId) throw new Error("Gagal mendapatkan ID room chat.");
       navigate(`/chat/${roomId}`);
-
-    } catch (error) {
-      console.error("Error memulai chat:", error);
-      toast.error(`Gagal memulai chat: ${(error as Error).message}`);
+    } catch (e: any) {
+      toast.error(`Gagal memulai chat: ${e.message}`);
     } finally {
-       setLoadingChat(false); 
+      setLoadingUserId(null);
     }
   };
 
-  if (authLoading || !currentUserProfile) {
+  if (authLoading || isLoadingMe || !currentUserProfile) {
     return (
       <div className="min-h-screen bg-muted">
-        <Navbar /> 
-        
+        <Navbar />
         <main className="container mx-auto grid grid-cols-10 gap-6 py-6">
           <aside className="col-span-2 hidden md:block">
             <Skeleton className="h-40 w-full rounded-lg" />
           </aside>
-          
           <section className="col-span-10 md:col-span-5 space-y-4">
-            <Skeleton className="h-8 w-3/4 mb-4" /> 
+            <Skeleton className="h-8 w-3/4 mb-4" />
             <Skeleton className="h-40 w-full" />
             <Skeleton className="h-40 w-full" />
           </section>
-
           <aside className="col-span-10 md:col-span-3 hidden md:block">
             <Skeleton className="h-40 w-full rounded-lg" />
-            <Skeleton className="h-64 w-full rounded-lg mt-6" /> 
+            <Skeleton className="h-64 w-full rounded-lg mt-6" />
           </aside>
         </main>
       </div>
     );
   }
 
+  const emptyQuery = query.length === 0;
+
   return (
     <div className="min-h-screen bg-muted">
-      <Navbar userName={currentUserProfile.name} userInitials={currentUserProfile.avatar_text} /> 
-      
+      <Navbar userName={currentUserProfile.name} userInitials={currentUserProfile.avatar_text} />
       <main className="container mx-auto grid grid-cols-10 gap-6 py-6">
         <LeftSidebar />
 
         <section className="col-span-10 md:col-span-5 space-y-4">
           <div>
             <h3 className="text-lg font-medium mb-3 border-b pb-2">Pengguna</h3>
-            {isLoadingUsers ? (
+            {emptyQuery ? (
+              <p className="text-sm text-muted-foreground">Ketik kata kunci untuk mencari pengguna.</p>
+            ) : isLoadingUsers ? (
               <Skeleton className="h-20 w-full" />
-            ) : userResults.length === 0 ? (
+            ) : users.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">Tidak ada pengguna ditemukan.</p>
             ) : (
               <Card>
                 <CardContent className="p-4 space-y-4">
-                  {userResults.map((profile) => (
+                  {users.map((profile) => (
                     <div key={profile.id} className="flex items-center justify-between">
-                      <Link 
-                        to={`/profile/name/${encodeURIComponent(profile.name)}`}
-                        className="flex items-start gap-3 group"
-                      >
+                      <Link to={`/profile/name/${encodeURIComponent(profile.name)}`} className="flex items-start gap-3 group">
                         <UserAvatar name={profile.name} initials={profile.avatar_text} />
-                        
-                        <div className="min-h-[2.5rem]"> 
+                        <div className="min-h-[2.5rem]">
                           <div className="flex items-baseline gap-1">
-                            <h4 className="font-semibold">{profile.name}</h4> 
-                            <Badge variant="secondary" className="px-1.5 py-0 text-xs font-medium h-fit">
-                              {profile.role}
-                            </Badge>
+                            <h4 className="font-semibold">{profile.name}</h4>
+                            <Badge variant="secondary" className="px-1.5 py-0 text-xs font-medium h-fit">{profile.role}</Badge>
                           </div>
-
-                          {profile.bio ? ( 
+                          {profile.bio ? (
                             <p className="text-xs text-muted-foreground mt-0.5">{profile.bio}</p>
                           ) : (
-                            <p className="text-xs text-muted-foreground mt-0.5 italic">Tidak ada bio</p> 
+                            <p className="text-xs text-muted-foreground mt-0.5 italic">Tidak ada bio</p>
                           )}
                         </div>
                       </Link>
-
                       {profile.id !== currentUserProfile.id && (
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => startOrGoToChat(profile.id)}
-                          disabled={loadingChat}
-                        > 
-                          {loadingChat ? '...' : 'Chat'}
+                          disabled={loadingUserId === profile.id}
+                        >
+                          {loadingUserId === profile.id ? "..." : "Chat"}
                         </Button>
                       )}
                     </div>
@@ -204,28 +224,57 @@ const SearchPage = () => {
             )}
           </div>
 
-          <h2 className="text-lg font-medium mb-3 border-b pb-2">
-            Hasil Pencarian untuk: "{query}"
-          </h2>
+          <h2 className="text-lg font-medium mb-3 border-b pb-2">Hasil Pencarian untuk: "{query}"</h2>
 
           <div className="flex flex-col gap-4">
-            {isLoading ? (
+            {emptyQuery ? (
+              <p className="text-sm text-muted-foreground">Masukkan kata kunci untuk mencari postingan.</p>
+            ) : isLoadingPosts && !postPages ? (
               <>
                 <Skeleton className="h-40 w-full" />
                 <Skeleton className="h-40 w-full" />
               </>
-            ) : searchResults.length === 0 ? (
+            ) : posts.length === 0 ? (
               <p className="text-center text-muted-foreground">Tidak ada hasil postingan ditemukan.</p>
             ) : (
-              searchResults.map((post) => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  currentUserId={currentUserProfile.id}
-                  currentUserName={currentUserProfile.name}
-                  currentUserInitials={currentUserProfile.avatar_text}
+              <>
+                {posts.map((post) => (
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    currentUserId={currentUserProfile.id}
+                    currentUserName={currentUserProfile.name}
+                    currentUserInitials={currentUserProfile.avatar_text}
+                  />
+                ))}
+
+                {isFetchingNextPage && (
+                  <>
+                    <Skeleton className="h-40 w-full" />
+                    <Skeleton className="h-40 w-full" />
+                  </>
+                )}
+
+                <InfiniteScrollTrigger
+                  onLoadMore={() => fetchNextPage()}
+                  disabled={!hasNextPage || isFetchingNextPage}
                 />
-              ))
+
+                {hasNextPage && (
+                  <div className="flex justify-center">
+                    <button
+                      className="px-4 py-2 text-sm border rounded-md"
+                      onClick={() => fetchNextPage()}
+                      disabled={isFetchingNextPage}
+                    >
+                      {isFetchingNextPage ? "Memuat..." : "Muat lagi"}
+                    </button>
+                  </div>
+                )}
+                {!hasNextPage && posts.length > 0 && (
+                  <p className="text-center text-sm text-muted-foreground py-2">Sudah semua hasil.</p>
+                )}
+              </>
             )}
           </div>
         </section>
@@ -236,12 +285,7 @@ const SearchPage = () => {
       <footer className="border-t py-4 bg-muted/30">
         <div className="container mx-auto px-4 text-center">
           <p className="text-sm text-muted-foreground">
-            <a
-              href="https://flamyheart.site"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-primary hover:underline underline-offset-4"
-            >
+            <a href="https://flamyheart.site" target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline underline-offset-4">
               © {new Date().getFullYear()} Andre Saputra
             </a>
           </p>
@@ -249,6 +293,4 @@ const SearchPage = () => {
       </footer>
     </div>
   );
-};
-
-export default SearchPage;
+}
