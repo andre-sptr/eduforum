@@ -172,6 +172,40 @@ $$;
 ALTER FUNCTION "public"."get_follower_leaderboard"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."get_followers_profiles"("p_user_id" "uuid", "p_limit" integer DEFAULT 20, "p_offset" integer DEFAULT 0, "p_search" "text" DEFAULT NULL::"text") RETURNS TABLE("id" "uuid", "name" "text", "avatar_text" "text", "role" "text", "created_at" timestamp with time zone)
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  select p.id, p.name, p.avatar_text, p.role, uf.created_at
+  from public.user_followers uf
+  join public.profiles p on p.id = uf.follower_id
+  where uf.following_id = p_user_id
+    and (p_search is null or p.name ilike '%' || p_search || '%')
+  order by uf.created_at desc
+  limit p_limit offset p_offset
+$$;
+
+
+ALTER FUNCTION "public"."get_followers_profiles"("p_user_id" "uuid", "p_limit" integer, "p_offset" integer, "p_search" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_following_profiles"("p_user_id" "uuid", "p_limit" integer DEFAULT 20, "p_offset" integer DEFAULT 0, "p_search" "text" DEFAULT NULL::"text") RETURNS TABLE("id" "uuid", "name" "text", "avatar_text" "text", "role" "text", "created_at" timestamp with time zone)
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  select p.id, p.name, p.avatar_text, p.role, uf.created_at
+  from public.user_followers uf
+  join public.profiles p on p.id = uf.following_id
+  where uf.follower_id = p_user_id
+    and (p_search is null or p.name ilike '%' || p_search || '%')
+  order by uf.created_at desc
+  limit p_limit offset p_offset
+$$;
+
+
+ALTER FUNCTION "public"."get_following_profiles"("p_user_id" "uuid", "p_limit" integer, "p_offset" integer, "p_search" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."handle_new_chat_message_notification"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
@@ -349,6 +383,83 @@ $$;
 ALTER FUNCTION "public"."handle_post_mentions_notification"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."is_username_available"("p_username" "text") RETURNS boolean
+    LANGUAGE "sql" SECURITY DEFINER
+    SET "search_path" TO 'public'
+    AS $$
+  with norm as (
+    select public.slugify_username(p_username, '') as u
+  )
+  select not exists (
+    select 1 from public.profiles p
+    join norm on true
+    where lower(p.username) = lower(norm.u)
+  );
+$$;
+
+
+ALTER FUNCTION "public"."is_username_available"("p_username" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."is_username_available"("desired" "text", "exclude_user_id" "uuid" DEFAULT NULL::"uuid") RETURNS boolean
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'pg_catalog', 'public'
+    AS $_$
+DECLARE
+  candidate text;
+  exists_cnt int;
+BEGIN
+  candidate := slugify_username(desired);
+
+  -- validasi ringan sesuai CHECK di tabel (regex kamu: ^[a-z0-9]+(?:-[a-z0-9]+)*$)
+  IF candidate !~ '^[a-z0-9]+(?:-[a-z0-9]+)*$' THEN
+    RETURN FALSE;
+  END IF;
+
+  SELECT count(*) INTO exists_cnt
+  FROM public.profiles p
+  WHERE p.username = candidate
+    AND (exclude_user_id IS NULL OR p.id <> exclude_user_id);
+
+  RETURN exists_cnt = 0;
+END;
+$_$;
+
+
+ALTER FUNCTION "public"."is_username_available"("desired" "text", "exclude_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."normalize_username"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'pg_catalog', 'public'
+    AS $$
+declare
+  v text;
+begin
+  v := public.slugify_username(new.username, 'user-' || substr(new.id::text, 1, 8));
+  if v = '' then
+    v := 'user-' || substr(new.id::text, 1, 8);
+  end if;
+  new.username := v;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."normalize_username"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."normalize_username"("inp" "text") RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO 'pg_catalog', 'public'
+    AS $$
+  SELECT trim(lower(inp));
+$$;
+
+
+ALTER FUNCTION "public"."normalize_username"("inp" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."repost_post"("post_id_to_repost" "uuid") RETURNS "void"
     LANGUAGE "plpgsql"
     SET "search_path" TO 'public'
@@ -384,6 +495,37 @@ $$;
 
 
 ALTER FUNCTION "public"."repost_post"("post_id_to_repost" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."slugify_username"("inp" "text") RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO 'pg_catalog', 'public'
+    AS $$
+  -- keep a-z0-9 dan '-' sesuai CHECK constraint pada profiles.username
+  SELECT regexp_replace(
+           normalize_username(inp),
+           '[^a-z0-9-]+',  -- selain a-z 0-9 dash
+           '-', 'g'
+         );
+$$;
+
+
+ALTER FUNCTION "public"."slugify_username"("inp" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."slugify_username"("p" "text", "fallback" "text") RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO 'pg_catalog', 'public'
+    AS $$
+  select case
+    when p is null or btrim(p) = '' then fallback
+    else
+      trim(both '-' from regexp_replace(lower(p), '[^a-z0-9]+', '-', 'g'))
+  end
+$$;
+
+
+ALTER FUNCTION "public"."slugify_username"("p" "text", "fallback" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."update_comment_like_count"() RETURNS "trigger"
@@ -532,6 +674,8 @@ CREATE TABLE IF NOT EXISTS "public"."chat_messages" (
     CONSTRAINT "chat_messages_content_check" CHECK (("char_length"("content") > 0))
 );
 
+ALTER TABLE ONLY "public"."chat_messages" FORCE ROW LEVEL SECURITY;
+
 
 ALTER TABLE "public"."chat_messages" OWNER TO "postgres";
 
@@ -543,6 +687,8 @@ CREATE TABLE IF NOT EXISTS "public"."chat_participants" (
     "joined_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
 
+ALTER TABLE ONLY "public"."chat_participants" FORCE ROW LEVEL SECURITY;
+
 
 ALTER TABLE "public"."chat_participants" OWNER TO "postgres";
 
@@ -552,6 +698,8 @@ CREATE TABLE IF NOT EXISTS "public"."chat_rooms" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "last_message_at" timestamp with time zone DEFAULT "now"()
 );
+
+ALTER TABLE ONLY "public"."chat_rooms" FORCE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."chat_rooms" OWNER TO "postgres";
@@ -563,6 +711,8 @@ CREATE TABLE IF NOT EXISTS "public"."comment_likes" (
     "comment_id" "uuid" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
+
+ALTER TABLE ONLY "public"."comment_likes" FORCE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."comment_likes" OWNER TO "postgres";
@@ -576,9 +726,10 @@ CREATE TABLE IF NOT EXISTS "public"."comments" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "image_url" "text",
     "likes_count" integer DEFAULT 0 NOT NULL,
-    "tagged_user_ids" "uuid"[],
     "parent_comment_id" "uuid"
 );
+
+ALTER TABLE ONLY "public"."comments" FORCE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."comments" OWNER TO "postgres";
@@ -595,6 +746,8 @@ CREATE TABLE IF NOT EXISTS "public"."notifications" (
     "room_id" "uuid"
 );
 
+ALTER TABLE ONLY "public"."notifications" FORCE ROW LEVEL SECURITY;
+
 
 ALTER TABLE "public"."notifications" OWNER TO "postgres";
 
@@ -605,6 +758,8 @@ CREATE TABLE IF NOT EXISTS "public"."post_likes" (
     "user_id" "uuid" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
+
+ALTER TABLE ONLY "public"."post_likes" FORCE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."post_likes" OWNER TO "postgres";
@@ -624,6 +779,8 @@ CREATE TABLE IF NOT EXISTS "public"."posts" (
     "tagged_user_ids" "uuid"[]
 );
 
+ALTER TABLE ONLY "public"."posts" FORCE ROW LEVEL SECURITY;
+
 
 ALTER TABLE "public"."posts" OWNER TO "postgres";
 
@@ -639,8 +796,11 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "username" "text",
-    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['Siswa'::"text", 'Guru'::"text", 'Alumni'::"text"])))
+    CONSTRAINT "profiles_role_check" CHECK (("role" = ANY (ARRAY['Siswa'::"text", 'Guru'::"text", 'Alumni'::"text"]))),
+    CONSTRAINT "profiles_username_slug_valid" CHECK (("username" ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'::"text"))
 );
+
+ALTER TABLE ONLY "public"."profiles" FORCE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."profiles" OWNER TO "postgres";
@@ -651,6 +811,8 @@ CREATE TABLE IF NOT EXISTS "public"."user_followers" (
     "following_id" "uuid" NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
 );
+
+ALTER TABLE ONLY "public"."user_followers" FORCE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."user_followers" OWNER TO "postgres";
@@ -721,8 +883,17 @@ ALTER TABLE ONLY "public"."profiles"
 
 
 
+ALTER TABLE ONLY "public"."notifications"
+    ADD CONSTRAINT "unique_post_mention" UNIQUE ("user_id", "actor_id", "type", "post_id");
+
+
+
 ALTER TABLE ONLY "public"."user_followers"
     ADD CONSTRAINT "user_followers_pkey" PRIMARY KEY ("follower_id", "following_id");
+
+
+
+CREATE UNIQUE INDEX "uq_profiles_username_ci" ON "public"."profiles" USING "btree" ("lower"("username"));
 
 
 
@@ -747,6 +918,10 @@ CREATE OR REPLACE TRIGGER "on_post_like_insert" AFTER INSERT ON "public"."post_l
 
 
 CREATE OR REPLACE TRIGGER "on_repost_notification" AFTER INSERT ON "public"."posts" FOR EACH ROW WHEN (("new"."original_post_id" IS NOT NULL)) EXECUTE FUNCTION "public"."create_repost_notification"();
+
+
+
+CREATE OR REPLACE TRIGGER "trg_profiles_normalize_username" BEFORE INSERT OR UPDATE OF "username" ON "public"."profiles" FOR EACH ROW EXECUTE FUNCTION "public"."normalize_username"();
 
 
 
@@ -891,29 +1066,41 @@ ALTER TABLE ONLY "public"."user_followers"
 
 
 
-CREATE POLICY "Allow authenticated message read access (TEMPORARY)" ON "public"."chat_messages" FOR SELECT TO "authenticated" USING (true);
-
-
-
-CREATE POLICY "Allow authenticated read access (TEMPORARY)" ON "public"."chat_participants" FOR SELECT TO "authenticated" USING (true);
-
-
-
 CREATE POLICY "Allow authenticated user to create notifications" ON "public"."notifications" FOR INSERT TO "authenticated" WITH CHECK (("auth"."uid"() = "actor_id"));
 
 
 
-CREATE POLICY "Allow authenticated user to follow others" ON "public"."user_followers" FOR INSERT WITH CHECK (("auth"."uid"() = "follower_id"));
+CREATE POLICY "Allow authenticated user to follow others" ON "public"."user_followers" FOR INSERT TO "authenticated" WITH CHECK (("auth"."uid"() = "follower_id"));
 
 
 
-CREATE POLICY "Allow authenticated user to unfollow" ON "public"."user_followers" FOR DELETE USING (("auth"."uid"() = "follower_id"));
+CREATE POLICY "Allow authenticated user to unfollow" ON "public"."user_followers" FOR DELETE TO "authenticated" USING (("auth"."uid"() = "follower_id"));
 
 
 
-CREATE POLICY "Allow insert access for message participants" ON "public"."chat_messages" FOR INSERT WITH CHECK ((("sender_id" = "auth"."uid"()) AND (EXISTS ( SELECT 1
-   FROM "public"."chat_participants"
-  WHERE (("chat_participants"."room_id" = "chat_messages"."room_id") AND ("chat_participants"."user_id" = "auth"."uid"()))))));
+CREATE POLICY "Allow authenticated users to view comments" ON "public"."comments" FOR SELECT TO "authenticated" USING (("auth"."uid"() IS NOT NULL));
+
+
+
+CREATE POLICY "Allow authenticated users to view follow relationships" ON "public"."user_followers" FOR SELECT TO "authenticated" USING (("auth"."uid"() IS NOT NULL));
+
+
+
+CREATE POLICY "Allow authenticated users to view likes" ON "public"."post_likes" FOR SELECT TO "authenticated" USING (("auth"."uid"() IS NOT NULL));
+
+
+
+CREATE POLICY "Allow authenticated users to view posts" ON "public"."posts" FOR SELECT TO "authenticated" USING (("auth"."uid"() IS NOT NULL));
+
+
+
+CREATE POLICY "Allow authenticated users to view profiles" ON "public"."profiles" FOR SELECT TO "authenticated" USING (("auth"."uid"() IS NOT NULL));
+
+
+
+CREATE POLICY "Allow insert access for message participants" ON "public"."chat_messages" FOR INSERT TO "authenticated" WITH CHECK ((("sender_id" = "auth"."uid"()) AND (EXISTS ( SELECT 1
+   FROM "public"."chat_participants" "p"
+  WHERE (("p"."room_id" = "chat_messages"."room_id") AND ("p"."user_id" = "auth"."uid"()))))));
 
 
 
@@ -921,13 +1108,21 @@ CREATE POLICY "Allow logged-in user to insert room" ON "public"."chat_rooms" FOR
 
 
 
-CREATE POLICY "Allow public read of follow relationships" ON "public"."user_followers" FOR SELECT USING (true);
+CREATE POLICY "Allow read access to fellow participants" ON "public"."chat_participants" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."chat_participants" "cp2"
+  WHERE (("cp2"."room_id" = "chat_participants"."room_id") AND ("cp2"."user_id" = "auth"."uid"())))));
 
 
 
-CREATE POLICY "Allow read access to participants" ON "public"."chat_rooms" FOR SELECT USING ((EXISTS ( SELECT 1
-   FROM "public"."chat_participants"
-  WHERE (("chat_participants"."room_id" = "chat_participants"."id") AND ("chat_participants"."user_id" = "auth"."uid"())))));
+CREATE POLICY "Allow read access to participants" ON "public"."chat_messages" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."chat_participants" "p"
+  WHERE (("p"."room_id" = "chat_messages"."room_id") AND ("p"."user_id" = "auth"."uid"())))));
+
+
+
+CREATE POLICY "Allow read access to participants" ON "public"."chat_rooms" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."chat_participants" "p"
+  WHERE (("p"."room_id" = "chat_rooms"."id") AND ("p"."user_id" = "auth"."uid"())))));
 
 
 
@@ -935,67 +1130,73 @@ CREATE POLICY "Allow user to join room" ON "public"."chat_participants" FOR INSE
 
 
 
-CREATE POLICY "Anyone can view comments" ON "public"."comments" FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can create comments" ON "public"."comments" FOR INSERT TO "authenticated" WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
-CREATE POLICY "Anyone can view likes" ON "public"."post_likes" FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can create posts" ON "public"."posts" FOR INSERT TO "authenticated" WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
-CREATE POLICY "Anyone can view posts" ON "public"."posts" FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can like posts" ON "public"."post_likes" FOR INSERT TO "authenticated" WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
-CREATE POLICY "Anyone can view profiles" ON "public"."profiles" FOR SELECT USING (true);
+CREATE POLICY "Comment likes: delete own" ON "public"."comment_likes" FOR DELETE TO "authenticated" USING (("auth"."uid"() = "user_id"));
 
 
 
-CREATE POLICY "Authenticated users can create comments" ON "public"."comments" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
+CREATE POLICY "Comment likes: insert own" ON "public"."comment_likes" FOR INSERT TO "authenticated" WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
-CREATE POLICY "Authenticated users can create posts" ON "public"."posts" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
+CREATE POLICY "Comment likes: public read" ON "public"."comment_likes" FOR SELECT TO "authenticated" USING (("auth"."uid"() IS NOT NULL));
 
 
 
-CREATE POLICY "Authenticated users can like posts" ON "public"."post_likes" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
+CREATE POLICY "Delete own messages" ON "public"."chat_messages" FOR DELETE TO "authenticated" USING ((("sender_id" = "auth"."uid"()) AND (EXISTS ( SELECT 1
+   FROM "public"."chat_participants" "p"
+  WHERE (("p"."room_id" = "chat_messages"."room_id") AND ("p"."user_id" = "auth"."uid"()))))));
 
 
 
-CREATE POLICY "Users can delete own comments" ON "public"."comments" FOR DELETE USING (("auth"."uid"() = "user_id"));
+CREATE POLICY "Update own messages" ON "public"."chat_messages" FOR UPDATE TO "authenticated" USING ((("sender_id" = "auth"."uid"()) AND (EXISTS ( SELECT 1
+   FROM "public"."chat_participants" "p"
+  WHERE (("p"."room_id" = "chat_messages"."room_id") AND ("p"."user_id" = "auth"."uid"())))))) WITH CHECK ((("sender_id" = "auth"."uid"()) AND (EXISTS ( SELECT 1
+   FROM "public"."chat_participants" "p"
+  WHERE (("p"."room_id" = "chat_messages"."room_id") AND ("p"."user_id" = "auth"."uid"()))))));
 
 
 
-CREATE POLICY "Users can delete own posts" ON "public"."posts" FOR DELETE USING (("auth"."uid"() = "user_id"));
+CREATE POLICY "Users can delete own comments" ON "public"."comments" FOR DELETE TO "authenticated" USING (("auth"."uid"() = "user_id"));
 
 
 
-CREATE POLICY "Users can insert own profile" ON "public"."profiles" FOR INSERT WITH CHECK (("auth"."uid"() = "id"));
+CREATE POLICY "Users can delete own posts" ON "public"."posts" FOR DELETE TO "authenticated" USING (("auth"."uid"() = "user_id"));
 
 
 
-CREATE POLICY "Users can manage their own comment likes" ON "public"."comment_likes" USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
+CREATE POLICY "Users can insert own profile" ON "public"."profiles" FOR INSERT TO "authenticated" WITH CHECK (("auth"."uid"() = "id"));
 
 
 
-CREATE POLICY "Users can mark their own notifications as read." ON "public"."notifications" FOR UPDATE USING (("auth"."uid"() = "user_id"));
+CREATE POLICY "Users can see their own notifications" ON "public"."notifications" FOR SELECT TO "authenticated" USING (("auth"."uid"() = "user_id"));
 
 
 
-CREATE POLICY "Users can see their own notifications." ON "public"."notifications" FOR SELECT USING (("auth"."uid"() = "user_id"));
+CREATE POLICY "Users can unlike posts" ON "public"."post_likes" FOR DELETE TO "authenticated" USING (("auth"."uid"() = "user_id"));
 
 
 
-CREATE POLICY "Users can unlike posts" ON "public"."post_likes" FOR DELETE USING (("auth"."uid"() = "user_id"));
+CREATE POLICY "Users can update own posts" ON "public"."posts" FOR UPDATE TO "authenticated" USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
-CREATE POLICY "Users can update own posts" ON "public"."posts" FOR UPDATE USING (("auth"."uid"() = "user_id"));
+CREATE POLICY "Users can update own profile" ON "public"."profiles" FOR UPDATE TO "authenticated" USING (("auth"."uid"() = "id")) WITH CHECK (("auth"."uid"() = "id"));
 
 
 
-CREATE POLICY "Users can update own profile" ON "public"."profiles" FOR UPDATE USING (("auth"."uid"() = "id"));
+CREATE POLICY "Users can update their own notifications" ON "public"."notifications" FOR UPDATE TO "authenticated" USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
@@ -1223,6 +1424,20 @@ GRANT ALL ON FUNCTION "public"."get_follower_leaderboard"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."get_followers_profiles"("p_user_id" "uuid", "p_limit" integer, "p_offset" integer, "p_search" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."get_followers_profiles"("p_user_id" "uuid", "p_limit" integer, "p_offset" integer, "p_search" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_followers_profiles"("p_user_id" "uuid", "p_limit" integer, "p_offset" integer, "p_search" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_followers_profiles"("p_user_id" "uuid", "p_limit" integer, "p_offset" integer, "p_search" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."get_following_profiles"("p_user_id" "uuid", "p_limit" integer, "p_offset" integer, "p_search" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."get_following_profiles"("p_user_id" "uuid", "p_limit" integer, "p_offset" integer, "p_search" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_following_profiles"("p_user_id" "uuid", "p_limit" integer, "p_offset" integer, "p_search" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_following_profiles"("p_user_id" "uuid", "p_limit" integer, "p_offset" integer, "p_search" "text") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."handle_new_chat_message_notification"() TO "anon";
 GRANT ALL ON FUNCTION "public"."handle_new_chat_message_notification"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."handle_new_chat_message_notification"() TO "service_role";
@@ -1259,9 +1474,46 @@ GRANT ALL ON FUNCTION "public"."handle_post_mentions_notification"() TO "service
 
 
 
+REVOKE ALL ON FUNCTION "public"."is_username_available"("p_username" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."is_username_available"("p_username" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."is_username_available"("p_username" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_username_available"("p_username" "text") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."is_username_available"("desired" "text", "exclude_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."is_username_available"("desired" "text", "exclude_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_username_available"("desired" "text", "exclude_user_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."normalize_username"() TO "anon";
+GRANT ALL ON FUNCTION "public"."normalize_username"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."normalize_username"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."normalize_username"("inp" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."normalize_username"("inp" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."normalize_username"("inp" "text") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."repost_post"("post_id_to_repost" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."repost_post"("post_id_to_repost" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."repost_post"("post_id_to_repost" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."slugify_username"("inp" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."slugify_username"("inp" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."slugify_username"("inp" "text") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."slugify_username"("p" "text", "fallback" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."slugify_username"("p" "text", "fallback" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."slugify_username"("p" "text", "fallback" "text") TO "service_role";
 
 
 
