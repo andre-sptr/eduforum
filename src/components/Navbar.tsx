@@ -1,7 +1,8 @@
+// src/components/Navbar.tsx
 import { Moon, Sun, LogOut, Search, Bell, User, Heart, MessageCircle, MessageSquare, Repeat, AtSign } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { UserAvatar } from "./UserAvatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -17,13 +18,13 @@ type NotifType =
   | "comment"
   | "follow"
   | "chat_message"
-  | "mention"
-  | "mention_post"
-  | "mention_comment";
+  | "mention"          // legacy (post)
+  | "mention_post"     // opsional alias (post)
+  | "mention_comment"; // baru (komentar)
 
 interface Notification {
   id: string;
-  type: NotifType | string;
+  type: NotifType | string; // toleransi
   is_read: boolean;
   created_at: string;
   room_id: string | null;
@@ -42,7 +43,8 @@ interface UserProfileData {
   avatar_text: string;
 }
 
-const isMentionType = (t: Notification["type"]) => t === "mention" || t === "mention_post" || t === "mention_comment";
+const isMentionType = (t: Notification["type"]) =>
+  t === "mention" || t === "mention_post" || t === "mention_comment";
 
 const formatTime = (t: string | null | undefined) => {
   if (!t) return "beberapa saat lalu";
@@ -60,13 +62,12 @@ const formatTime = (t: string | null | undefined) => {
   }
 };
 
-export const Navbar = ({ userName, userInitials }: NavbarProps): JSX.Element => {
-  const initialDark = useMemo(() => {
-    const saved = typeof window !== "undefined" ? localStorage.getItem("theme") : null;
-    if (saved) return saved === "dark";
-    return typeof window !== "undefined" ? window.matchMedia("(prefers-color-scheme: dark)").matches : false;
-  }, []);
-  const [isDark, setIsDark] = useState(initialDark);
+export const Navbar = ({ userName, userInitials }: NavbarProps) => {
+  const [isDark, setIsDark] = useState(() => {
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme) return savedTheme === "dark";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
 
   useEffect(() => {
     const theme = isDark ? "dark" : "light";
@@ -79,86 +80,107 @@ export const Navbar = ({ userName, userInitials }: NavbarProps): JSX.Element => 
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+
   const [hasNewActivityNotif, setHasNewActivityNotif] = useState(false);
   const [hasNewChatNotif, setHasNewChatNotif] = useState(false);
 
   const { data: activityNotifications = [], isLoading: isLoadingActivityNotifs } = useQuery<Notification[]>({
     queryKey: ["activity_notifications", user?.id],
-    enabled: !!user,
     queryFn: async () => {
+      if (!user) return [];
       const { data, error } = await supabase
         .from("notifications")
-        .select(`id, type, is_read, created_at, room_id, post_id, actor:profiles!actor_id (name, avatar_text)`)
-        .eq("user_id", user!.id)
+        .select(`
+          id, type, is_read, created_at, room_id, post_id,
+          actor:profiles!actor_id (name, avatar_text)
+        `)
+        .eq("user_id", user.id)
         .neq("type", "chat_message")
         .order("created_at", { ascending: false })
         .limit(10);
       if (error) throw new Error(error.message);
       return data || [];
     },
+    enabled: !!user,
   });
 
   const { data: chatNotifications = [], isLoading: isLoadingChatNotifs } = useQuery<Notification[]>({
     queryKey: ["chat_notifications", user?.id],
-    enabled: !!user,
     queryFn: async () => {
+      if (!user) return [];
       const { data, error } = await supabase
         .from("notifications")
-        .select(`id, type, is_read, created_at, room_id, post_id, actor:profiles!actor_id (name, avatar_text)`)
-        .eq("user_id", user!.id)
+        .select(`
+          id, type, is_read, created_at, room_id, post_id,
+          actor:profiles!actor_id (name, avatar_text)
+        `)
+        .eq("user_id", user.id)
         .eq("type", "chat_message")
         .order("created_at", { ascending: false })
         .limit(10);
       if (error) throw new Error(error.message);
       return data || [];
     },
+    enabled: !!user,
   });
 
   useEffect(() => {
-    if (activityNotifications.length > 0) setHasNewActivityNotif(activityNotifications.some((n) => !n.is_read));
+    if (activityNotifications.length > 0) {
+      setHasNewActivityNotif(activityNotifications.some((n) => !n.is_read));
+    }
   }, [activityNotifications]);
 
   useEffect(() => {
-    if (chatNotifications.length > 0) setHasNewChatNotif(chatNotifications.some((n) => !n.is_read));
+    if (chatNotifications.length > 0) {
+      setHasNewChatNotif(chatNotifications.some((n) => !n.is_read));
+    }
   }, [chatNotifications]);
 
   const markActivityAsReadMutation = useMutation({
-    mutationFn: async () =>
-      await supabase.from("notifications").update({ is_read: true }).eq("user_id", user!.id).eq("is_read", false).neq("type", "chat_message"),
+    mutationFn: async () => {
+      if (!user) throw new Error("Tidak ada user");
+      return await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("user_id", user.id)
+        .eq("is_read", false)
+        .neq("type", "chat_message");
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activity_notifications", user?.id] });
     },
   });
 
   const markChatAsReadMutation = useMutation({
-    mutationFn: async () =>
-      await supabase.from("notifications").update({ is_read: true }).eq("user_id", user!.id).eq("is_read", false).eq("type", "chat_message"),
+    mutationFn: async () => {
+      if (!user) throw new Error("Tidak ada user");
+      return await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("user_id", user.id)
+        .eq("is_read", false)
+        .eq("type", "chat_message");
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chat_notifications", user?.id] });
     },
   });
 
-  const handleOpenActivityNotifs = useCallback(
-    (isOpen: boolean) => {
-      if (isOpen && hasNewActivityNotif) {
-        setHasNewActivityNotif(false);
-        markActivityAsReadMutation.mutate();
-      }
-    },
-    [hasNewActivityNotif, markActivityAsReadMutation]
-  );
+  const handleOpenActivityNotifs = (isOpen: boolean) => {
+    if (isOpen && hasNewActivityNotif) {
+      setHasNewActivityNotif(false);
+      markActivityAsReadMutation.mutate();
+    }
+  };
 
-  const handleOpenChatNotifs = useCallback(
-    (isOpen: boolean) => {
-      if (isOpen && hasNewChatNotif) {
-        setHasNewChatNotif(false);
-        markChatAsReadMutation.mutate();
-      }
-    },
-    [hasNewChatNotif, markChatAsReadMutation]
-  );
+  const handleOpenChatNotifs = (isOpen: boolean) => {
+    if (isOpen && hasNewChatNotif) {
+      setHasNewChatNotif(false);
+      markChatAsReadMutation.mutate();
+    }
+  };
 
-  const renderNotificationText = useCallback((notif: Notification) => {
+  const renderNotificationText = (notif: Notification) => {
     const actorName = <span className="font-semibold">{notif.actor.name}</span>;
     switch (notif.type) {
       case "like":
@@ -181,27 +203,27 @@ export const Navbar = ({ userName, userInitials }: NavbarProps): JSX.Element => 
       default:
         return <>{actorName} mengirim notifikasi baru.</>;
     }
-  }, []);
+  };
 
-  const toggleTheme = useCallback(() => setIsDark((v) => !v), []);
-  const handleSearchSubmit = useCallback(
-    (event: React.KeyboardEvent<HTMLInputElement>) => {
-      if (event.key === "Enter" && searchQuery.trim()) {
-        navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-        setSearchQuery("");
-      }
-    },
-    [navigate, searchQuery]
-  );
+  const toggleTheme = () => setIsDark(!isDark);
 
-  const handleNotificationClick = useCallback(
-    (notif: Notification) => {
-      if (notif.type === "chat_message" && notif.room_id) navigate(`/chat/${notif.room_id}`);
-      else if (notif.post_id) navigate(`/post/${notif.post_id}`);
-      else if (notif.type === "follow" && notif.actor) navigate(`/profile/name/${encodeURIComponent(notif.actor.name)}`);
-    },
-    [navigate]
-  );
+  const handleSearchSubmit = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" && searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery("");
+    }
+  };
+
+  const handleNotificationClick = (notif: Notification) => {
+    // why: navigasi cukup ke post; tanpa comment_id kita tidak scroll spesifik
+    if (notif.type === "chat_message" && notif.room_id) {
+      navigate(`/chat/${notif.room_id}`);
+    } else if (notif.post_id) {
+      navigate(`/post/${notif.post_id}`);
+    } else if (notif.type === "follow" && notif.actor) {
+      navigate(`/profile/name/${encodeURIComponent(notif.actor.name)}`);
+    }
+  };
 
   const isNotificationClickable = (notif: Notification) => {
     if (notif.type === "chat_message" && notif.room_id) return true;
@@ -212,22 +234,31 @@ export const Navbar = ({ userName, userInitials }: NavbarProps): JSX.Element => 
 
   const { data: currentUserProfile } = useQuery<UserProfileData | null>({
     queryKey: ["currentUserProfileSidebar", user?.id],
-    enabled: !!user,
     queryFn: async () => {
-      const { data } = await supabase.from("profiles").select("id, name, avatar_text").eq("id", user!.id).maybeSingle();
+      if (!user) return null;
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, name, avatar_text")
+        .eq("id", user.id)
+        .maybeSingle();
       return data;
     },
+    enabled: !!user,
     staleTime: Infinity,
   });
 
-  const myProfileLink = currentUserProfile?.name ? `/profile/name/${encodeURIComponent(currentUserProfile.name)}` : `/settings/profile`;
+  const myProfileLink = currentUserProfile?.name
+    ? `/profile/name/${encodeURIComponent(currentUserProfile.name)}`
+    : `/settings/profile`;
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between gap-6 px-4">
         <div className="flex items-center gap-2">
           <img src="/favicon.png" alt="EduForum Logo" className="h-8 w-8" />
-          <span className="text-xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">EduForum</span>
+          <span className="text-xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+            EduForum
+          </span>
         </div>
 
         <div className="flex-1 max-w-sm hidden md:block">
@@ -247,7 +278,7 @@ export const Navbar = ({ userName, userInitials }: NavbarProps): JSX.Element => 
         <div className="flex items-center gap-1">
           <Popover onOpenChange={handleOpenChatNotifs}>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full relative" aria-label="Pesan">
+              <Button variant="ghost" size="icon" className="rounded-full relative">
                 <MessageSquare className="h-5 w-5" />
                 {hasNewChatNotif && (
                   <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
@@ -284,7 +315,9 @@ export const Navbar = ({ userName, userInitials }: NavbarProps): JSX.Element => 
                         </div>
                         <UserAvatar name={notif.actor.name} initials={notif.actor.avatar_text} size="sm" />
                         <div className="flex-1">
-                          <p className={`text-sm ${!notif.is_read ? "text-foreground" : "text-muted-foreground"}`}>{renderNotificationText(notif)}</p>
+                          <p className={`text-sm ${!notif.is_read ? "text-foreground" : "text-muted-foreground"}`}>
+                            {renderNotificationText(notif)}
+                          </p>
                           <p className="text-xs text-muted-foreground">{formatTime(notif.created_at)}</p>
                         </div>
                         {!notif.is_read && <span className="flex h-2 w-2 rounded-full bg-primary flex-shrink-0 mt-1.5" />}
@@ -298,7 +331,7 @@ export const Navbar = ({ userName, userInitials }: NavbarProps): JSX.Element => 
 
           <Popover onOpenChange={handleOpenActivityNotifs}>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full relative" aria-label="Notifikasi">
+              <Button variant="ghost" size="icon" className="rounded-full relative">
                 <Bell className="h-5 w-5" />
                 {hasNewActivityNotif && (
                   <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
@@ -338,9 +371,12 @@ export const Navbar = ({ userName, userInitials }: NavbarProps): JSX.Element => 
                           {notif.type === "follow" && <User className="h-4 w-4 text-blue-500" />}
                           {isMentionType(notif.type) && <AtSign className="h-4 w-4 text-indigo-500" />}
                         </div>
+
                         <UserAvatar name={notif.actor.name} initials={notif.actor.avatar_text} size="sm" />
                         <div className="flex-1">
-                          <p className={`text-sm ${!notif.is_read ? "text-foreground" : "text-muted-foreground"}`}>{renderNotificationText(notif)}</p>
+                          <p className={`text-sm ${!notif.is_read ? "text-foreground" : "text-muted-foreground"}`}>
+                            {renderNotificationText(notif)}
+                          </p>
                           <p className="text-xs text-muted-foreground">{formatTime(notif.created_at)}</p>
                         </div>
                         {!notif.is_read && <span className="flex h-2 w-2 rounded-full bg-primary flex-shrink-0 mt-1.5" />}
@@ -352,7 +388,7 @@ export const Navbar = ({ userName, userInitials }: NavbarProps): JSX.Element => 
             </PopoverContent>
           </Popover>
 
-          <Button variant="ghost" size="icon" className="rounded-full" onClick={toggleTheme} aria-label="Toggle theme">
+          <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setIsDark(!isDark)}>
             {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
 
@@ -365,7 +401,7 @@ export const Navbar = ({ userName, userInitials }: NavbarProps): JSX.Element => 
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem asChild className="gap-2 cursor-pointer">
-                  <Link to={currentUserProfile?.name ? `/profile/name/${encodeURIComponent(currentUserProfile.name)}` : "/settings/profile"}>
+                  <Link to={myProfileLink}>
                     <User className="h-4 w-4" />
                     <span>Profil Saya</span>
                   </Link>

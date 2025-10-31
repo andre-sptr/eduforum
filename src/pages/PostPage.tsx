@@ -6,135 +6,91 @@ import { PostCard } from "@/components/PostCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { Card } from '@/components/ui/card';
 
-type ProfileLite = {
-  name: string | null;
-  username?: string | null;
-  avatar_text: string | null;
-  role: string | null;
+type PostWithDetails = {
+  id: string;
+  content: string;
+  image_url: string | null;
+  created_at: string;
+  user_id: string;
+  profiles: {
+    name: string;
+    avatar_text: string;
+    role: string;
+  } | null;
+  likes: Array<{ user_id: string }>;
+  comments: Array<{ id: string }>;
+  original_post_id?: string | null;
+  original_author_id?: string | null;
+  original_author?: {
+    name: string;
+    avatar_text: string;
+    role: string;
+  } | null;
 };
 
-type UserProfile = {
+type UserProfileData = {
   id: string;
   name: string;
   avatar_text: string;
 };
 
-export type PostWithCounts = {
-  id: string;
-  content: string | null;
-  image_url: string | null;
-  created_at: string;
-  user_id: string;
-  profiles: ProfileLite | null;
-  original_post_id: string | null;
-  original_author_id: string | null;
-  original_author: ProfileLite | null;
-  likes_count: number;
-  comments_count: number;
-  viewer_has_liked: boolean;
-};
-
-export default function PostPage(): JSX.Element {
+const PostPage = () => {
   const { postId } = useParams<{ postId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const {
-    data: post,
-    isLoading: isLoadingPost,
-    error: postError,
-  } = useQuery<PostWithCounts | null>({
-    queryKey: ["post", postId, user?.id ?? null],
-    enabled: Boolean(postId),
-    staleTime: 60000,
-    gcTime: 300000,
+  const { 
+    data: post, 
+    isLoading: isLoadingPost, 
+    error: postError 
+  } = useQuery<PostWithDetails | null>({
+    queryKey: ['post', postId],
     queryFn: async () => {
       if (!postId) return null;
 
       const { data, error } = await supabase
-        .from("posts")
-        .select(
-          `
+        .from('posts')
+        .select(`
           id,
           content,
           image_url,
           created_at,
-          user_id,
-          profiles!user_id(name, username, avatar_text, role),
-          post_likes:post_likes(count),
-          comments:comments(count),
+          user_id, 
+          profiles!user_id (name, avatar_text, role),
+          likes:post_likes ( user_id ),
+          comments ( id ),
           original_post_id,
           original_author_id,
-          original_author:profiles!original_author_id(name, username, avatar_text, role)
-        `
-        )
-        .eq("id", postId as string)
-        .maybeSingle();
+          original_author:profiles!original_author_id (name, avatar_text, role)
+        `)
+        .eq('id', postId)
+        .single();
 
-      if (error) throw new Error(error.message);
-
-      if (!data) return null;
-
-      const likes_count =
-        (Array.isArray((data as any)?.post_likes) &&
-          ((data as any).post_likes[0]?.count as number)) ||
-        0;
-      const comments_count =
-        (Array.isArray((data as any)?.comments) &&
-          ((data as any).comments[0]?.count as number)) ||
-        0;
-
-      let viewer_has_liked = false;
-      if (user?.id) {
-        const { data: viewerLikeRows, error: viewerLikeError } = await supabase
-          .from("post_likes")
-          .select("post_id")
-          .eq("post_id", postId as string)
-          .eq("user_id", user.id)
-          .limit(1);
-        if (viewerLikeError) throw new Error(viewerLikeError.message);
-        viewer_has_liked = (viewerLikeRows ?? []).length > 0;
+      if (error) {
+        throw new Error(error.message);
       }
-
-      const normalized: PostWithCounts = {
-        id: (data as any).id,
-        content: (data as any).content ?? null,
-        image_url: (data as any).image_url ?? null,
-        created_at: (data as any).created_at,
-        user_id: (data as any).user_id,
-        profiles: (data as any).profiles ?? null,
-        original_post_id: (data as any).original_post_id ?? null,
-        original_author_id: (data as any).original_author_id ?? null,
-        original_author: (data as any).original_author ?? null,
-        likes_count,
-        comments_count,
-        viewer_has_liked,
-      };
-
-      return normalized;
+      return data as PostWithDetails;
     },
+    enabled: !!postId,
   });
 
-  const {
-    data: currentUserProfile,
-    isLoading: isLoadingProfile,
-    error: profileError,
-  } = useQuery<UserProfile | null>({
-    queryKey: ["profile", user?.id],
-    enabled: Boolean(user?.id),
-    staleTime: 60000,
-    gcTime: 300000,
+  const { 
+    data: currentUserProfile, 
+    isLoading: isLoadingProfile 
+  } = useQuery<UserProfileData | null>({
+    queryKey: ['currentUserProfile', user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      if (!user) return null;
+      const { data } = await supabase
         .from("profiles")
         .select("id, name, avatar_text")
-        .eq("id", user!.id)
+        .eq("id", user.id)
         .single();
-      if (error) throw new Error(error.message);
-      return data as UserProfile;
+      return data;
     },
+    enabled: !!user,
   });
 
   if (isLoadingPost || isLoadingProfile) {
@@ -145,10 +101,10 @@ export default function PostPage(): JSX.Element {
     );
   }
 
-  if (postError || profileError) {
+  if (postError) {
     return (
       <div className="container mx-auto max-w-2xl p-4 mt-6 text-center text-red-500">
-        {(postError as Error)?.message || (profileError as Error)?.message || "Terjadi kesalahan memuat data."}
+        Terjadi kesalahan: {postError.message}
       </div>
     );
   }
@@ -164,19 +120,34 @@ export default function PostPage(): JSX.Element {
   return (
     <div className="bg-muted min-h-screen p-6">
       <div className="w-full max-w-2xl mx-auto">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Kembali
+        <Button 
+            variant="ghost" 
+            onClick={() => navigate(-1)}
+            className="mb-4"
+        >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Kembali
         </Button>
+        
         <Card className="shadow-xl">
           <PostCard
-            post={post}
-            currentUserId={currentUserProfile.id}
-            currentUserName={currentUserProfile.name}
-            currentUserInitials={currentUserProfile.avatar_text}
+              key={post.id}
+              post={{
+              ...post,
+              likes_count: post.likes.length,
+              comments_count: post.comments.length,
+              original_post_id: post.original_post_id || null,
+              original_author_id: post.original_author_id || null,
+              original_author: post.original_author || null,
+              }}
+              currentUserId={currentUserProfile.id}
+              currentUserName={currentUserProfile.name}
+              currentUserInitials={currentUserProfile.avatar_text}
           />
         </Card>
       </div>
     </div>
   );
-}
+};
+
+export default PostPage;
