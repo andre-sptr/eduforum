@@ -33,6 +33,7 @@ export type PostWithCounts = {
   original_author: ProfileLite | null;
   likes_count: number;
   comments_count: number;
+  viewer_has_liked: boolean;
 };
 
 export default function PostPage(): JSX.Element {
@@ -45,11 +46,13 @@ export default function PostPage(): JSX.Element {
     isLoading: isLoadingPost,
     error: postError,
   } = useQuery<PostWithCounts | null>({
-    queryKey: ["post", postId],
+    queryKey: ["post", postId, user?.id ?? null],
     enabled: Boolean(postId),
     staleTime: 60000,
     gcTime: 300000,
     queryFn: async () => {
+      if (!postId) return null;
+
       const { data, error } = await supabase
         .from("posts")
         .select(
@@ -68,9 +71,11 @@ export default function PostPage(): JSX.Element {
         `
         )
         .eq("id", postId as string)
-        .single();
+        .maybeSingle();
 
       if (error) throw new Error(error.message);
+
+      if (!data) return null;
 
       const likes_count =
         (Array.isArray((data as any)?.post_likes) &&
@@ -80,6 +85,18 @@ export default function PostPage(): JSX.Element {
         (Array.isArray((data as any)?.comments) &&
           ((data as any).comments[0]?.count as number)) ||
         0;
+
+      let viewer_has_liked = false;
+      if (user?.id) {
+        const { data: viewerLikeRows, error: viewerLikeError } = await supabase
+          .from("post_likes")
+          .select("post_id")
+          .eq("post_id", postId as string)
+          .eq("user_id", user.id)
+          .limit(1);
+        if (viewerLikeError) throw new Error(viewerLikeError.message);
+        viewer_has_liked = (viewerLikeRows ?? []).length > 0;
+      }
 
       const normalized: PostWithCounts = {
         id: (data as any).id,
@@ -93,6 +110,7 @@ export default function PostPage(): JSX.Element {
         original_author: (data as any).original_author ?? null,
         likes_count,
         comments_count,
+        viewer_has_liked,
       };
 
       return normalized;

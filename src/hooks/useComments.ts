@@ -1,18 +1,10 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { nestComments, RawComment } from "@/lib/commentHelpers";
+import { resolveMentionsToIds } from "@/lib/mentionHelpers";
 
-export type CommentRow = {
-  id: string;
-  post_id: string;
-  user_id: string;
-  content: string | null;
-  image_url: string | null;
-  created_at: string;
-  parent_comment_id: string | null;
-  profiles: { name: string | null; avatar_text: string | null } | null;
-  user_like?: { id: string; user_id: string }[] | null;
-  likes_count?: number | null;
-};
+export type CommentRow = RawComment & { post_id: string };
 
 type PageResult = { rows: CommentRow[]; nextOffset: number | null };
 
@@ -33,7 +25,7 @@ async function fetchCommentsPage(postId: string, offset: number, pageSize: numbe
   if (error) throw new Error(error.message);
 
   const rows: CommentRow[] = (data ?? []).map((d: any) => {
-    const prof = Array.isArray(d.profiles) ? d.profiles[0] ?? null : d.profiles ?? null;
+    const profSource = Array.isArray(d.profiles) ? d.profiles[0] ?? {} : d.profiles ?? {};
     const likeArr = Array.isArray(d.user_like) ? d.user_like : d.user_like ? [d.user_like] : [];
     return {
       id: String(d.id),
@@ -43,8 +35,11 @@ async function fetchCommentsPage(postId: string, offset: number, pageSize: numbe
       image_url: d.image_url ?? null,
       created_at: String(d.created_at),
       parent_comment_id: d.parent_comment_id ?? null,
-      profiles: prof ? { name: prof.name ?? null, avatar_text: prof.avatar_text ?? null } : null,
-      user_like: likeArr?.map((x: any) => ({ id: String(x.id), user_id: String(x.user_id) })) ?? [],
+      profiles: {
+        name: profSource.name ?? "Pengguna",
+        avatar_text: profSource.avatar_text ?? "??",
+      },
+      user_like: likeArr.map((x: any) => ({ id: String(x.id), user_id: x?.user_id ? String(x.user_id) : undefined })),
       likes_count: typeof d.likes_count === "number" ? d.likes_count : Number(d.likes_count ?? 0),
     };
   });
@@ -53,8 +48,11 @@ async function fetchCommentsPage(postId: string, offset: number, pageSize: numbe
   return { rows, nextOffset };
 }
 
-export function useComments(postId: string, currentUserId: string, pageSize = 20) {
+type CurrentUser = { id: string; name: string; avatar_text: string };
+
+export function useComments(postId: string, currentUser: CurrentUser, pageSize = 20) {
   const queryClient = useQueryClient();
+  const currentUserId = currentUser.id;
 
   const query = useInfiniteQuery({
     queryKey: ["comments", postId, { pageSize }],
@@ -69,6 +67,7 @@ export function useComments(postId: string, currentUserId: string, pageSize = 20
   const addComment = useMutation({
     mutationFn: async ({ text, file, parentId }: { text: string; file: File | null; parentId: string | null }) => {
       if (!currentUserId) throw new Error("Login diperlukan");
+      const taggedIds = await resolveMentionsToIds(text);
       let imageUrl: string | null = null;
       let filePath: string | null = null;
       if (file) {
@@ -86,11 +85,24 @@ export function useComments(postId: string, currentUserId: string, pageSize = 20
         content: text || null,
         image_url: imageUrl,
         parent_comment_id: parentId,
+        tagged_user_ids: taggedIds.length > 0 ? taggedIds : null,
       };
       const { data, error } = await supabase.from("comments").insert(insert).select("id, created_at").single();
       if (error) {
         if (filePath) await supabase.storage.from("post_media").remove([filePath]);
         throw new Error(error.message);
+      }
+      if (taggedIds.length > 0) {
+        const rows = taggedIds
+          .filter((id) => id !== currentUserId)
+          .map((uid) => ({ user_id: uid, actor_id: currentUserId, type: "mention_comment", post_id: postId }));
+        const uniqueRows = rows.filter(
+          (r, i, arr) => i === arr.findIndex((x) => x.user_id === r.user_id && x.post_id === r.post_id && x.type === r.type)
+        );
+        if (uniqueRows.length > 0) {
+          const { error: notifError } = await supabase.from("notifications").insert(uniqueRows);
+          if (notifError) throw notifError;
+        }
       }
       return data;
     },
@@ -100,7 +112,7 @@ export function useComments(postId: string, currentUserId: string, pageSize = 20
       await queryClient.cancelQueries({ queryKey: ["posts"] });
       const prevComments = queryClient.getQueryData<any>(["comments", postId, { pageSize }]);
       const prevPost = queryClient.getQueryData<any>(["post", postId]);
-      const prevLists = queryClient.getQueryData<any>(["posts"]);
+      const prevLists = queryClient.getQueriesData({ queryKey: ["posts"] });
       queryClient.setQueryData(["post", postId], (old: any) =>
         old ? { ...old, comments_count: Math.max(0, (old.comments_count || 0) + 1) } : old
       );
@@ -128,7 +140,10 @@ export function useComments(postId: string, currentUserId: string, pageSize = 20
           image_url: null,
           created_at: new Date().toISOString(),
           parent_comment_id: vars.parentId,
-          profiles: null,
+          profiles: {
+            name: currentUser.name,
+            avatar_text: currentUser.avatar_text,
+          },
           user_like: [],
           likes_count: 0,
         };
@@ -142,7 +157,11 @@ export function useComments(postId: string, currentUserId: string, pageSize = 20
     onError: (_e, _v, ctx) => {
       if (ctx?.prevComments) queryClient.setQueryData(["comments", postId, { pageSize }], ctx.prevComments);
       if (ctx?.prevPost) queryClient.setQueryData(["post", postId], ctx.prevPost);
-      if (ctx?.prevLists) queryClient.setQueryData(["posts"], ctx.prevLists);
+      if (ctx?.prevLists) {
+        ctx.prevLists.forEach(([key, data]) => {
+          queryClient.setQueryData(key, data);
+        });
+      }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["comments", postId] });
@@ -151,11 +170,20 @@ export function useComments(postId: string, currentUserId: string, pageSize = 20
     },
   });
 
-  const comments = (query.data?.pages ?? []).flatMap((p) => p.rows);
+  const comments = useMemo(
+    () => (query.data?.pages ?? []).flatMap((p) => p.rows) as CommentRow[],
+    [query.data]
+  );
+
+  const nestedComments = useMemo(
+    () => nestComments(comments.map(({ post_id, ...rest }) => rest)),
+    [comments]
+  );
 
   return {
     ...query,
     comments,
+    nestedComments,
     addComment,
   };
 }

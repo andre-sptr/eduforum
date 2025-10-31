@@ -1,18 +1,26 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
+type ProfileLite = {
+  name: string | null;
+  username?: string | null;
+  avatar_text: string | null;
+  role: string | null;
+};
+
 export type FeedPost = {
   id: string;
   content: string | null;
   image_url: string | null;
   created_at: string;
   user_id: string;
-  profiles: { name: string | null; avatar_text: string | null; role: string | null } | null;
+  profiles: ProfileLite | null;
   original_post_id: string | null;
   original_author_id: string | null;
-  original_author: { name: string | null; avatar_text: string | null; role: string | null } | null;
+  original_author: ProfileLite | null;
   likes_count: number;
   comments_count: number;
+  viewer_has_liked: boolean;
 };
 
 export type UseInfinitePostsOptions = {
@@ -20,6 +28,7 @@ export type UseInfinitePostsOptions = {
   orderBy?: "created_at";
   orderDesc?: boolean;
   userFilterId?: string | null;
+  currentUserId?: string | null;
 };
 
 type PageResult = {
@@ -41,12 +50,12 @@ async function fetchPostsPage(
       image_url,
       created_at,
       user_id,
-      profiles!user_id(name, avatar_text, role),
+      profiles!user_id(name, username, avatar_text, role),
       post_likes:post_likes(count),
       comments:comments(count),
       original_post_id,
       original_author_id,
-      original_author:profiles!original_author_id(name, avatar_text, role)
+      original_author:profiles!original_author_id(name, username, avatar_text, role)
     `
     );
 
@@ -61,7 +70,7 @@ async function fetchPostsPage(
 
   if (error) throw new Error(error.message);
 
-  const rows: FeedPost[] =
+  const rowsBase =
     (data ?? []).map((d: any) => ({
       id: d.id,
       content: d.content ?? null,
@@ -78,6 +87,24 @@ async function fetchPostsPage(
         (Array.isArray(d.comments) && (d.comments[0]?.count as number)) || 0,
     })) ?? [];
 
+  let viewerLikedIds: Set<string> | null = null;
+
+  if (opts.currentUserId && rowsBase.length > 0) {
+    const postIds = rowsBase.map((row) => row.id);
+    const { data: viewerLikeRows, error: viewerLikeError } = await supabase
+      .from("post_likes")
+      .select("post_id")
+      .eq("user_id", opts.currentUserId)
+      .in("post_id", postIds);
+    if (viewerLikeError) throw new Error(viewerLikeError.message);
+    viewerLikedIds = new Set((viewerLikeRows ?? []).map((row: any) => String(row.post_id)));
+  }
+
+  const rows: FeedPost[] = rowsBase.map((row) => ({
+    ...row,
+    viewer_has_liked: viewerLikedIds ? viewerLikedIds.has(row.id) : false,
+  }));
+
   const nextOffset = rows.length < pageSize ? null : offset + pageSize;
 
   return { rows, nextOffset };
@@ -91,7 +118,16 @@ export function useInfinitePosts(options: UseInfinitePostsOptions = {}) {
   const pageSize = options.pageSize ?? 10;
 
   const query = useInfiniteQuery({
-    queryKey: ["posts", { pageSize, orderBy: options.orderBy ?? "created_at", orderDesc: options.orderDesc ?? true, user: options.userFilterId ?? null }],
+    queryKey: [
+      "posts",
+      {
+        pageSize,
+        orderBy: options.orderBy ?? "created_at",
+        orderDesc: options.orderDesc ?? true,
+        user: options.userFilterId ?? null,
+        viewer: options.currentUserId ?? null,
+      },
+    ],
     initialPageParam: 0,
     getNextPageParam: (lastPage: PageResult) => lastPage.nextOffset,
     queryFn: async ({ pageParam }) => fetchPostsPage(pageParam as number, pageSize, options),

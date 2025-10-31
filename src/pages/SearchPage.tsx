@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/UserAvatar";
 import { PostCard, PostWithAuthor } from "@/components/PostCard";
+import { InfiniteScrollTrigger } from "@/components/InfiniteScrollTrigger";
 import { useAuth } from "@/hooks/useAuth";
 
 type SearchedProfile = {
@@ -23,30 +24,6 @@ type SearchedProfile = {
 };
 
 const PAGE_SIZE = 10;
-
-const InfiniteScrollTrigger: React.FC<{
-  onLoadMore: () => void;
-  disabled?: boolean;
-  rootMargin?: string;
-}> = ({ onLoadMore, disabled, rootMargin = "600px 0px" }) => {
-  const ref = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (disabled) return;
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) onLoadMore();
-      },
-      { rootMargin }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [onLoadMore, disabled, rootMargin]);
-
-  return <div ref={ref} className="h-8" />;
-};
 
 export default function SearchPage(): JSX.Element {
   const [searchParams] = useSearchParams();
@@ -68,7 +45,7 @@ export default function SearchPage(): JSX.Element {
     },
   });
 
-  const enabledSearch = !!query && !!user;
+  const enabledSearch = !!query && !!user && !!currentUserProfile;
 
   const {
     data: postPages,
@@ -77,7 +54,7 @@ export default function SearchPage(): JSX.Element {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ["searchPosts", query],
+    queryKey: ["searchPosts", query, currentUserProfile?.id ?? null],
     enabled: enabledSearch,
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
@@ -87,9 +64,17 @@ export default function SearchPage(): JSX.Element {
         .from("posts")
         .select(
           `
-          *,
-          profiles!user_id(name, avatar_text, role),
-          original_author:profiles!original_author_id(name, avatar_text, role)
+          id,
+          content,
+          image_url,
+          created_at,
+          user_id,
+          profiles!user_id(name, username, avatar_text, role),
+          post_likes:post_likes(count),
+          comments:comments(count),
+          original_post_id,
+          original_author_id,
+          original_author:profiles!original_author_id(name, username, avatar_text, role)
         `,
           { count: "exact" }
         )
@@ -98,7 +83,41 @@ export default function SearchPage(): JSX.Element {
         .range(from, to);
 
       if (error) throw error;
-      const items = (data as PostWithAuthor[]) || [];
+
+      const baseItems = (data ?? []).map((d: any) => ({
+        id: d.id,
+        content: d.content ?? null,
+        image_url: d.image_url ?? null,
+        created_at: d.created_at,
+        user_id: d.user_id,
+        profiles: d.profiles ?? null,
+        original_post_id: d.original_post_id ?? null,
+        original_author_id: d.original_author_id ?? null,
+        original_author: d.original_author ?? null,
+        likes_count:
+          (Array.isArray(d.post_likes) && (d.post_likes[0]?.count as number)) || 0,
+        comments_count:
+          (Array.isArray(d.comments) && (d.comments[0]?.count as number)) || 0,
+      }));
+
+      let viewerLikedIds: Set<string> | null = null;
+      if (currentUserProfile?.id && baseItems.length > 0) {
+        const { data: viewerLikeRows, error: viewerLikeError } = await supabase
+          .from("post_likes")
+          .select("post_id")
+          .eq("user_id", currentUserProfile.id)
+          .in(
+            "post_id",
+            baseItems.map((item) => item.id)
+          );
+        if (viewerLikeError) throw viewerLikeError;
+        viewerLikedIds = new Set((viewerLikeRows ?? []).map((row: any) => String(row.post_id)));
+      }
+
+      const items: PostWithAuthor[] = baseItems.map((item) => ({
+        ...item,
+        viewer_has_liked: viewerLikedIds ? viewerLikedIds.has(item.id) : false,
+      }));
       return {
         items,
         nextOffset: from + items.length,

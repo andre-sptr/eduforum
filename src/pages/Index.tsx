@@ -42,7 +42,7 @@ export default function Index(): JSX.Element {
     hasNextPage,
     isFetchingNextPage,
     isLoading,
-  } = useInfinitePosts({});
+  } = useInfinitePosts({ currentUserId: currentUserProfile?.id ?? null });
 
   const orderedPosts = useMemo(() => posts, [posts]);
 
