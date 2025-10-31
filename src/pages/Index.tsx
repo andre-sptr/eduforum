@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/Navbar";
 import { CreatePost } from "@/components/CreatePost";
-import { PostCard, PostWithAuthor } from "@/components/PostCard";
+import { PostCard } from "@/components/PostCard";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LeftSidebar } from "@/components/LeftSidebar";
 import { RightSidebar } from "@/components/RightSidebar";
+import { useInfinitePosts } from "@/hooks/useInfinitePosts";
+import { Button } from "@/components/ui/button";
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -18,34 +20,36 @@ const Index = () => {
     if (!loading && !user) navigate("/auth");
   }, [user, loading, navigate]);
 
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading: isProfileLoading } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: async () => {
       if (!user) return null;
-      const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, name, avatar_text, role")
+        .eq("id", user.id)
+        .single();
+      if (error) throw new Error(error.message);
       return data;
     },
     enabled: !!user,
+    staleTime: 60_000,
   });
 
-  const { data: posts = [], isLoading } = useQuery<PostWithAuthor[]>({
-    queryKey: ["posts"],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("posts")
-        .select(`
-          *,
-          profiles!user_id(name, avatar_text, role),
-          original_author:profiles!original_author_id(name, avatar_text, role)
-        `)
-        .order("created_at", { ascending: false });
-        
-      return (data as PostWithAuthor[]) || [];
-    },
+  const {
+    posts,
+    isLoading: isLoadingPosts,
+    isFetchingNextPage,
+    hasNextPage,
+    loadMore,
+  } = useInfinitePosts({
+    currentUserId: user?.id ?? null,
     enabled: !!user,
   });
 
-  if (loading || !user || !profile) {
+  const isLoading = loading || isProfileLoading || !user || !profile || isLoadingPosts;
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-muted">
         <Navbar />
@@ -71,24 +75,36 @@ const Index = () => {
     <div className="min-h-screen bg-muted">
       <Navbar userName={profile.name} userInitials={profile.avatar_text} />
       <main className="container mx-auto grid grid-cols-10 gap-6 py-6">
-        
+
         <LeftSidebar />
 
         <section className="col-span-10 md:col-span-5 space-y-4">
           <CreatePost userName={profile.name} userInitials={profile.avatar_text} />
-          
-          {isLoading ? (
+
+          {isLoadingPosts && posts.length === 0 ? (
             <Skeleton className="h-64 w-full" />
           ) : (
             posts.map((post) => (
-              <PostCard 
-                key={post.id} 
-                post={post} 
-                currentUserName={profile.name} 
-                currentUserInitials={profile.avatar_text} 
+              <PostCard
+                key={post.id}
+                post={post}
+                currentUserName={profile.name}
+                currentUserInitials={profile.avatar_text}
                 currentUserId={profile.id}
               />
             ))
+          )}
+
+          {hasNextPage && (
+            <div className="flex justify-center pt-2">
+              <Button
+                variant="outline"
+                onClick={loadMore}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage ? "Memuat..." : "Muat lebih banyak"}
+              </Button>
+            </div>
           )}
         </section>
 
