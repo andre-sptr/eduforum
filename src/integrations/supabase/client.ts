@@ -1,19 +1,13 @@
-import { createClient } from "@supabase/supabase-js";
-import type { Database } from "../database.types";
-import { env } from "@/lib/env";
+import { createClient } from '@supabase/supabase-js';
+import type { Database } from '../database.types';
 
-const authStorage = typeof window !== "undefined" ? window.localStorage : null;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-export const supabase = createClient<Database>(env.supabaseUrl, env.supabaseAnonKey, {
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    persistSession: Boolean(authStorage),
-    autoRefreshToken: Boolean(authStorage),
-    detectSessionInUrl: true,
-    ...(authStorage ? { storage: authStorage } : {}),
-  },
-  global: {
-    headers: {
-      "X-Client-Info": "eduforum-web",
-    },
-  },
+    storage: localStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+  }
 });
