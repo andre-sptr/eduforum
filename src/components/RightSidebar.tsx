@@ -1,7 +1,6 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { FileText } from "lucide-react";
-
 import {
   Tooltip,
   TooltipContent,
@@ -57,6 +56,8 @@ export const RightSidebar = () => {
                             src={tool.iconUrl}
                             alt={tool.name}
                             className="h-3/5 w-3/5 object-contain" 
+                            loading="lazy"
+                            decoding="async"
                           />
                         ) : (
                           <FileText className="h-1/2 w-1/2 text-blue-500 group-hover:text-primary transition-colors duration-200" />

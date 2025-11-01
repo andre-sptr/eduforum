@@ -1,4 +1,4 @@
-import React, { useState, useRef, ChangeEvent } from "react";
+import React, { useState, useRef, ChangeEvent, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "./UserAvatar";
@@ -28,25 +28,30 @@ export const CommentForm = ({
   initialMention = "",
   currentUserId
 }: CommentFormProps) => {
-  
   const [content, setContent] = useState(initialMention);
   const [commentImageFile, setCommentImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [activeMention, setActiveMention] = useState<string | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+    };
+  }, [imagePreviewUrl]);
+
   const { data: suggestedUsers = [], isLoading: isSearching } = useQuery({
       queryKey: ['suggestedUsersInComment', activeMention],
       queryFn: async () => {
           if (!activeMention || activeMention.length < 2) return [];
-
           const { data, error } = await supabase
               .from('profiles')
               .select('id, name, avatar_text, role')
               .ilike('name', `${activeMention}%`) 
               .neq('id', currentUserId)
               .limit(5);
-
           if (error) throw error;
           return data || [];
       },
@@ -57,9 +62,7 @@ export const CommentForm = ({
   const handleContentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const newContent = e.target.value;
       setContent(newContent);
-
       const match = newContent.match(MENTION_DETECTION_REGEX);
-
       if (match) {
           const typedText = match[1].trim(); 
           if (typedText.length >= 2 && !typedText.includes('@')) { 
@@ -75,7 +78,6 @@ export const CommentForm = ({
   const handleSelectSuggestion = (userToTag: { name: string }) => {
       const regexToReplace = new RegExp(`@${activeMention}$`);
       const newContent = content.replace(regexToReplace, `@${userToTag.name} `);
-      
       setContent(newContent);
       setActiveMention(null);
   };
@@ -84,6 +86,9 @@ export const CommentForm = ({
     const file = event.target.files?.[0];
       const MAX_SIZE_MB = 5;
       const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
       if (!file) { clearImageSelection(); return; }
       if (!file.type.startsWith('image/')) { toast.error("Hanya file gambar yang diizinkan."); if (imageInputRef.current) imageInputRef.current.value = ""; return; }
       if (file.size > MAX_SIZE_BYTES) { toast.error(`Ukuran gambar maksimal ${MAX_SIZE_MB} MB.`); if (imageInputRef.current) imageInputRef.current.value = ""; clearImageSelection(); return; }
@@ -94,6 +99,9 @@ export const CommentForm = ({
   const triggerImageInput = () => imageInputRef.current?.click();
 
   const clearImageSelection = () => {
+    if (imagePreviewUrl) {
+      URL.revokeObjectURL(imagePreviewUrl);
+    }
     setCommentImageFile(null);
     setImagePreviewUrl(null);
     if (imageInputRef.current) imageInputRef.current.value = "";
@@ -131,14 +139,12 @@ export const CommentForm = ({
               )}
           </div>
       )}
-
       {imagePreviewUrl && (
           <div className="relative w-fit">
             <img src={imagePreviewUrl} alt="Preview" className="max-h-24 rounded border" />
             <Button variant="destructive" size="icon" className="absolute -top-2 -right-2 h-5 w-5 rounded-full z-10 p-0" onClick={clearImageSelection} aria-label="Hapus Gambar"> <X className="h-3 w-3" /> </Button>
           </div>
       )}
-      
       <div className="flex gap-2 items-center">
         <UserAvatar name={currentUserName} initials={currentUserInitials} size="sm" />
         <input type="file" ref={imageInputRef} onChange={handleImageChange} className="hidden" accept="image/*" />

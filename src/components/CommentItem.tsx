@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Comment } from "@/lib/commentHelpers";
 import { CommentForm } from "./CommentForm";
 import { processCommentContent } from "@/lib/textProcessor";
+import { getOptimizedImageUrl } from "@/lib/image";
 
 interface CommentItemProps {
   comment: Comment;
@@ -48,7 +49,6 @@ export const CommentItem = ({
 }: CommentItemProps) => {
   const queryClient = useQueryClient();
   const isCommentAuthor = comment.user_id === currentUserId;
-  
   const [isReplying, setIsReplying] = useState(false);
 
   const deleteCommentMutation = useMutation({
@@ -56,18 +56,17 @@ export const CommentItem = ({
       const { data: commentData } = await supabase.from('comments').select('image_url').eq('id', commentId).single();
       const { error } = await supabase.from('comments').delete().eq('id', commentId);
       if (error) throw new Error(error.message);
-      
       if (commentData?.image_url) {
-         try {
-           const urlParts = commentData.image_url.split('/');
-           const fileName = urlParts.pop();
-           const folderPath = urlParts.slice(urlParts.indexOf('comments')).join('/');
-           if (folderPath && fileName) {
-             await supabase.storage.from('post_media').remove([`${folderPath}/${fileName}`]);
-           }
-         } catch(storageError){
-           console.error("Gagal menghapus gambar dari storage:", storageError);
-         }
+        try {
+          const urlParts = commentData.image_url.split('/');
+          const fileName = urlParts.pop();
+          const folderPath = urlParts.slice(urlParts.indexOf('comments')).join('/');
+          if (folderPath && fileName) {
+            await supabase.storage.from('post_media').remove([`${folderPath}/${fileName}`]);
+          }
+        } catch(storageError){
+          console.error("Gagal menghapus gambar dari storage:", storageError);
+        }
       }
     },
     onSuccess: () => {
@@ -85,7 +84,6 @@ export const CommentItem = ({
   const likeCommentMutation = useMutation({
     mutationFn: async () => {
       if (!currentUserId) throw new Error("Login dulu");
-      
       if (userHasLiked) {
         await supabase.from("comment_likes").delete().eq("comment_id", comment.id).eq("user_id", currentUserId);
       } else {
@@ -128,7 +126,6 @@ export const CommentItem = ({
     <div className="flex gap-2">
       <UserAvatar name={comment.profiles.name} initials={comment.profiles.avatar_text} size="sm" />
       <div className="flex-1">
-        
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <p className="text-sm font-semibold">{comment.profiles.name}</p>
@@ -176,7 +173,6 @@ export const CommentItem = ({
             </AlertDialog>
           )}
         </div>
-
         {comment.content && (
         <p className="text-sm mt-1 whitespace-pre-wrap break-all">
             {processCommentContent(comment.content, allUserNames)}
@@ -185,14 +181,25 @@ export const CommentItem = ({
         {comment.image_url && (
           <Dialog>
             <DialogTrigger asChild>
-              <img src={comment.image_url} alt="Gambar komentar" className="mt-2 max-h-32 max-w-[200px] rounded-md border cursor-pointer object-cover" />
+              <img 
+                src={getOptimizedImageUrl(comment.image_url, 400) || undefined} 
+                alt="Gambar komentar" 
+                className="mt-2 max-h-32 max-w-[200px] rounded-md border cursor-pointer object-cover" 
+                loading="lazy"
+                decoding="async"
+              />
             </DialogTrigger>
             <DialogContent className="max-w-xl p-0 border-0">
-              <img src={comment.image_url} alt="Gambar komentar full size" className="w-full h-auto max-h-[80vh] object-contain" />
+              <img 
+                src={getOptimizedImageUrl(comment.image_url, 1200) || undefined} 
+                alt="Gambar komentar full size" 
+                className="w-full h-auto max-h-[80vh] object-contain" 
+                loading="lazy"
+                decoding="async"
+              />
             </DialogContent>
           </Dialog>
         )}
-        
         <div className="mt-1 flex items-center">
           {depth < 2 && (
             <Button
@@ -204,7 +211,6 @@ export const CommentItem = ({
               {isReplying ? "Batal" : "Balas"}
             </Button>
           )}
-
           <Button
             variant="ghost"
             size="sm"
@@ -218,7 +224,6 @@ export const CommentItem = ({
             </span>
           </Button>
         </div>
-
         {isReplying && (
           <div className="mt-3">
             <CommentForm
@@ -232,7 +237,6 @@ export const CommentItem = ({
             />
           </div>
         )}
-
         {comment.replies.length > 0 && (
           <div className="mt-4 border-l-2 pl-4">
             {comment.replies.map(reply => (

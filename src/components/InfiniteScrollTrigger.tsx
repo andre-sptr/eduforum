@@ -7,7 +7,6 @@ type Props = {
 
 export const InfiniteScrollTrigger: React.FC<Props> = ({ onLoadMore, disabled }) => {
   const ref = useRef<HTMLDivElement | null>(null);
-
   useEffect(() => {
     if (disabled) return;
     const el = ref.current;
@@ -21,6 +20,5 @@ export const InfiniteScrollTrigger: React.FC<Props> = ({ onLoadMore, disabled })
     io.observe(el);
     return () => io.disconnect();
   }, [onLoadMore, disabled]);
-
   return <div ref={ref} className="h-8" />;
 };

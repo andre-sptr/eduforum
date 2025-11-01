@@ -18,6 +18,5 @@ export const getQueryClient = () => {
       },
     });
   }
-
   return client;
 };

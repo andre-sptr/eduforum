@@ -1,13 +1,9 @@
-// src/hooks/useUsernameAvailability.ts
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 const RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const slugify = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
 export type UsernameStatus =
   | { state: "idle" }
@@ -19,7 +15,6 @@ export type UsernameStatus =
 export function useUsernameAvailability(input: string) {
   const [status, setStatus] = useState<UsernameStatus>({ state: "idle" });
   const suggestion = useMemo(() => slugify(input || ""), [input]);
-
   useEffect(() => {
     if (!input) {
       setStatus({ state: "idle" });
@@ -45,6 +40,5 @@ export function useUsernameAvailability(input: string) {
       clearTimeout(t);
     };
   }, [input, suggestion]);
-
   return status;
 }

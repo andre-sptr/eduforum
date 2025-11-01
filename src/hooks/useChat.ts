@@ -2,25 +2,33 @@ import { useEffect, useMemo, useRef } from "react";
 import { useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type ChatMessage = { id: string; room_id: string; sender_id: string; content: string; created_at: string };
+export type ChatMessage = {
+  id: string;
+  room_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+  profiles: {
+    name: string;
+    avatar_text: string;
+    role: string;
+  } | null;
+};
 
 type PageResult = { rows: ChatMessage[]; nextCursor: string | null };
 
 async function fetchMessagesPage(roomId: string, cursor: string | null, pageSize: number): Promise<PageResult> {
   let query = supabase
     .from("chat_messages")
-    .select("*")
+    .select("*, profiles!sender_id(name, avatar_text, role)")
     .eq("room_id", roomId)
     .order("created_at", { ascending: false })
     .limit(pageSize);
-
   if (cursor) {
     query = query.lt("created_at", cursor);
   }
-
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-
   const rowsDesc = (data ?? []) as ChatMessage[];
   const rows = rowsDesc.slice().reverse();
   const nextCursor = rowsDesc.length < pageSize ? null : rowsDesc[rowsDesc.length - 1]?.created_at ?? null;
@@ -91,7 +99,7 @@ export function useChat(roomId: string, userId: string | null | undefined, pageS
       const { data, error } = await supabase
         .from("chat_messages")
         .insert({ room_id: roomId, sender_id: userId, content })
-        .select("*")
+        .select("*, profiles!sender_id(name, avatar_text, role)")
         .single();
       if (error) throw new Error(error.message);
       return data as ChatMessage;
@@ -105,6 +113,7 @@ export function useChat(roomId: string, userId: string | null | undefined, pageS
         sender_id: userId as string,
         content,
         created_at: new Date().toISOString(),
+        profiles: null,
       };
       qc.setQueryData<InfiniteData<PageResult>>(["chatMessages", roomId, { pageSize }], (old) => {
         if (!old?.pages) {

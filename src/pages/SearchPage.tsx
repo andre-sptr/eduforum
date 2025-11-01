@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar'; 
 import { LeftSidebar } from '@/components/LeftSidebar'; 
@@ -14,17 +14,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from "@/components/ui/badge";
 import { toast } from 'sonner';
 
-interface Post {
-  id: string;
-  user_id: string;
-  content: string;
-  image_url: string | null;
-  likes_count: number;
-  comments_count: number;
-  created_at: string;
-  profiles: { name: string; avatar_text: string; role: string };
+type PostLike = { user_id: string };
+interface Post extends Omit<PostWithAuthor, 'viewer_has_liked'> {
+  user_like: PostLike[];
 }
-
 interface SearchedProfile {
   id: string;
   name: string;
@@ -32,42 +25,50 @@ interface SearchedProfile {
   avatar_text: string;
   role: string;
 }
+interface CurrentProfileData {
+  id: string;
+  name: string;
+  avatar_text: string;
+}
 
 const SearchPage = () => {
   const [searchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
   const { user, loading: authLoading } = useAuth();
-  const [currentUserProfile, setCurrentUserProfile] = useState<{id: string, name: string, avatar_text: string} | null>(null);
   const navigate = useNavigate();
   const [loadingChat, setLoadingChat] = useState(false);
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (user) {
-        const { data } = await supabase.from("profiles").select("id, name, avatar_text").eq("id", user.id).maybeSingle();
-        setCurrentUserProfile(data);
-      }
-    };
-    fetchProfile();
-  }, [user]);
-
-  const { data: searchResults = [], isLoading } = useQuery<PostWithAuthor[]>({
-    queryKey: ['searchPosts', query],
+  const { data: currentUserProfile, isLoading: isProfileLoading } = useQuery<CurrentProfileData | null>({
+    queryKey: ["profile", user?.id],
     queryFn: async () => {
-      if (!query) return [];
+      if (!user) return null;
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, name, avatar_text")
+        .eq("id", user.id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!user,
+  });
 
+  const { data: searchResults = [], isLoading } = useQuery<Post[]>({
+    queryKey: ['searchPosts', query, user?.id],
+    queryFn: async () => {
+      if (!query || !user?.id) return [];
       const { data, error } = await supabase
         .from('posts')
         .select(`
           *,
           profiles!user_id(name, avatar_text, role),
-          original_author:profiles!original_author_id(name, avatar_text, role)
+          original_author:profiles!original_author_id(name, avatar_text, role),
+          user_like:post_likes!left(user_id)
         `)
         .ilike('content', `%${query}%`) 
+        .eq('user_like.user_id', user.id)
         .order('created_at', { ascending: false });
-
       if (error) throw error;
-      return (data as PostWithAuthor[]) || [];
+      return (data as Post[]) || [];
     },
     enabled: !!query && !!user,
   });
@@ -81,7 +82,6 @@ const SearchPage = () => {
         .select('id, name, bio, avatar_text, role')
         .ilike('name', `%${query}%`)
         .limit(10);
-
       if (error) throw error;
       return data || [];
     },
@@ -94,25 +94,19 @@ const SearchPage = () => {
       return;
     }
     const currentUserId = currentUserProfile.id;
-
     if (currentUserId === recipientId) {
         toast.info("Anda tidak bisa chat dengan diri sendiri.");
         return;
     }
-    
     setLoadingChat(true); 
-
     try {
       const { data: roomId, error } = await supabase
         .rpc('create_or_get_chat_room', { 
             recipient_id: recipientId
         });
-
       if (error) throw error;
       if (!roomId) throw new Error("Gagal mendapatkan ID room chat."); 
-
       navigate(`/chat/${roomId}`);
-
     } catch (error) {
       console.error("Error memulai chat:", error);
       toast.error(`Gagal memulai chat: ${(error as Error).message}`);
@@ -121,22 +115,19 @@ const SearchPage = () => {
     }
   };
 
-  if (authLoading || !currentUserProfile) {
+  if (authLoading || isProfileLoading || !currentUserProfile) {
     return (
       <div className="min-h-screen bg-muted">
         <Navbar /> 
-        
         <main className="container mx-auto grid grid-cols-10 gap-6 py-6">
           <aside className="col-span-2 hidden md:block">
             <Skeleton className="h-40 w-full rounded-lg" />
           </aside>
-          
           <section className="col-span-10 md:col-span-5 space-y-4">
             <Skeleton className="h-8 w-3/4 mb-4" /> 
             <Skeleton className="h-40 w-full" />
             <Skeleton className="h-40 w-full" />
           </section>
-
           <aside className="col-span-10 md:col-span-3 hidden md:block">
             <Skeleton className="h-40 w-full rounded-lg" />
             <Skeleton className="h-64 w-full rounded-lg mt-6" /> 
@@ -149,10 +140,8 @@ const SearchPage = () => {
   return (
     <div className="min-h-screen bg-muted">
       <Navbar userName={currentUserProfile.name} userInitials={currentUserProfile.avatar_text} /> 
-      
       <main className="container mx-auto grid grid-cols-10 gap-6 py-6">
         <LeftSidebar />
-
         <section className="col-span-10 md:col-span-5 space-y-4">
           <div>
             <h3 className="text-lg font-medium mb-3 border-b pb-2">Pengguna</h3>
@@ -170,7 +159,6 @@ const SearchPage = () => {
                         className="flex items-start gap-3 group"
                       >
                         <UserAvatar name={profile.name} initials={profile.avatar_text} />
-                        
                         <div className="min-h-[2.5rem]"> 
                           <div className="flex items-baseline gap-1">
                             <h4 className="font-semibold">{profile.name}</h4> 
@@ -178,7 +166,6 @@ const SearchPage = () => {
                               {profile.role}
                             </Badge>
                           </div>
-
                           {profile.bio ? ( 
                             <p className="text-xs text-muted-foreground mt-0.5">{profile.bio}</p>
                           ) : (
@@ -186,7 +173,6 @@ const SearchPage = () => {
                           )}
                         </div>
                       </Link>
-
                       {profile.id !== currentUserProfile.id && (
                         <Button 
                           size="sm" 
@@ -203,11 +189,9 @@ const SearchPage = () => {
               </Card>
             )}
           </div>
-
           <h2 className="text-lg font-medium mb-3 border-b pb-2">
             Hasil Pencarian untuk: "{query}"
           </h2>
-
           <div className="flex flex-col gap-4">
             {isLoading ? (
               <>
@@ -217,22 +201,26 @@ const SearchPage = () => {
             ) : searchResults.length === 0 ? (
               <p className="text-center text-muted-foreground">Tidak ada hasil postingan ditemukan.</p>
             ) : (
-              searchResults.map((post) => (
-                <PostCard
-                  key={post.id}
-                  post={post}
-                  currentUserId={currentUserProfile.id}
-                  currentUserName={currentUserProfile.name}
-                  currentUserInitials={currentUserProfile.avatar_text}
-                />
-              ))
+              searchResults.map((post) => {
+                const viewerHasLiked = (post.user_like?.length || 0) > 0;
+                return (
+                  <PostCard
+                    key={post.id}
+                    post={{
+                      ...post,
+                      viewer_has_liked: viewerHasLiked,
+                    }}
+                    currentUserId={currentUserProfile.id}
+                    currentUserName={currentUserProfile.name}
+                    currentUserInitials={currentUserProfile.avatar_text}
+                  />
+                )
+              })
             )}
           </div>
         </section>
-
         <RightSidebar />
       </main>
-
       <footer className="border-t py-4 bg-muted/30">
         <div className="container mx-auto px-4 text-center">
           <p className="text-sm text-muted-foreground">

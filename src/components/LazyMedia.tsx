@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 
 type Props = {
   url: string;
+  alt: string;
   className?: string;
   aspect?: "video" | "square" | "16/9" | "4/3" | "3/4" | "1/1";
   objectFit?: "cover" | "contain";
@@ -28,7 +29,7 @@ const aspectClass = (a?: Props["aspect"]) => {
   }
 };
 
-export const LazyMedia: React.FC<Props> = ({ url, className, aspect = "video", objectFit = "cover" }) => {
+export const LazyMedia: React.FC<Props> = ({ url, alt, className, aspect = "video", objectFit = "cover" }) => {
   const [visible, setVisible] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const holderRef = useRef<HTMLDivElement | null>(null);
@@ -40,6 +41,10 @@ export const LazyMedia: React.FC<Props> = ({ url, className, aspect = "video", o
       (entries) => {
         if (entries[0].isIntersecting) {
           setVisible(true);
+          const ext = getExt(url);
+          if (!isImg(ext) && !isVid(ext)) {
+            setLoaded(true);
+          }
           io.disconnect();
         }
       },
@@ -47,7 +52,7 @@ export const LazyMedia: React.FC<Props> = ({ url, className, aspect = "video", o
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [url]);
 
   const ext = getExt(url);
   const showSkeleton = !visible || !loaded;
@@ -59,7 +64,7 @@ export const LazyMedia: React.FC<Props> = ({ url, className, aspect = "video", o
       {visible && isImg(ext) && (
         <img
           src={url}
-          alt=""
+          alt={alt}
           className={`w-full h-full ${fitCls} ${showSkeleton ? "opacity-0" : "opacity-100"} transition-opacity`}
           loading="lazy"
           decoding="async"
@@ -83,7 +88,6 @@ export const LazyMedia: React.FC<Props> = ({ url, className, aspect = "video", o
           target="_blank"
           rel="noopener noreferrer"
           className={`absolute inset-0 flex items-center justify-center bg-card text-sm ${showSkeleton ? "opacity-0" : "opacity-100"} transition-opacity`}
-          onLoad={() => setLoaded(true)}
         >
           Unduh berkas
         </a>

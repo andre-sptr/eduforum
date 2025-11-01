@@ -2,25 +2,27 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { PostCard } from "@/components/PostCard";
+import { PostCard, PostWithAuthor } from "@/components/PostCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { Card } from '@/components/ui/card';
 
+type PostLike = { user_id: string };
 type PostWithDetails = {
   id: string;
   content: string;
   image_url: string | null;
   created_at: string;
   user_id: string;
+  likes_count: number;
+  comments_count: number;
   profiles: {
     name: string;
     avatar_text: string;
     role: string;
   } | null;
-  likes: Array<{ user_id: string }>;
-  comments: Array<{ id: string }>;
+  user_like: PostLike[];
   original_post_id?: string | null;
   original_author_id?: string | null;
   original_author?: {
@@ -29,7 +31,6 @@ type PostWithDetails = {
     role: string;
   } | null;
 };
-
 type UserProfileData = {
   id: string;
   name: string;
@@ -46,34 +47,27 @@ const PostPage = () => {
     isLoading: isLoadingPost, 
     error: postError 
   } = useQuery<PostWithDetails | null>({
-    queryKey: ['post', postId],
+    queryKey: ['post', postId, user?.id],
     queryFn: async () => {
-      if (!postId) return null;
-
+      if (!postId || !user?.id) return null;
       const { data, error } = await supabase
         .from('posts')
         .select(`
-          id,
-          content,
-          image_url,
-          created_at,
-          user_id, 
+          id, content, image_url, created_at, user_id,
+          likes_count, comments_count, original_post_id, original_author_id,
           profiles!user_id (name, avatar_text, role),
-          likes:post_likes ( user_id ),
-          comments ( id ),
-          original_post_id,
-          original_author_id,
-          original_author:profiles!original_author_id (name, avatar_text, role)
+          original_author:profiles!original_author_id (name, avatar_text, role),
+          user_like:post_likes!left(user_id)
         `)
         .eq('id', postId)
+        .eq('user_like.user_id', user.id)
         .single();
-
       if (error) {
         throw new Error(error.message);
       }
       return data as PostWithDetails;
     },
-    enabled: !!postId,
+    enabled: !!postId && !!user?.id,
   });
 
   const { 
@@ -117,6 +111,8 @@ const PostPage = () => {
     );
   }
 
+  const viewerHasLiked = (post.user_like?.length || 0) > 0;
+
   return (
     <div className="bg-muted min-h-screen p-6">
       <div className="w-full max-w-2xl mx-auto">
@@ -128,21 +124,21 @@ const PostPage = () => {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Kembali
         </Button>
-        
         <Card className="shadow-xl">
           <PostCard
-              key={post.id}
-              post={{
+            key={post.id}
+            post={{
               ...post,
-              likes_count: post.likes.length,
-              comments_count: post.comments.length,
+              likes_count: post.likes_count,
+              comments_count: post.comments_count,
               original_post_id: post.original_post_id || null,
               original_author_id: post.original_author_id || null,
               original_author: post.original_author || null,
-              }}
-              currentUserId={currentUserProfile.id}
-              currentUserName={currentUserProfile.name}
-              currentUserInitials={currentUserProfile.avatar_text}
+              viewer_has_liked: viewerHasLiked,
+            }}
+            currentUserId={currentUserProfile.id}
+            currentUserName={currentUserProfile.name}
+            currentUserInitials={currentUserProfile.avatar_text}
           />
         </Card>
       </div>

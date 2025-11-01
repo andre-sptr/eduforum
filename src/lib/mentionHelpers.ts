@@ -4,13 +4,10 @@ const MENTION_REGEX = /@([a-zA-Z0-9_.]+(?:\s[a-zA-Z0-9_.]+)*)/g;
 
 export async function resolveMentionsToIds(commentText: string): Promise<string[]> {
   const mentions = [...commentText.matchAll(MENTION_REGEX)].map(match => match[1]);
-
   if (mentions.length === 0) {
     return [];
   }
-
   const uniqueNames = Array.from(new Set(mentions));
-  
   const { data: profiles, error } = await supabase
     .from('profiles')
     .select('id, name')
@@ -20,8 +17,5 @@ export async function resolveMentionsToIds(commentText: string): Promise<string[
     console.error("Gagal resolve mentions:", error.message);
     return [];
   }
-  
-  const taggedIds = profiles.map(profile => profile.id);
-  
-  return taggedIds;
+  return profiles.map(profile => profile.id);
 }

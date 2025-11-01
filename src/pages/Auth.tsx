@@ -98,16 +98,13 @@ const Auth = () => {
     try {
       const validated = resetSchema.parse({ email: resetEmail });
       setLoading(true);
-
       const { error } = await supabase.auth.resetPasswordForEmail(validated.email, {
         redirectTo: `${window.location.origin}/update-password`,
       });
-
       if (error) {
         toast.error(error.message);
         return;
       }
-
       toast.success("Link reset password telah dikirim ke email Anda!");
       setIsResetting(false);
       setResetEmail("");
@@ -127,7 +124,13 @@ const Auth = () => {
       <Card className="w-full max-w-md p-6 shadow-xl">
         <div className="mb-6 text-center">
           <div className="inline-flex items-center gap-3">
-            <img src="/favicon.png" alt="EduForum Logo" className="h-12 w-12" />
+            <img 
+              src="/favicon.png" 
+              alt="EduForum Logo" 
+              className="h-12 w-12"
+              loading="lazy"
+              decoding="async"
+            />
             <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">EduForum</h1>
           </div>
           <p className="mt-2 text-muted-foreground">Platform Sosial Edukatif MAN IC Siak</p>
@@ -204,7 +207,6 @@ const Auth = () => {
               </form>
             )}
           </TabsContent>
-  
           <TabsContent value="signup">
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="space-y-2">

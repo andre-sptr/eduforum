@@ -1,4 +1,3 @@
-// src/components/UsernameForm.tsx
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useUsernameAvailability } from "@/hooks/useUsernameAvailability";
@@ -26,9 +25,15 @@ export default function UsernameForm({ profileId, initialUsername = "" }: Props)
 
   return (
     <form onSubmit={onSubmit} className="space-y-2">
-      <label className="text-sm">Username</label>
-      <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="contoh: andre-pratama" />
-      <div className="text-xs">
+      <label htmlFor="username-input" className="text-sm">Username</label>
+      <Input 
+        id="username-input"
+        value={username} 
+        onChange={(e) => setUsername(e.target.value)} 
+        placeholder="contoh: andre-pratama" 
+        aria-describedby="username-status-message"
+      />
+      <div id="username-status-message" className="text-xs">
         {status.state === "idle" && <span className="text-muted-foreground">Hanya huruf kecil, angka, dan tanda minus.</span>}
         {status.state === "format-invalid" && <span className="text-amber-600">Format tidak valid. Saran: <b>{status.suggestion}</b></span>}
         {status.state === "checking" && <span className="text-muted-foreground">Memeriksa ketersediaan…</span>}

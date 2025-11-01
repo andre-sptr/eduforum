@@ -1,4 +1,3 @@
-// pages/RedirectByName.tsx
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,8 +10,15 @@ export default function RedirectByName(): JSX.Element | null {
     let alive = true;
     (async () => {
       const decoded = decodeURIComponent(name || "");
-      const { data } = await supabase.from("profiles").select("username").ilike("name", decoded).maybeSingle();
+      const { data } = await supabase
+        .from("profiles")
+        .select("username")
+        .ilike("name", decoded)
+        .limit(1)
+        .maybeSingle();
+      
       if (!alive) return;
+      
       if (!data?.username) {
         navigate("/404", { replace: true });
         return;

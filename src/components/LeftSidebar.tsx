@@ -38,9 +38,7 @@ export const LeftSidebar = () => {
   return (
     <aside className="col-span-2 hidden md:block">
       <div className="sticky top-20 rounded-lg border bg-card p-4 shadow-sm">
-
         <h3 className="font-bold mb-4 text-card-foreground">Navigasi</h3>
-        
         <nav className="flex flex-col space-y-1 mb-4 border-b pb-4">
           {navItems.map((item) => {
             let isActive = false;
@@ -51,10 +49,8 @@ export const LeftSidebar = () => {
             } else {
               isActive = currentPath.startsWith(item.href);
             }
-
             const Icon = item.icon;
             const targetLink = item.actualLink || item.href;
-
             return (
               <Button
                 variant={isActive ? "secondary" : "ghost"}
@@ -70,11 +66,9 @@ export const LeftSidebar = () => {
             );
           })}
         </nav>
-        
         <h3 className="font-bold mb-3 text-card-foreground flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-primary/70"/> Leaderboard
         </h3>
-        
         <div className="space-y-1">
           {isLoadingLeaderboard ? (
             [1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-6 w-full rounded-md" />)
@@ -93,10 +87,8 @@ export const LeftSidebar = () => {
                   }`}>
                     {index < 3 ? '👑' : `${index + 1}.`} 
                   </span>
-                  
                   <span className="text-sm truncate">{user.name}</span>
                 </div>
-
                 <span className="text-xs text-primary font-semibold flex-shrink-0">
                   {user.follower_count} Pengikut
                 </span>

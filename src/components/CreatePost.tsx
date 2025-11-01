@@ -1,13 +1,14 @@
+import React, { useState, useRef, ChangeEvent, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, Image, Paperclip, X, FileText, Volume2 } from "lucide-react";
 import { UserAvatar } from "./UserAvatar";
-import { useState, useRef, ChangeEvent } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { resolveMentionsToIds } from "@/lib/mentionHelpers"; // <-- 1. IMPORT FUNGSI ANDA
 
 interface CreatePostProps {
   userName: string;
@@ -25,60 +26,54 @@ export const CreatePost = ({ userName, userInitials }: CreatePostProps) => {
   const [activeMention, setActiveMention] = useState<string | null>(null);
   const { user } = useAuth();
 
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      const MAX_FILE_SIZE_MB = 15;
-      const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-
-      if (!file) {
-        setSelectedFile(null);
-        setPreviewUrl(null);
-        return;
-      }
-
-      if (file.size > MAX_FILE_SIZE_BYTES) {
-        toast.error(`Ukuran file maksimal adalah ${MAX_FILE_SIZE_MB} MB.`);
-        if (event.target) {
-          event.target.value = "";
-        }
-        setSelectedFile(null);
-        setPreviewUrl(null);
-        return;
-      }
-
-      setSelectedFile(file);
-      
-      if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
-        setPreviewUrl(URL.createObjectURL(file));
-      } else {
-        setPreviewUrl(null);
-      }
+    const file = event.target.files?.[0];
+    const MAX_FILE_SIZE_MB = 15;
+    const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    if (!file) {
+      setSelectedFile(null);
+      setPreviewUrl(null);
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      toast.error(`Ukuran file maksimal adalah ${MAX_FILE_SIZE_MB} MB.`);
+      if (event.target) event.target.value = "";
+      setSelectedFile(null);
+      setPreviewUrl(null);
+      return;
+    }
+    setSelectedFile(file);
+    if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
+      setPreviewUrl(URL.createObjectURL(file));
+    } else {
+      setPreviewUrl(null);
+    }
   };
 
-  const triggerImageVideoInput = () => {
-    imageVideoInputRef.current?.click();
-  };
-
-  const triggerAudioInput = () => {
-      audioInputRef.current?.click();
-  };
-
-  const triggerDocInput = () => {
-      docInputRef.current?.click();
-  };
+  const triggerImageVideoInput = () => imageVideoInputRef.current?.click();
+  const triggerAudioInput = () => audioInputRef.current?.click();
+  const triggerDocInput = () => docInputRef.current?.click();
 
   const clearFileSelection = () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
     setSelectedFile(null);
     setPreviewUrl(null);
-    if (imageVideoInputRef.current) {
-      imageVideoInputRef.current.value = ""; 
-    }
-    if (audioInputRef.current) {
-      audioInputRef.current.value = ""; 
-    }
-    if (docInputRef.current) {
-      docInputRef.current.value = ""; 
-    }
+    if (imageVideoInputRef.current) imageVideoInputRef.current.value = ""; 
+    if (audioInputRef.current) audioInputRef.current.value = ""; 
+    if (docInputRef.current) docInputRef.current.value = ""; 
   };
 
   const createPostMutation = useMutation({
@@ -88,7 +83,6 @@ export const CreatePost = ({ userName, userInitials }: CreatePostProps) => {
 
       let mediaUrl: string | null = null;
       let filePath: string | null = null;
-
       if (file) {
         const fileExt = file.name.split('.').pop();
         filePath = `${user.id}/${Date.now()}.${fileExt}`;
@@ -96,39 +90,18 @@ export const CreatePost = ({ userName, userInitials }: CreatePostProps) => {
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('post_media')
           .upload(filePath, file);
-
         if (uploadError) {
           toast.error(`Gagal mengupload: ${uploadError.message}`);
           throw new Error(uploadError.message);
         }
-
         const { data: urlData } = supabase.storage
           .from('post_media')
           .getPublicUrl(uploadData.path);
         mediaUrl = urlData.publicUrl;
       }
 
-      let taggedUserIds: string[] = [];
-      const mentionRegex = /@([a-zA-Z0-9_.]+(?:\s[a-zA-Z0-9_.]+)*)/g; 
-      const mentions = content.match(mentionRegex);
-
-      if (mentions && mentions.length > 0) {
-          const names = mentions.map(m => m.substring(1).trim()); 
-          const nameFilters = names
-              .map(name => `name.ilike.%${name}%`)
-              .join(',');
-
-          const { data: mentionedUsers, error: userError } = await supabase
-              .from('profiles')
-              .select('id, name') 
-              .or(nameFilters); 
-
-          if (userError) {
-              console.error("Error mencari user yang dimention:", userError);
-          } else if (mentionedUsers) {
-              taggedUserIds = mentionedUsers.map(u => u.id);
-          }
-      }
+      // --- 2. PERBAIKAN: Gunakan fungsi Anda yang cepat dan akurat ---
+      const taggedUserIds = await resolveMentionsToIds(content);
 
       const { data: insertedPostData, error: insertError } = await supabase.from("posts").insert({
         user_id: user.id,
@@ -147,20 +120,20 @@ export const CreatePost = ({ userName, userInitials }: CreatePostProps) => {
 
       if (taggedUserIds.length > 0 && insertedPostData) {
          try {
-            const notifications = taggedUserIds
-               .filter(id => id !== user.id) 
-               .map(taggedUserId => ({
-                  user_id: taggedUserId, 
-                  actor_id: user.id, 	
-                  type: 'mention', 	
-                  post_id: insertedPostData.id 
-               }));
-            if (notifications.length > 0) {
-               const { error: notifError } = await supabase.from('notifications').insert(notifications);
-               if (notifError) console.error("Gagal mengirim notifikasi mention:", notifError);
-            }
+           const notifications = taggedUserIds
+             .filter(id => id !== user.id) 
+             .map(taggedUserId => ({
+               user_id: taggedUserId, 
+               actor_id: user.id, 	
+               type: 'mention', 	
+               post_id: insertedPostData.id 
+             }));
+           if (notifications.length > 0) {
+             const { error: notifError } = await supabase.from('notifications').insert(notifications);
+             if (notifError) console.error("Gagal mengirim notifikasi mention:", notifError);
+           }
          } catch (e) {
-             console.error("Error saat proses notifikasi mention:", e);
+            console.error("Error saat proses notifikasi mention:", e);
          }
       }
     },
@@ -187,13 +160,10 @@ export const CreatePost = ({ userName, userInitials }: CreatePostProps) => {
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
     setContent(newContent);
-    
     const mentionRegex = /@(\w+)$/; 
     const match = newContent.match(mentionRegex);
-
     if (match) {
       const typedText = match[1]; 
-      
       if (typedText.length >= 2) {
         setActiveMention(typedText); 
       } else {
@@ -208,14 +178,12 @@ export const CreatePost = ({ userName, userInitials }: CreatePostProps) => {
       queryKey: ['suggestedUsers', activeMention],
       queryFn: async () => {
           if (!activeMention || activeMention.length < 2 || !user) return [];
-
           const { data, error } = await supabase
               .from('profiles')
               .select('id, name, avatar_text, role') 
               .ilike('name', `${activeMention}%`)
               .neq('id', user.id)
               .limit(5);
-
           if (error) throw error;
           return data || [];
       },
@@ -234,15 +202,12 @@ export const CreatePost = ({ userName, userInitials }: CreatePostProps) => {
             placeholder=" Apa yang ingin kamu bagikan? Gunakan @ untuk mention teman." 
             className="min-h-[80px] border-0 p-0 text-base shadow-none focus-visible:ring-0" 
           />
-
           {activeMention && (
             <div className="absolute z-20 w-1/2 mt-1 bg-card border rounded-lg shadow-lg max-h-60 overflow-y-auto">
               {isSearching && <p className="p-2 text-xs text-muted-foreground">Mencari...</p>}
-              
               {suggestedUsers.length === 0 && !isSearching && activeMention.length > 1 && (
                   <p className="p-2 text-xs text-muted-foreground">Tidak ada saran ditemukan.</p>
               )}
-              
               {suggestedUsers.map((user) => (
                 <div 
                   key={user.id} 
@@ -260,31 +225,9 @@ export const CreatePost = ({ userName, userInitials }: CreatePostProps) => {
               ))}
             </div>
           )}
-
-          <input 
-            type="file" 
-            ref={imageVideoInputRef} 
-            onChange={handleFileChange} 
-            className="hidden" 
-            accept="image/*,video/*"
-          />
-
-          <input 
-            type="file" 
-            ref={audioInputRef} 
-            onChange={handleFileChange} 
-            className="hidden" 
-            accept="audio/*"
-          />
-
-          <input 
-            type="file" 
-            ref={docInputRef} 
-            onChange={handleFileChange} 
-            className="hidden" 
-            accept="application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
-          />
-
+          <input type="file" ref={imageVideoInputRef} onChange={handleFileChange} className="hidden" accept="image/*,video/*"/>
+          <input type="file" ref={audioInputRef} onChange={handleFileChange} className="hidden" accept="audio/*"/>
+          <input type="file" ref={docInputRef} onChange={handleFileChange} className="hidden" accept="application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx"/>
           {selectedFile && (
             <div className="mt-3 relative w-fit">
               {selectedFile.type.startsWith('image/') && previewUrl && (
@@ -312,41 +255,18 @@ export const CreatePost = ({ userName, userInitials }: CreatePostProps) => {
               </Button>
             </div>
           )}
-
           <div className="mt-4 flex justify-between items-center">
             <div className="flex gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-primary"
-                onClick={triggerDocInput}
-                aria-label="Upload Dokumen/Media"
-                disabled={createPostMutation.isPending}
-              >
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={triggerDocInput} aria-label="Upload Dokumen/Media" disabled={createPostMutation.isPending}>
                 <Paperclip className="h-5 w-5" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-primary"
-                onClick={triggerImageVideoInput}
-                aria-label="Upload Gambar/Video"
-                disabled={createPostMutation.isPending}
-              >
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={triggerImageVideoInput} aria-label="Upload Gambar/Video" disabled={createPostMutation.isPending}>
                 <Image className="h-5 w-5" />
               </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-muted-foreground hover:text-primary" 
-                onClick={triggerAudioInput} 
-                aria-label="Upload Audio/Musik"
-                disabled={createPostMutation.isPending} 
-              >
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary" onClick={triggerAudioInput} aria-label="Upload Audio/Musik" disabled={createPostMutation.isPending}>
                 <Volume2 className="h-5 w-5" />
               </Button>
             </div>
-
             <Button
               size="sm"
               onClick={handlePostSubmit}

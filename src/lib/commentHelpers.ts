@@ -19,13 +19,10 @@ export interface Comment extends RawComment {
 
 export const nestComments = (commentList: RawComment[]): Comment[] => {
   const commentMap: Record<string, Comment> = {};
-
   commentList.forEach(comment => {
     commentMap[comment.id] = { ...comment, replies: [] };
   });
-
   const nestedComments: Comment[] = [];
-
   Object.values(commentMap).forEach(comment => {
     if (comment.parent_comment_id) {
       const parent = commentMap[comment.parent_comment_id];
@@ -36,6 +33,5 @@ export const nestComments = (commentList: RawComment[]): Comment[] => {
       nestedComments.push(comment);
     }
   });
-
   return nestedComments;
 };

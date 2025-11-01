@@ -5,17 +5,16 @@ import { nestComments, RawComment } from "@/lib/commentHelpers";
 import { resolveMentionsToIds } from "@/lib/mentionHelpers";
 
 export type CommentRow = RawComment & { post_id: string };
-
 type PageResult = { rows: CommentRow[]; nextOffset: number | null };
 
-async function fetchCommentsPage(postId: string, offset: number, pageSize: number): Promise<PageResult> {
+async function fetchCommentsPage(postId: string, offset: number, pageSize: number, currentUserId: string): Promise<PageResult> {
   const { data, error } = await supabase
     .from("comments")
     .select(
       `
       id, post_id, user_id, content, image_url, created_at, parent_comment_id,
       profiles(name, avatar_text),
-      user_like:comment_likes!left(id, user_id),
+      user_like:comment_likes!left(id, user_id, user_id.eq.${currentUserId}), 
       likes_count
     `
     )
@@ -23,10 +22,9 @@ async function fetchCommentsPage(postId: string, offset: number, pageSize: numbe
     .order("created_at", { ascending: true })
     .range(offset, offset + pageSize - 1);
   if (error) throw new Error(error.message);
-
   const rows: CommentRow[] = (data ?? []).map((d: any) => {
-    const profSource = Array.isArray(d.profiles) ? d.profiles[0] ?? {} : d.profiles ?? {};
-    const likeArr = Array.isArray(d.user_like) ? d.user_like : d.user_like ? [d.user_like] : [];
+    const profSource = d.profiles ?? {};
+    const likeArr = d.user_like ?? [];
     return {
       id: String(d.id),
       post_id: String(d.post_id),
@@ -43,7 +41,6 @@ async function fetchCommentsPage(postId: string, offset: number, pageSize: numbe
       likes_count: typeof d.likes_count === "number" ? d.likes_count : Number(d.likes_count ?? 0),
     };
   });
-
   const nextOffset = rows.length < pageSize ? null : offset + pageSize;
   return { rows, nextOffset };
 }
@@ -59,7 +56,8 @@ export function useComments(postId: string, currentUser: CurrentUser, pageSize =
     enabled: !!postId,
     initialPageParam: 0,
     getNextPageParam: (lastPage: PageResult) => lastPage.nextOffset,
-    queryFn: async ({ pageParam }) => fetchCommentsPage(postId, pageParam as number, pageSize),
+    queryFn: async ({ pageParam }) => 
+      fetchCommentsPage(postId, pageParam as number, pageSize, currentUserId),
     staleTime: 30000,
     gcTime: 300000,
   });
@@ -113,6 +111,7 @@ export function useComments(postId: string, currentUser: CurrentUser, pageSize =
       const prevComments = queryClient.getQueryData<any>(["comments", postId, { pageSize }]);
       const prevPost = queryClient.getQueryData<any>(["post", postId]);
       const prevLists = queryClient.getQueriesData({ queryKey: ["posts"] });
+      const optimisticImageUrl = vars.file ? URL.createObjectURL(vars.file) : null;
       queryClient.setQueryData(["post", postId], (old: any) =>
         old ? { ...old, comments_count: Math.max(0, (old.comments_count || 0) + 1) } : old
       );
@@ -137,7 +136,7 @@ export function useComments(postId: string, currentUser: CurrentUser, pageSize =
           post_id: postId,
           user_id: currentUserId,
           content: vars.text || null,
-          image_url: null,
+          image_url: optimisticImageUrl,
           created_at: new Date().toISOString(),
           parent_comment_id: vars.parentId,
           profiles: {
@@ -147,14 +146,22 @@ export function useComments(postId: string, currentUser: CurrentUser, pageSize =
           user_like: [],
           likes_count: 0,
         };
-        const first = old.pages[0];
-        const newFirst = { ...first, rows: [...first.rows, optimistic] };
-        const pages = [newFirst, ...old.pages.slice(1)];
+        const lastPageIndex = old.pages.length - 1;
+        const lastPage = old.pages[lastPageIndex];
+        const newLastPage = { 
+          ...lastPage, 
+          rows: [...lastPage.rows, optimistic] 
+        };
+        const pages = [
+          ...old.pages.slice(0, lastPageIndex), 
+          newLastPage
+        ];
         return { ...old, pages };
       });
-      return { prevComments, prevPost, prevLists };
+      return { prevComments, prevPost, prevLists, optimisticImageUrl };
     },
     onError: (_e, _v, ctx) => {
+      if (ctx?.optimisticImageUrl) URL.revokeObjectURL(ctx.optimisticImageUrl);
       if (ctx?.prevComments) queryClient.setQueryData(["comments", postId, { pageSize }], ctx.prevComments);
       if (ctx?.prevPost) queryClient.setQueryData(["post", postId], ctx.prevPost);
       if (ctx?.prevLists) {
@@ -163,7 +170,8 @@ export function useComments(postId: string, currentUser: CurrentUser, pageSize =
         });
       }
     },
-    onSettled: () => {
+    onSettled: (_data, _error, _vars, ctx) => {
+      if (ctx?.optimisticImageUrl) URL.revokeObjectURL(ctx.optimisticImageUrl);
       queryClient.invalidateQueries({ queryKey: ["comments", postId] });
       queryClient.invalidateQueries({ queryKey: ["post", postId] });
       queryClient.invalidateQueries({ queryKey: ["posts"] });

@@ -1,4 +1,3 @@
-// src/components/Navbar.tsx
 import { Moon, Sun, LogOut, Search, Bell, User, Heart, MessageCircle, MessageSquare, Repeat, AtSign } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -11,41 +10,27 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-type NotifType =
-  | "like"
-  | "comment_like"
-  | "repost"
-  | "comment"
-  | "follow"
-  | "chat_message"
-  | "mention"          // legacy (post)
-  | "mention_post"     // opsional alias (post)
-  | "mention_comment"; // baru (komentar)
-
+type NotifType = "like" | "comment_like" | "repost" | "comment" | "follow" | "chat_message" | "mention" | "mention_post" | "mention_comment";
 interface Notification {
   id: string;
-  type: NotifType | string; // toleransi
+  type: NotifType | string;
   is_read: boolean;
   created_at: string;
   room_id: string | null;
   post_id?: string | null;
   actor: { name: string; avatar_text: string };
 }
-
 interface NavbarProps {
   userName?: string;
   userInitials?: string;
 }
-
 interface UserProfileData {
   id: string;
   name: string;
   avatar_text: string;
 }
 
-const isMentionType = (t: Notification["type"]) =>
-  t === "mention" || t === "mention_post" || t === "mention_comment";
-
+const isMentionType = (t: Notification["type"]) => t === "mention" || t === "mention_post" || t === "mention_comment";
 const formatTime = (t: string | null | undefined) => {
   if (!t) return "beberapa saat lalu";
   try {
@@ -80,7 +65,6 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-
   const [hasNewActivityNotif, setHasNewActivityNotif] = useState(false);
   const [hasNewChatNotif, setHasNewChatNotif] = useState(false);
 
@@ -90,10 +74,7 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
       if (!user) return [];
       const { data, error } = await supabase
         .from("notifications")
-        .select(`
-          id, type, is_read, created_at, room_id, post_id,
-          actor:profiles!actor_id (name, avatar_text)
-        `)
+        .select(`id, type, is_read, created_at, room_id, post_id, actor:profiles!actor_id (name, avatar_text)`)
         .eq("user_id", user.id)
         .neq("type", "chat_message")
         .order("created_at", { ascending: false })
@@ -110,10 +91,7 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
       if (!user) return [];
       const { data, error } = await supabase
         .from("notifications")
-        .select(`
-          id, type, is_read, created_at, room_id, post_id,
-          actor:profiles!actor_id (name, avatar_text)
-        `)
+        .select(`id, type, is_read, created_at, room_id, post_id, actor:profiles!actor_id (name, avatar_text)`)
         .eq("user_id", user.id)
         .eq("type", "chat_message")
         .order("created_at", { ascending: false })
@@ -215,7 +193,6 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
   };
 
   const handleNotificationClick = (notif: Notification) => {
-    // why: navigasi cukup ke post; tanpa comment_id kita tidak scroll spesifik
     if (notif.type === "chat_message" && notif.room_id) {
       navigate(`/chat/${notif.room_id}`);
     } else if (notif.post_id) {
@@ -255,12 +232,11 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center justify-between gap-6 px-4">
         <div className="flex items-center gap-2">
-          <img src="/favicon.png" alt="EduForum Logo" className="h-8 w-8" />
+          <img src="/favicon.png" alt="EduForum Logo" className="h-8 w-8" decoding="async" />
           <span className="text-xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
             EduForum
           </span>
         </div>
-
         <div className="flex-1 max-w-sm hidden md:block">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -274,7 +250,6 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
             />
           </div>
         </div>
-
         <div className="flex items-center gap-1">
           <Popover onOpenChange={handleOpenChatNotifs}>
             <PopoverTrigger asChild>
@@ -328,7 +303,6 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
               </div>
             </PopoverContent>
           </Popover>
-
           <Popover onOpenChange={handleOpenActivityNotifs}>
             <PopoverTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full relative">
@@ -371,7 +345,6 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
                           {notif.type === "follow" && <User className="h-4 w-4 text-blue-500" />}
                           {isMentionType(notif.type) && <AtSign className="h-4 w-4 text-indigo-500" />}
                         </div>
-
                         <UserAvatar name={notif.actor.name} initials={notif.actor.avatar_text} size="sm" />
                         <div className="flex-1">
                           <p className={`text-sm ${!notif.is_read ? "text-foreground" : "text-muted-foreground"}`}>
@@ -387,11 +360,9 @@ export const Navbar = ({ userName, userInitials }: NavbarProps) => {
               </div>
             </PopoverContent>
           </Popover>
-
           <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setIsDark(!isDark)}>
             {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
-
           {userName && userInitials && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

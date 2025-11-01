@@ -37,13 +37,10 @@ const UpdatePassword = () => {
     e.preventDefault();
     try {
       const validated = updatePasswordSchema.parse({ password, confirmPassword });
-
       setLoading(true);
-
       const { error } = await supabase.auth.updateUser({
         password: validated.password,
       });
-
       if (error) {
         toast.error(error.message.includes("expired") 
           ? "Link reset password Anda sudah kedaluwarsa. Silakan minta yang baru." 
@@ -51,10 +48,8 @@ const UpdatePassword = () => {
         );
         return;
       }
-
       toast.success("Password Anda berhasil diperbarui!");
       navigate("/auth");
-
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
@@ -75,7 +70,6 @@ const UpdatePassword = () => {
             Silakan masukkan password baru Anda.
           </p>
         </div>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="new-password">Password Baru</Label>
@@ -100,7 +94,6 @@ const UpdatePassword = () => {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Menyimpan..." : "Simpan Password"}
           </Button>
-
           <Button 
             variant="link" 
             type="button" 

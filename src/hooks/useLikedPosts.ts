@@ -1,4 +1,3 @@
-// useLikedPosts.ts
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -13,7 +12,7 @@ export const useLikedPosts = (userId: string | undefined, postIds: string[]) => 
         .eq("user_id", userId)
         .in("post_id", postIds);
       if (error) throw error;
-      return new Set<string>((data || []).map((r: any) => r.post_id));
+      return new Set<string>((data || []).map((r: { post_id: string }) => r.post_id));
     },
     staleTime: 60_000,
     gcTime: 300_000,

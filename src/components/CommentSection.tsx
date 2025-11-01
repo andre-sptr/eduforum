@@ -22,7 +22,7 @@ export const CommentSection = ({ postId, currentUserProfile }: CommentSectionPro
   const currentUserId = currentUserProfile.id;
 
   const { data: flatComments = [], isLoading } = useQuery<RawComment[]>({
-    queryKey: ["comments", postId],
+    queryKey: ["comments", postId, currentUserId], 
     queryFn: async () => {
       if (!currentUserId) return [];
       const { data, error } = await supabase
@@ -31,11 +31,11 @@ export const CommentSection = ({ postId, currentUserProfile }: CommentSectionPro
           id, user_id, content, image_url, created_at, likes_count,
           parent_comment_id,
           profiles(name, avatar_text),
-          user_like:comment_likes!left(id, user_id)
+          user_like:comment_likes!comment_id(id) 
         `)
         .eq("post_id", postId)
+        .eq("user_like.user_id", currentUserId)
         .order("created_at", { ascending: true });
-
       if (error) throw error;
       return data ?? [];
     },
@@ -51,11 +51,9 @@ export const CommentSection = ({ postId, currentUserProfile }: CommentSectionPro
       parentId: string | null
     }) => {
       if (!currentUserId) throw new Error("Login dulu ya");
-
       const taggedIds = await resolveMentionsToIds(text);
       let imageUrl: string | null = null;
       let filePath: string | null = null;
-
       if (file) {
         const fileExt = file.name.split('.').pop();
         filePath = `comments/${postId}/${currentUserId}_${Date.now()}.${fileExt}`;
@@ -63,17 +61,13 @@ export const CommentSection = ({ postId, currentUserProfile }: CommentSectionPro
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('post_media')
           .upload(filePath, file);
-
         if (uploadError) throw new Error(uploadError.message);
-
         const { data: urlData } = supabase.storage
           .from('post_media')
           .getPublicUrl(uploadData.path);
         imageUrl = urlData.publicUrl;
       }
-
       if (!text && !imageUrl) throw new Error("Komentar tidak boleh kosong");
-
       const { data: insertedCommentData, error: insertError } = await supabase
         .from("comments")
         .insert({
@@ -86,14 +80,12 @@ export const CommentSection = ({ postId, currentUserProfile }: CommentSectionPro
         })
         .select('id')
         .single();
-
       if (insertError) {
         if (imageUrl && file && filePath) {
           await supabase.storage.from('post_media').remove([filePath]);
         }
         throw insertError;
       }
-
       if (taggedIds.length > 0) {
         try {
           const rows = taggedIds
@@ -104,12 +96,10 @@ export const CommentSection = ({ postId, currentUserProfile }: CommentSectionPro
               type: "mention_comment",
               post_id: postId,
             }));
-
           const uniqueRows = rows.filter(
             (r, i, arr) =>
               i === arr.findIndex((x) => x.user_id === r.user_id && x.post_id === r.post_id && x.type === x.type)
           );
-
           if (uniqueRows.length > 0) {
             const { error } = await supabase.from("notifications").insert(uniqueRows);
             if (error) {
@@ -121,7 +111,6 @@ export const CommentSection = ({ postId, currentUserProfile }: CommentSectionPro
           console.error("[notifications] exception:", e);
         }
       }
-
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["comments", postId] });
@@ -156,7 +145,6 @@ export const CommentSection = ({ postId, currentUserProfile }: CommentSectionPro
       <h3 className="text-lg font-semibold border-t pt-4">
         Komentar ({flatComments.length})
       </h3>
-
       {currentUserProfile && (
         <div className="pt-3">
           <CommentForm
@@ -169,14 +157,12 @@ export const CommentSection = ({ postId, currentUserProfile }: CommentSectionPro
           />
         </div>
       )}
-
       {isLoading && (
         <div className="space-y-4 pt-4">
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-20 w-full" />
         </div>
       )}
-
       {!isLoading && nestedComments.length > 0 && (
         <div className="space-y-3 pt-3">
           {nestedComments.map((comment) => (
@@ -196,11 +182,9 @@ export const CommentSection = ({ postId, currentUserProfile }: CommentSectionPro
           ))}
         </div>
       )}
-      
       {!isLoading && nestedComments.length === 0 && (
           <p className="text-center text-muted-foreground py-4">Belum ada komentar.</p>
       )}
-
     </div>
   );
 };

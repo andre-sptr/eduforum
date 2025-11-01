@@ -1,10 +1,8 @@
 const getEnv = (key: string) => {
   const value = import.meta.env[key as keyof ImportMetaEnv];
-
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`Missing required environment variable: ${key}`);
   }
-
   return value;
 };
 

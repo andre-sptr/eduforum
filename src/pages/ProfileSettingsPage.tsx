@@ -47,7 +47,7 @@ const ProfileSettingsPage = () => {
 
   const { data: currentProfile, isLoading: isProfileLoading } = useQuery<ProfileData | null>({
     queryKey: ['userProfile', user?.id],
-    queryFn: async () => {  
+    queryFn: async () => { 	
       if (!user) return null;
       const { data } = await supabase
         .from('profiles')
@@ -126,10 +126,8 @@ const ProfileSettingsPage = () => {
       <Navbar userName={currentProfile?.name || ''} userInitials={currentProfile?.avatar_text || ''} />
       <main className="container mx-auto grid grid-cols-10 gap-6 py-6">
         <LeftSidebar />
-
         <section className="col-span-10 md:col-span-5 space-y-6">
           <h1 className="text-2xl font-bold">Pengaturan</h1> 
-
           <form onSubmit={handleSubmit(onSubmit)}>
             <Card>
               <CardHeader>
@@ -145,7 +143,6 @@ const ProfileSettingsPage = () => {
                   />
                   {errors.name && <p className="text-sm text-red-500">{errors.name.message}</p>}
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="avatar_text">Inisial Avatar (2 Huruf)</Label>
                   <Input
@@ -157,7 +154,6 @@ const ProfileSettingsPage = () => {
                   />
                   {errors.avatar_text && <p className="text-sm text-red-500">{errors.avatar_text.message}</p>}
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="bio">Bio Singkat</Label>
                   <Textarea
@@ -168,12 +164,10 @@ const ProfileSettingsPage = () => {
                   />
                   {errors.bio && <p className="text-sm text-red-500">{errors.bio.message}</p>}
                 </div>
-
-                 <div className="space-y-2">
+                <div className="space-y-2">
                   <Label>Peran</Label>
                   <Input value={currentProfile?.role || 'Siswa'} disabled className="bg-muted" />
-                 </div>
-
+                </div>
               </CardContent>
               <CardFooter>
                 <Button type="submit" disabled={!isDirty || isSubmitting}>
@@ -183,10 +177,8 @@ const ProfileSettingsPage = () => {
             </Card>
           </form>
         </section>
-
         <RightSidebar />
       </main>
-
       <footer className="border-t py-4 bg-muted/30">
         <div className="container mx-auto px-4 text-center">
           <p className="text-sm text-muted-foreground">

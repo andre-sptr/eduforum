@@ -1,6 +1,7 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/database.types";
+import { useMemo } from "react";
 
 type ProfileLite = {
   name: string | null;
@@ -33,18 +34,12 @@ export type UseInfinitePostsOptions = {
   enabled?: boolean;
 };
 
-type PageResult = {
-  rows: FeedPost[];
-  nextOffset: number | null;
-};
-
+type PageResult = { rows: FeedPost[]; nextOffset: number | null };
+type PostLikeRow = { user_id: string };
 type PostRow = Database["public"]["Tables"]["posts"]["Row"] & {
   profiles: ProfileLite | null;
   original_author: ProfileLite | null;
-};
-
-type PostLikeRow = {
-  post_id: string;
+  user_like: PostLikeRow[];
 };
 
 async function fetchPostsPage(
@@ -56,32 +51,29 @@ async function fetchPostsPage(
     .from("posts")
     .select(
       `
-      id,
-      content,
-      image_url,
-      created_at,
-      user_id,
-      likes_count,
-      comments_count,
+      id, content, image_url, created_at, user_id,
+      likes_count, comments_count,
+      tagged_user_ids, updated_at, 
       profiles!user_id(name, username, avatar_text, role),
-      original_post_id,
-      original_author_id,
-      original_author:profiles!original_author_id(name, username, avatar_text, role)
+      original_post_id, original_author_id,
+      original_author:profiles!original_author_id(name, username, avatar_text, role),
+      user_like:post_likes!left(post_id, user_id)
     `
     );
 
   if (opts.userFilterId) {
     query = query.eq("user_id", opts.userFilterId);
   }
-
+  if (opts.currentUserId) {
+    query = query.eq("user_like.user_id", opts.currentUserId);
+  }
   const orderDesc = opts.orderDesc ?? true;
   query = query.order(opts.orderBy ?? "created_at", { ascending: !orderDesc });
 
   const { data, error } = await query.range(offset, offset + pageSize - 1);
-
   if (error) throw new Error(error.message);
 
-  const rowsBase =
+  const rows: FeedPost[] =
     ((data as PostRow[] | null) ?? []).map((row) => ({
       id: row.id,
       content: row.content ?? null,
@@ -94,41 +86,16 @@ async function fetchPostsPage(
       original_author: row.original_author ?? null,
       likes_count: typeof row.likes_count === "number" ? row.likes_count : 0,
       comments_count: typeof row.comments_count === "number" ? row.comments_count : 0,
+      viewer_has_liked: (row.user_like?.length || 0) > 0,
     })) ?? [];
 
-  let viewerLikedIds: Set<string> | null = null;
-
-  if (opts.currentUserId && rowsBase.length > 0) {
-    const postIds = rowsBase.map((row) => row.id);
-    if (postIds.length > 0) {
-      const { data: viewerLikeRows, error: viewerLikeError } = await supabase
-        .from("post_likes")
-        .select<PostLikeRow>("post_id")
-        .eq("user_id", opts.currentUserId)
-        .in("post_id", postIds);
-      if (viewerLikeError) throw new Error(viewerLikeError.message);
-      viewerLikedIds = new Set((viewerLikeRows ?? []).map((row) => String(row.post_id)));
-    }
-  }
-
-  const rows: FeedPost[] = rowsBase.map((row) => ({
-    ...row,
-    viewer_has_liked: viewerLikedIds ? viewerLikedIds.has(row.id) : false,
-  }));
-
   const nextOffset = rows.length < pageSize ? null : offset + pageSize;
-
   return { rows, nextOffset };
 }
 
-/**
- * Infinite posts hook dengan offset-based pagination.
- * Kenapa offset: sederhana untuk Supabase, cocok untuk feed linear. Jika skala besar, pertimbangkan keyset.
- */
 export function useInfinitePosts(options: UseInfinitePostsOptions = {}) {
   const pageSize = options.pageSize ?? 10;
   const enabled = options.enabled ?? true;
-
   const query = useInfiniteQuery({
     queryKey: [
       "posts",
@@ -148,7 +115,10 @@ export function useInfinitePosts(options: UseInfinitePostsOptions = {}) {
     enabled,
   });
 
-  const posts = (query.data?.pages ?? []).flatMap((p) => p.rows);
+  const posts = useMemo(
+    () => (query.data?.pages ?? []).flatMap((p) => p.rows),
+    [query.data]
+  );
 
   return {
     ...query,
