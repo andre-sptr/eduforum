@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -6,9 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const signupSchema = z.object({
   email: z.string().email("Email tidak valid").max(255),
@@ -16,229 +16,169 @@ const signupSchema = z.object({
   name: z.string().trim().min(2, "Nama minimal 2 karakter").max(100),
   role: z.enum(["Siswa", "Guru", "Alumni"]),
 });
+const loginSchema = z.object({ email: z.string().email("Email tidak valid"), password: z.string().min(1, "Password harus diisi") });
+const resetSchema = z.object({ email: z.string().email("Email tidak valid") });
 
-const loginSchema = z.object({
-  email: z.string().email("Email tidak valid"),
-  password: z.string().min(1, "Password harus diisi"),
-});
+type Role = "Siswa" | "Guru" | "Alumni";
+const Brand = () => (
+  <div className="mb-6 text-center">
+    <div className="inline-flex items-center gap-3">
+      <img src="/favicon.png" alt="EduForum Logo" className="h-12 w-12" loading="lazy" decoding="async" />
+      <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">EduForum</h1>
+    </div>
+    <p className="mt-2 text-muted-foreground">Platform Sosial Edukatif MAN IC Siak</p>
+  </div>
+);
 
-const resetSchema = z.object({
-  email: z.string().email("Email tidak valid"),
-});
+function Field({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      {children}
+    </div>
+  );
+}
 
-const Auth = () => {
-  const navigate = useNavigate();
+export default function Auth() {
+  const nav = useNavigate();
+  const [tab, setTab] = useState<"login" | "signup">("login");
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("login");
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [signupEmail, setSignupEmail] = useState("");
-  const [signupPassword, setSignupPassword] = useState("");
-  const [name, setName] = useState("");
-  const [role, setRole] = useState<"Siswa" | "Guru" | "Alumni">("Siswa");
-  const [isResetting, setIsResetting] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
+
+  // state login
+  const [login, setLogin] = useState({ email: "", password: "" });
+  // state signup
+  const [signup, setSignup] = useState<{ email: string; password: string; name: string; role: Role }>({
+    email: "", password: "", name: "", role: "Siswa",
+  });
+  // state reset
   const [resetEmail, setResetEmail] = useState("");
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) navigate("/");
-    });
-  }, [navigate]);
+    supabase.auth.getSession().then(({ data: { session } }) => { if (session) nav("/"); });
+  }, [nav]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const validated = loginSchema.parse({ email: loginEmail, password: loginPassword });
-      setLoading(true);
-      const { error } = await supabase.auth.signInWithPassword({
-        email: validated.email,
-        password: validated.password,
-      });
-      if (error) {
-        toast.error(error.message.includes("Invalid") ? "Email atau password salah" : error.message);
-        return;
-      }
-      toast.success("Login berhasil!");
-      navigate("/");
-    } catch (error) {
-      if (error instanceof z.ZodError) toast.error(error.errors[0].message);
-    } finally {
-      setLoading(false);
-    }
+  const safeParse = <T,>(schema: z.ZodSchema<T>, data: unknown) => {
+    const res = schema.safeParse(data);
+    if (!res.success) throw new Error(res.error.errors[0].message);
+    return res.data;
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
+  const onLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const validated = signupSchema.parse({ email: signupEmail, password: signupPassword, name, role });
       setLoading(true);
+      const v = safeParse(loginSchema, login);
+      const { email, password } = v;
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return toast.error(error.message.includes("Invalid") ? "Email atau password salah" : error.message);
+      toast.success("Login berhasil!"); nav("/");
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally { setLoading(false); }
+  };
+
+  const onSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const v = safeParse(signupSchema, signup);
       const { error } = await supabase.auth.signUp({
-        email: validated.email,
-        password: validated.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: { name: validated.name, role: validated.role },
-        },
+        email: v.email, password: v.password,
+        options: { emailRedirectTo: `${window.location.origin}/`, data: { name: v.name, role: v.role } },
       });
-      if (error) {
-        toast.error(error.message.includes("already") ? "Email sudah terdaftar" : error.message);
-        return;
-      }
-      toast.success("Akun berhasil dibuat! Silakan login.");
-      setActiveTab("login");
-    } catch (error) {
-      if (error instanceof z.ZodError) toast.error(error.errors[0].message);
-    } finally {
-      setLoading(false);
-    }
+      if (error) return toast.error(error.message.includes("already") ? "Email sudah terdaftar" : error.message);
+      toast.success("Akun berhasil dibuat! Silakan login."); setTab("login");
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally { setLoading(false); }
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const onReset = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const validated = resetSchema.parse({ email: resetEmail });
       setLoading(true);
-      const { error } = await supabase.auth.resetPasswordForEmail(validated.email, {
-        redirectTo: `${window.location.origin}/update-password`,
-      });
-      if (error) {
-        toast.error(error.message);
-        return;
-      }
-      toast.success("Link reset password telah dikirim ke email Anda!");
-      setIsResetting(false);
-      setResetEmail("");
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-      } else if (error instanceof Error) {
-        toast.error(error.message);
-      }
-    } finally {
-      setLoading(false);
-    }
+      const v = safeParse(resetSchema, { email: resetEmail });
+      const { error } = await supabase.auth.resetPasswordForEmail(v.email, { redirectTo: `${window.location.origin}/update-password` });
+      if (error) return toast.error(error.message);
+      toast.success("Link reset password telah dikirim!"); setResetMode(false); setResetEmail("");
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally { setLoading(false); }
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4">
       <Card className="w-full max-w-md p-6 shadow-xl">
-        <div className="mb-6 text-center">
-          <div className="inline-flex items-center gap-3">
-            <img 
-              src="/favicon.png" 
-              alt="EduForum Logo" 
-              className="h-12 w-12"
-              loading="lazy"
-              decoding="async"
-            />
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">EduForum</h1>
-          </div>
-          <p className="mt-2 text-muted-foreground">Platform Sosial Edukatif MAN IC Siak</p>
-        </div>
-        <Tabs 
-          value={activeTab}
-          onValueChange={(tab) => {
-            setActiveTab(tab);
-            setIsResetting(false);
-          }}
-          className="w-full"
-        >
-          {!isResetting && (
+        <Brand />
+        <Tabs value={tab} onValueChange={(v) => { setTab(v as typeof tab); setResetMode(false); }} className="w-full">
+          {!resetMode && (
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Daftar</TabsTrigger>
             </TabsList>
           )}
+
           <TabsContent value="login">
-            {isResetting ? (
-              <form onSubmit={handleResetPassword} className="space-y-4">
-                <div className="border-t border-gray-200"></div>
-                <div className="text-center mb-4">
-                  <h3 className="font-bold text-2xl">Reset Password</h3>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="reset-email">Email</Label>
-                  <Input 
-                    id="reset-email" 
-                    type="email" 
-                    value={resetEmail} 
-                    onChange={(e) => setResetEmail(e.target.value)} 
-                    required 
-                    placeholder="nama@gmail.com"
-                  />
-                </div>
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Mengirim..." : "Kirim Link Reset"}
-                </Button>
-                <Button 
-                  variant="link" 
-                  type="button" 
-                  className="w-full" 
-                  onClick={() => setIsResetting(false)}
-                  disabled={loading}
-                >
-                  Batal (Kembali ke Login)
-                </Button>
+            {resetMode ? (
+              <form onSubmit={onReset} className="space-y-4">
+                <div className="border-t" />
+                <div className="text-center mb-2"><h3 className="font-bold text-2xl">Reset Password</h3></div>
+                <Field id="reset-email" label="Email">
+                  <Input id="reset-email" type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} required placeholder="nama@gmail.com" />
+                </Field>
+                <Button type="submit" className="w-full" disabled={loading}>{loading ? "Mengirim..." : "Kirim Link Reset"}</Button>
+                <Button variant="link" type="button" className="w-full" onClick={() => setResetMode(false)} disabled={loading}>Batal (Kembali ke Login)</Button>
               </form>
             ) : (
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="login-email">Email</Label>
-                  <Input id="login-email" type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="login-password">Password</Label>
-                  <Input id="login-password" type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required />
-                </div>
+              <form onSubmit={onLogin} className="space-y-4">
+                <Field id="login-email" label="Email">
+                  <Input id="login-email" type="email" value={login.email} onChange={(e) => setLogin((s) => ({ ...s, email: e.target.value }))} required />
+                </Field>
+                <Field id="login-password" label="Password">
+                  <Input id="login-password" type="password" value={login.password} onChange={(e) => setLogin((s) => ({ ...s, password: e.target.value }))} required />
+                </Field>
                 <div className="text-center">
-                  <Button 
-                    variant="link" 
-                    type="button" 
-                    onClick={() => {
-                      setIsResetting(true);
-                      setResetEmail(loginEmail); 
-                    }} 
-                    className="px-0 h-auto py-1 text-sm"
-                  >
+                  <Button variant="link" type="button" className="px-0 h-auto py-1 text-sm"
+                    onClick={() => { setResetMode(true); setResetEmail(login.email); }}>
                     Lupa Password?
                   </Button>
                 </div>
-                <Button type="submit" className="w-full bg-gradient-to-r from-primary to-primary/90" disabled={loading}>{loading ? "Loading..." : "Login"}</Button>
+                <Button type="submit" className="w-full bg-gradient-to-r from-primary to-primary/90" disabled={loading}>
+                  {loading ? "Loading..." : "Login"}
+                </Button>
               </form>
             )}
           </TabsContent>
+
           <TabsContent value="signup">
-            <form onSubmit={handleSignup} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="signup-name">Nama Lengkap</Label>
-                <Input id="signup-name" type="text" value={name} onChange={(e) => setName(e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-email">Email</Label>
-                <Input id="signup-email" type="email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-password">Password</Label>
-                <Input id="signup-password" type="password" value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="role">Peran</Label>
-                <Select value={role} onValueChange={(value: any) => setRole(value)}>
-                  <SelectTrigger id="role"><SelectValue /></SelectTrigger>
+            <form onSubmit={onSignup} className="space-y-4">
+              <Field id="signup-name" label="Nama Lengkap">
+                <Input id="signup-name" value={signup.name} onChange={(e) => setSignup((s) => ({ ...s, name: e.target.value }))} required />
+              </Field>
+              <Field id="signup-email" label="Email">
+                <Input id="signup-email" type="email" value={signup.email} onChange={(e) => setSignup((s) => ({ ...s, email: e.target.value }))} required />
+              </Field>
+              <Field id="signup-password" label="Password">
+                <Input id="signup-password" type="password" value={signup.password} onChange={(e) => setSignup((s) => ({ ...s, password: e.target.value }))} required />
+              </Field>
+              <Field id="role" label="Peran">
+                <Select value={signup.role} onValueChange={(v) => setSignup((s) => ({ ...s, role: v as Role }))}>
+                  <SelectTrigger id="role"><SelectValue placeholder="Pilih peran" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Siswa">Siswa</SelectItem>
                     <SelectItem value="Guru">Guru</SelectItem>
                     <SelectItem value="Alumni">Alumni</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <Button type="submit" className="w-full bg-gradient-to-r from-primary to-primary/90" disabled={loading}>{loading ? "Loading..." : "Daftar"}</Button>
+              </Field>
+              <Button type="submit" className="w-full bg-gradient-to-r from-primary to-primary/90" disabled={loading}>
+                {loading ? "Loading..." : "Daftar"}
+              </Button>
             </form>
           </TabsContent>
         </Tabs>
       </Card>
     </div>
   );
-};
-
-export default Auth;
+}

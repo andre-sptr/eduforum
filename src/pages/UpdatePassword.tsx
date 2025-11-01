@@ -1,112 +1,74 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { z } from "zod";
 
-const updatePasswordSchema = z.object({
+const schema = z.object({
   password: z.string().min(6, "Password minimal 6 karakter").max(100),
-  confirmPassword: z.string()
-})
-.refine((data) => data.password === data.confirmPassword, {
-  message: "Password tidak cocok",
-  path: ["confirmPassword"],
-});
+  confirmPassword: z.string(),
+}).refine(v => v.password === v.confirmPassword, { path: ["confirmPassword"], message: "Password tidak cocok" });
 
-const UpdatePassword = () => {
-  const navigate = useNavigate();
+export default function UpdatePassword() {
+  const nav = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [password, setPwd] = useState("");
+  const [confirmPassword, setCPwd] = useState("");
+  const disabled = loading || password.length < 6 || password !== confirmPassword;
 
   useEffect(() => {
     if (!window.location.hash) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          navigate('/');
-        }
-      });
+      supabase.auth.getSession().then(({ data: { session } }) => { if (session) nav("/"); });
     }
-  }, [navigate]);
+  }, [nav]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const parsed = schema.safeParse({ password, confirmPassword });
+    if (!parsed.success) return toast.error(parsed.error.issues[0].message);
+    setLoading(true);
     try {
-      const validated = updatePasswordSchema.parse({ password, confirmPassword });
-      setLoading(true);
-      const { error } = await supabase.auth.updateUser({
-        password: validated.password,
-      });
-      if (error) {
-        toast.error(error.message.includes("expired") 
-          ? "Link reset password Anda sudah kedaluwarsa. Silakan minta yang baru." 
-          : error.message
-        );
-        return;
-      }
-      toast.success("Password Anda berhasil diperbarui!");
-      navigate("/auth");
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-      } else if (error instanceof Error) {
-        toast.error(error.message);
-      }
-    } finally {
-      setLoading(false);
-    }
+      const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+      if (error) return toast.error(error.message.includes("expired") ? "Link reset kadaluwarsa. Minta link baru." : error.message);
+      toast.success("Password berhasil diperbarui!"); nav("/auth");
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally { setLoading(false); }
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4">
       <Card className="w-full max-w-md p-6 shadow-xl">
-        <div className="mb-6 text-center">
-          <h1 className="text-3xl font-bold">Reset Password</h1>
-          <p className="mt-2 text-muted-foreground">
-            Silakan masukkan password baru Anda.
-          </p>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <header className="mb-6 text-center">
+          <h1 className="text-3xl font-extrabold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">Reset Password</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Masukkan password baru Anda. Minimal 6 karakter.</p>
+        </header>
+
+        <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="new-password">Password Baru</Label>
-            <Input
-              id="new-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <Label htmlFor="pwd">Password Baru</Label>
+            <Input id="pwd" type="password" value={password} onChange={e => setPwd(e.target.value)} autoComplete="new-password" required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirm-password">Konfirmasi Password Baru</Label>
-            <Input
-              id="confirm-password"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
+            <Label htmlFor="cpwd">Konfirmasi Password</Label>
+            <Input id="cpwd" type="password" value={confirmPassword} onChange={e => setCPwd(e.target.value)} autoComplete="new-password" required />
+            {password && confirmPassword && password !== confirmPassword && (
+              <p className="text-xs text-red-500">Password tidak cocok.</p>
+            )}
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+
+          <Button type="submit" className="w-full" disabled={disabled}>
             {loading ? "Menyimpan..." : "Simpan Password"}
           </Button>
-          <Button 
-            variant="link" 
-            type="button" 
-            className="w-full" 
-            onClick={() => navigate('/auth')}
-            disabled={loading}
-          >
+          <Button variant="link" type="button" className="w-full" onClick={() => nav("/auth")} disabled={loading}>
             Kembali ke Login
           </Button>
         </form>
       </Card>
     </div>
   );
-};
-
-export default UpdatePassword;
+}

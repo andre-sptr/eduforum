@@ -1,10 +1,9 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 
 const Index = React.lazy(() => import("./pages/Index"));
 const Auth = React.lazy(() => import("./pages/Auth"));
@@ -22,30 +21,58 @@ const PageLoader = () => (
   </div>
 );
 
-const queryClient = new QueryClient();
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  }, [pathname]);
+  return null;
+}
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/settings/profile" element={<ProfileSettingsPage />} />
-            <Route path="/profile/name/:name" element={<UserProfilePage />} />
-            <Route path="/update-password" element={<UpdatePassword />} />
-            <Route path="/post/:postId" element={<PostPage />} />
-            <Route path="/chat/:roomId" element={<ChatPage />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+function LegacyNameRedirect() {
+  const { username = "" } = useParams<{ username: string }>();
+  return <Navigate replace to={`/profile/u/${encodeURIComponent(username)}`} />;
+}
 
-export default App;
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { retry: 1, refetchOnWindowFocus: false, refetchOnReconnect: true, staleTime: 15_000, gcTime: 300_000 },
+    mutations: { retry: 0 },
+  },
+});
+
+function AppRoutes() {
+  return (
+    <>
+      <ScrollToTop />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/settings/profile" element={<ProfileSettingsPage />} />
+          <Route path="/profile/u/:username" element={<UserProfilePage />} />
+          <Route path="/profile/name/:name" element={<LegacyNameRedirect />} />
+          <Route path="/update-password" element={<UpdatePassword />} />
+          <Route path="/post/:postId" element={<PostPage />} />
+          <Route path="/chat/:roomId" element={<ChatPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}

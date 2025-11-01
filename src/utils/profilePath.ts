@@ -9,8 +9,8 @@ export function slugify(input: string): string {
 
 export function profilePath(username?: string | null, name?: string | null): string {
   const u = (username || "").trim();
-  if (u) return `/u/${slugify(u)}`;
+  if (u) return `/profile/u/${slugify(u)}`;
   const n = (name || "").trim();
-  if (n) return `/u/${slugify(n)}`;
-  return "/u/unknown";
+  if (n) return `/profile/u/${slugify(n)}`;
+  return "/profile/u/unknown";
 }

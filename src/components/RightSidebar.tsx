@@ -32,7 +32,7 @@ const freeTools = [
 
 export const RightSidebar = () => {
   return (
-    <aside className="col-span-10 md:col-span-3 hidden md:block space-y-6">
+    <aside className="col-span-10 md:col-span-3 hidden md:block space-y-4">
       <Card className="shadow-sm overflow-hidden">
         <CardHeader>
           <CardTitle className="text-lg">Free Tools</CardTitle>

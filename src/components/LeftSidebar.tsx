@@ -16,6 +16,7 @@ interface LeaderboardUser {
     avatar_text: string;
     role: string;
     follower_count: number;
+    username: string;
 }
 
 export const LeftSidebar = () => {
@@ -76,7 +77,7 @@ export const LeftSidebar = () => {
             leaderboard.map((user, index) => (
               <Link 
                 key={user.user_id} 
-                to={`/profile/name/${encodeURIComponent(user.name)}`}
+                to={`/profile/u/${encodeURIComponent(user.username)}`}
                 className="flex items-center justify-between hover:bg-muted p-1.5 rounded-lg transition-colors" 
               >
                 <div className="flex items-center gap-3 truncate">
