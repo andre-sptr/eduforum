@@ -64,7 +64,6 @@ const Index = () => {
     };
   }, [user]);
 
-  // --- PERBAIKAN: Pindahkan useMemo ke atas, sebelum 'if' ---
   const uniquePostArray = useMemo(() => {
     const uniquePosts = new Map(posts.map(post => [post.id, post]));
     return Array.from(uniquePosts.values());

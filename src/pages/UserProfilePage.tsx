@@ -36,7 +36,7 @@ const UserProfilePage = () => {
               .from('profiles')
               .select('id, name, bio, avatar_text, role, username') 
               .eq('name', decodedUsername)
-              .limit(1) // <-- Perbaikan Kritis
+              .limit(1)
               .maybeSingle(); 
           return data;
       },

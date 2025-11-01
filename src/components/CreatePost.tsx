@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { resolveMentionsToIds } from "@/lib/mentionHelpers"; // <-- 1. IMPORT FUNGSI ANDA
+import { resolveMentionsToIds } from "@/lib/mentionHelpers";
 
 interface CreatePostProps {
   userName: string;
@@ -100,7 +100,6 @@ export const CreatePost = ({ userName, userInitials }: CreatePostProps) => {
         mediaUrl = urlData.publicUrl;
       }
 
-      // --- 2. PERBAIKAN: Gunakan fungsi Anda yang cepat dan akurat ---
       const taggedUserIds = await resolveMentionsToIds(content);
 
       const { data: insertedPostData, error: insertError } = await supabase.from("posts").insert({

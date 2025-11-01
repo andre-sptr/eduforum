@@ -1,7 +1,12 @@
-// src/components/PostCard.tsx
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, Award, MoreHorizontal, Trash2, FileText, Repeat } from "lucide-react";
+import Heart from "lucide-react/dist/esm/icons/heart";
+import MessageCircle from "lucide-react/dist/esm/icons/message-circle";
+import Award from "lucide-react/dist/esm/icons/award";
+import MoreHorizontal from "lucide-react/dist/esm/icons/more-horizontal";
+import Trash2 from "lucide-react/dist/esm/icons/trash-2";
+import FileText from "lucide-react/dist/esm/icons/file-text";
+import Repeat from "lucide-react/dist/esm/icons/repeat";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -156,7 +161,7 @@ export const PostCard = ({ post, currentUserName, currentUserInitials, currentUs
   const profileLink = `/profile/name/${encodeURIComponent(post.profiles.name)}`;
 
   return (
-    <Card className="overflow-hidden shadow-md">
+    <Card className="overflow-hidden shadow-md dark:bg-card/80 dark:border-white/10 dark:backdrop-blur-md">
       {isRepost && (
         <div className="flex items-center gap-2 px-4 pt-3 text-sm text-muted-foreground">
           <Repeat className="h-4 w-4" />
