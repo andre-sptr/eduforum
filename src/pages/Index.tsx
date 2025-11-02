@@ -375,9 +375,6 @@ const Index = () => {
               ) : posts.length === 0 ? (
                 <div className="text-center py-12">
                   <p className="text-muted-foreground">Belum ada postingan</p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Buat postingan pertama Anda!
-                  </p>
                 </div>
               ) : (
                 <>

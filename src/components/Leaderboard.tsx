@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Trophy, Medal, Award } from "lucide-react";
+import { TrendingUp, Trophy, Medal, Award, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@radix-ui/react-tooltip";
 
 interface LeaderboardUser {
   id: string;
@@ -13,6 +14,28 @@ interface LeaderboardUser {
 interface LeaderboardProps {
   users: LeaderboardUser[];
 }
+
+const freeTools = [
+  { 
+    name: "PDF Tools", 
+    websiteUrl: "https://pdf.flamyheart.site/" 
+  },
+  { 
+    name: "AI Agent", 
+    iconUrl: "/maskot.png",
+    websiteUrl: "https://ai.flamyheart.site/" 
+  },
+  { 
+    name: "ChatBot", 
+    iconUrl: "/whatsapp.png",
+    websiteUrl: "https://wa.me/6287790596246" 
+  },
+  { 
+    name: "AetherNet", 
+    iconUrl: "/logo.jpg",
+    websiteUrl: "https://aethernet.flamyheart.site/" 
+  },
+];
 
 const Leaderboard = ({ users }: LeaderboardProps) => {
   const navigate = useNavigate();
@@ -39,11 +62,53 @@ const Leaderboard = ({ users }: LeaderboardProps) => {
 
   return (
     <div className="space-y-4">
-      <Card className="bg-card border-border">
+      <Card className="shadow-sm overflow-hidden">
         <CardHeader>
+          <CardTitle className="text-lg">Free Tools</CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-3.5">
+          <TooltipProvider>
+            <div className="grid grid-cols-4 gap-4">
+              {freeTools.map((tool) => (
+                <Tooltip key={tool.name} delayDuration={100}>
+                  <TooltipTrigger asChild>
+                    <a
+                      href={tool.websiteUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group block aspect-square"
+                      aria-label={`Link ke ${tool.name}`}
+                    >
+                      <div className="flex h-full w-full items-center justify-center rounded-lg bg-muted/50 border border-border/50 group-hover:bg-muted group-hover:scale-105 group-hover:shadow-md transition-all duration-200">
+                        {tool.iconUrl ? (
+                          <img
+                            src={tool.iconUrl}
+                            alt={tool.name}
+                            className="h-3/5 w-3/5 object-contain" 
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <FileText className="h-1/2 w-1/2 text-blue-500 group-hover:text-primary transition-colors duration-200" />
+                        )}
+                      </div>
+                    </a>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{tool.name}</p>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          </TooltipProvider>
+        </CardContent>
+      </Card>
+      
+      <Card className="bg-card border-border">
+        <CardHeader className="border-b border-border">
           <CardTitle className="text-xl flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-accent" />
-            Top 5 Follower
+            <TrendingUp className="h-5 w-5 text-accent" />
+            Leaderboard
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -80,11 +145,11 @@ const Leaderboard = ({ users }: LeaderboardProps) => {
       </Card>
       
       <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg">Tentang EduForum</CardTitle>
+        <CardHeader className="border-b border-border">
+          <CardTitle className="text-xl flex items-center gap-2">Tentang EduForum</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground text-justify">
+          <p className="text-sm text-muted-foreground text-justify mt-4">
             <strong>EduForum</strong> adalah platform komunitas digital eksklusif yang dirancang khusus untuk siswa, guru, 
             dan alumni <strong>MAN Insan Cendekia Siak</strong>. Di sini, setiap anggota dapat terhubung, berbagi pengalaman, 
             serta berdiskusi seputar akademik, pengembangan diri, dan kehidupan sekolah dalam suasana yang positif dan inspiratif. 🎓

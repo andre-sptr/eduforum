@@ -9,7 +9,7 @@ All colors MUST be HSL.
 @layer base {
   :root {
     /* Light Mode - Royal Blue & Gold Theme */
-    --background: 220 25% 97%;
+    --background: 220 100% 97%;
     --foreground: 220 50% 15%;
 
     --card: 0 0% 100%;

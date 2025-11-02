@@ -126,21 +126,14 @@ const Auth = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-[var(--shadow-gold)]">
-              <GraduationCap className="w-8 h-8 text-primary-foreground" />
-            </div>
-          </div>
-          <h1 className="text-4xl font-bold text-foreground mb-2">EduForum MAN IC Siak</h1>
-          <p className="text-muted-foreground">Platform Edukasi Interaktif Eksklusif</p>
-        </div>
-
         <Card className="border-border bg-card shadow-xl">
           <CardHeader>
-            <CardTitle className="text-2xl text-center">Selamat Datang</CardTitle>
+            <div className="flex items-center justify-center mb-2">
+                <img src="/favicon.ico" alt="Logo EduForum" className="w-16 h-16" />
+            </div>
+            <CardTitle className="text-2xl text-center">EduForum MAN IC Siak</CardTitle>
             <CardDescription className="text-center">
-              Bergabung dengan komunitas MAN IC Siak
+                Platform Edukasi Interaktif Eksklusif MAN IC Siak
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -157,7 +150,7 @@ const Auth = () => {
                     <Input
                       id="login-email"
                       type="email"
-                      placeholder="nama@maniciak.sch.id"
+                      placeholder="nama@gmail.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -205,7 +198,7 @@ const Auth = () => {
                     <Input
                       id="register-name"
                       type="text"
-                      placeholder="Nama Lengkap Anda"
+                      placeholder="Nama Lengkap"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       required
@@ -217,7 +210,7 @@ const Auth = () => {
                     <Input
                       id="register-email"
                       type="email"
-                      placeholder="nama@maniciak.sch.id"
+                      placeholder="nama@gmail.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -237,10 +230,10 @@ const Auth = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="register-role">Role (Tidak dapat diubah)</Label>
+                    <Label htmlFor="register-role">Role</Label>
                     <Select value={role} onValueChange={setRole} required>
                       <SelectTrigger className="bg-input border-border">
-                        <SelectValue placeholder="Pilih Role Anda" />
+                        <SelectValue placeholder="Pilih Role" />
                       </SelectTrigger>
                       <SelectContent className="bg-popover border-border">
                         <SelectItem value="siswa">Siswa</SelectItem>
