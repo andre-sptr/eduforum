@@ -1,13 +1,21 @@
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import Heart from "lucide-react/dist/esm/icons/heart";
-import MessageCircle from "lucide-react/dist/esm/icons/message-circle";
-import Award from "lucide-react/dist/esm/icons/award";
-import MoreHorizontal from "lucide-react/dist/esm/icons/more-horizontal";
-import Trash2 from "lucide-react/dist/esm/icons/trash-2";
-import FileText from "lucide-react/dist/esm/icons/file-text";
-import Repeat from "lucide-react/dist/esm/icons/repeat";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Heart, MessageCircle, Repeat2, Share2, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { id } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import MediaCarousel from "./MediaCarousel";
+import CommentSection from "./CommentSection";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MentionInput } from "./MentionInput";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,312 +25,360 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { UserAvatar } from "./UserAvatar";
-import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CommentSection } from "./CommentSection";
-import { useNavigate, Link } from "react-router-dom";
-import type { FeedPost } from "@/hooks/useInfinitePosts";
-import { ImageDialog } from "@/components/ImageDialog";
-import { getOptimizedImageUrl } from "@/lib/image";
-
-export type PostWithAuthor = FeedPost & {
-  profiles: { name: string; avatar_text: string; role: string };
-  original_author: { name: string; avatar_text: string; role: string } | null;
-};
 
 interface PostCardProps {
-  post: PostWithAuthor;
-  currentUserName?: string;
-  currentUserInitials?: string;
-  currentUserId: string;
+  post: {
+    id: string;
+    content: string;
+    created_at: string;
+    media_urls?: string[];
+    media_types?: string[];
+    profiles: {
+      id: string;
+      full_name: string;
+      avatar_url?: string;
+      role: string;
+    };
+    likes: any[];
+  };
+  currentUserId?: string;
+  onLike?: () => void;
+  onPostUpdated?: () => void;
+  onPostDeleted?: () => void;
 }
 
-const getFileMeta = (rawUrl: string) => {
-  const [path] = rawUrl.split("?");
-  const fileName = path.substring(path.lastIndexOf("/") + 1);
-  const ext = (fileName.split(".").pop() || "").toLowerCase();
-  const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
-  const isVideo = ["mp4", "webm", "ogg"].includes(ext);
-  return { isImage, isVideo, fileName };
-};
+const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }: PostCardProps) => {
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [isReposted, setIsReposted] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(post.content);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-export const PostCard = ({ post, currentUserName, currentUserInitials, currentUserId }: PostCardProps) => {
-  const [showComments, setShowComments] = useState(false);
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const [loadingChat, setLoadingChat] = useState(false);
-  const isRepost = post.original_post_id !== null;
-  const displayAuthorProfile = isRepost ? post.original_author : post.profiles;
-  const displayAuthorId = isRepost ? post.original_post_id : post.user_id;
-  const reposterName = isRepost ? post.profiles.name : null;
-  const isAuthor = post.user_id === currentUserId;
-  const userHasLiked = post.viewer_has_liked;
+  const isOwnPost = currentUserId === post.profiles.id;
 
-  const likeMutation = useMutation({
-    mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Login dulu");
-      if (userHasLiked) {
-        await supabase.from("post_likes").delete().eq("post_id", post.id).eq("user_id", user.id);
-      } else {
-        await supabase.from("post_likes").insert({ post_id: post.id, user_id: user.id });
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-    },
-    onError: (error) => {
-      toast.error(`Gagal: ${(error as Error).message}`);
+  useEffect(() => {
+    if (currentUserId) {
+      const userLiked = post.likes.some(like => like.user_id === currentUserId);
+      setIsLiked(userLiked);
+      checkRepost();
     }
-  });
+    setLikeCount(post.likes.length);
+  }, [post.likes, currentUserId]);
 
-  const deletePostMutation = useMutation({
-    mutationFn: async (postId: string) => {
-      const { error } = await supabase.from("posts").delete().eq("id", postId);
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: () => {
-      toast.success("Postingan berhasil dihapus.");
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-    },
-    onError: (error: any) => {
-      toast.error(`Gagal menghapus: ${error.message}`);
-    }
-  });
+  const checkRepost = async () => {
+    if (!currentUserId) return;
 
-  const repostMutation = useMutation({
-    mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Anda harus login untuk me-repost.");
-      const idToRepost = post.original_post_id || post.id;
-      const { error } = await supabase.rpc("repost_post", { post_id_to_repost: idToRepost });
-      if (error) {
-        if (error.code === "23505") throw new Error("Anda sudah me-repost postingan ini.");
-        throw new Error(error.message);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-    },
-    onError: (error) => {
-      toast.error(`Gagal me-repost: ${(error as Error).message}`);
-    }
-  });
+    const { data } = await supabase
+      .from('reposts')
+      .select('*')
+      .eq('user_id', currentUserId)
+      .eq('post_id', post.id)
+      .single();
 
-  const formatTime = (t: string) => {
-    const diff = Date.now() - new Date(t).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "Baru saja";
-    if (mins < 60) return `${mins} menit lalu`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours} jam lalu`;
-    const days = Math.floor(hours / 24);
-    return `${days} hari lalu`;
+    setIsReposted(!!data);
   };
 
-  const startOrGoToChat = async (recipientId: string) => {
-    if (!currentUserId) return toast.error("Gagal memulai chat: ID pengguna saat ini tidak ditemukan.");
-    if (currentUserId === recipientId) return toast.info("Anda tidak bisa chat dengan diri sendiri.");
-    setLoadingChat(true);
+  const getInitials = (name: string) => {
+    const names = name.split(" ");
+    if (names.length >= 2) {
+      return `${names[0][0]}${names[1][0]}`.toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  const getRoleBadgeColor = (role: string) => {
+    switch (role) {
+      case "siswa":
+        return "bg-blue-500/20 text-blue-400";
+      case "guru":
+        return "bg-green-500/20 text-green-400";
+      case "alumni":
+        return "bg-purple-500/20 text-purple-400";
+      default:
+        return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const handleLike = async () => {
+    if (!currentUserId) {
+      toast.error("Silakan login terlebih dahulu");
+      return;
+    }
+
     try {
-      const { data: roomId, error } = await supabase.rpc("create_or_get_chat_room", { recipient_id: recipientId });
-      if (error) throw error;
-      if (!roomId) throw new Error("Gagal mendapatkan ID room chat.");
-      navigate(`/chat/${roomId}`);
-    } catch (error) {
-      toast.error(`Gagal memulai chat: ${(error as Error).message}`);
-    } finally {
-      setLoadingChat(false);
+      if (isLiked) {
+        const { error } = await supabase
+          .from('likes')
+          .delete()
+          .eq('user_id', currentUserId)
+          .eq('post_id', post.id);
+
+        if (error) throw error;
+
+        setIsLiked(false);
+        setLikeCount(prev => prev - 1);
+      } else {
+        const { error } = await supabase
+          .from('likes')
+          .insert({
+            user_id: currentUserId,
+            post_id: post.id,
+          });
+
+        if (error) throw error;
+
+        setIsLiked(true);
+        setLikeCount(prev => prev + 1);
+      }
+
+      onLike?.();
+    } catch (error: any) {
+      toast.error(error.message);
     }
   };
 
-  const renderContentWithMentions = (content: string | null): React.ReactNode => {
-    if (!content) return null;
-    const mentionRegex = /@([a-zA-Z0-9_\s]+)/g;
-    const parts = content.split(mentionRegex);
-    return parts.map((part, index) =>
-      index % 2 === 1 ? (
-        <Link key={index} to={`/profile/name/${encodeURIComponent(part.trim())}`} className="text-primary hover:underline font-medium">
-          @{part.trim()}
-        </Link>
-      ) : (
-        part
-      )
-    );
+  const handleRepost = async () => {
+    if (!currentUserId) {
+      toast.error("Silakan login terlebih dahulu");
+      return;
+    }
+
+    try {
+      if (isReposted) {
+        const { error } = await supabase
+          .from('reposts')
+          .delete()
+          .eq('user_id', currentUserId)
+          .eq('post_id', post.id);
+
+        if (error) throw error;
+
+        setIsReposted(false);
+        toast.success("Repost dibatalkan");
+      } else {
+        const { error } = await supabase
+          .from('reposts')
+          .insert({
+            user_id: currentUserId,
+            post_id: post.id,
+          });
+
+        if (error) throw error;
+
+        setIsReposted(true);
+        toast.success("Berhasil di-repost!");
+      }
+    } catch (error: any) {
+      toast.error(error.message);
+    }
   };
 
-  const disableRepost = repostMutation.isPending || displayAuthorId === currentUserId || isAuthor;
-  const profileLink = `/profile/name/${encodeURIComponent(post.profiles.name)}`;
+  const handleShare = () => {
+    const url = `${window.location.origin}/post/${post.id}`;
+    navigator.clipboard.writeText(url);
+    toast.success("Link postingan disalin!");
+  };
+
+  const handleEditPost = async () => {
+    if (!editContent.trim()) {
+      toast.error("Konten postingan tidak boleh kosong");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("posts")
+        .update({ content: editContent.trim() })
+        .eq("id", post.id);
+
+      if (error) throw error;
+
+      setIsEditing(false);
+      toast.success("Postingan berhasil diubah");
+      onPostUpdated?.();
+    } catch (error: any) {
+      toast.error("Gagal mengubah postingan: " + error.message);
+    }
+  };
+
+  const handleDeletePost = async () => {
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("posts")
+        .delete()
+        .eq("id", post.id);
+
+      if (error) throw error;
+
+      toast.success("Postingan berhasil dihapus");
+      onPostDeleted?.();
+    } catch (error: any) {
+      toast.error("Gagal menghapus postingan: " + error.message);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+    }
+  };
+
+  const startEdit = () => {
+    setIsEditing(true);
+    setEditContent(post.content);
+  };
+
+  const cancelEdit = () => {
+    setIsEditing(false);
+    setEditContent(post.content);
+  };
 
   return (
-    <Card className="overflow-hidden shadow-md dark:bg-card/80 dark:border-white/10 dark:backdrop-blur-md">
-      {isRepost && (
-        <div className="flex items-center gap-2 px-4 pt-3 text-sm text-muted-foreground">
-          <Repeat className="h-4 w-4" />
-          <Link to={`/profile/name/${encodeURIComponent(reposterName || "Seseorang")}`} className="font-medium hover:underline transition-colors">
-            {reposterName || "Seseorang"}
-          </Link>
-          <span>me-repost</span>
-        </div>
-      )}
-      <div className="p-4">
-        <div className="flex gap-3 justify-between items-start">
-          <div className="flex gap-3">
-            <Link to={profileLink} className="flex gap-3 items-start group">
-              <UserAvatar name={displayAuthorProfile?.name || "User"} initials={displayAuthorProfile?.avatar_text || "??"} />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold">{displayAuthorProfile?.name || "Pengguna Dihapus"}</h3>
-                  {!isRepost && isAuthor && <Badge variant="secondary" className="px-2 py-0.5 text-xs font-medium">Saya</Badge>}
-                  {isRepost && displayAuthorId === currentUserId && <Badge variant="outline" className="px-2 py-0.5 text-xs font-medium">Penulis Asli</Badge>}
-                  {displayAuthorProfile?.role === "Guru" && <Badge className="bg-accent"><Award className="h-3 w-3 mr-1" />Guru</Badge>}
-                </div>
-                <p className="text-xs text-muted-foreground">{formatTime(post.created_at)}</p>
-              </div>
-            </Link>
-          </div>
-          {isAuthor ? (
-            <AlertDialog>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <AlertDialogTrigger asChild>
-                    <DropdownMenuItem
-                      className="flex gap-2 items-center text-red-500 focus:text-red-500 cursor-pointer"
-                      onSelect={(e) => e.preventDefault()}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span>Hapus Postingan</span>
-                    </DropdownMenuItem>
-                  </AlertDialogTrigger>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Anda yakin?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Tindakan ini tidak dapat dibatalkan dan akan menghapus postingan Anda.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Batal</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-red-500 hover:bg-red-600"
-                    onClick={() => deletePostMutation.mutate(post.id)}
-                    disabled={deletePostMutation.isPending}
-                  >
-                    {deletePostMutation.isPending ? "Menghapus..." : "Ya, Hapus"}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          ) : (
-            <Button size="sm" variant="outline" onClick={() => startOrGoToChat(displayAuthorId!)} disabled={loadingChat || !displayAuthorId}>
-              {loadingChat ? "..." : "Chat"}
-            </Button>
-          )}
-        </div>
-        <p className="mt-3 whitespace-pre-wrap">{renderContentWithMentions(post.content)}</p>
-        {post.image_url && (() => {
-          const { isImage, isVideo, fileName } = getFileMeta(post.image_url);
-          if (isImage) {
-            const thumb = getOptimizedImageUrl(post.image_url, 500)!;
-            const full = getOptimizedImageUrl(post.image_url, 1600)!;
-            return (
-              <ImageDialog
-                trigger={
-                  <div className="mt-3 aspect-video overflow-hidden rounded-lg border bg-muted cursor-pointer">
-                    <img src={thumb} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
-                  </div>
-                }
-                thumbSrc={thumb}
-                fullSrc={full}
-                alt={`Gambar dari ${displayAuthorProfile?.name || "pengguna"}`}
-              />
-            );
-          }
-          if (isVideo) {
-            return (
-              <div className="mt-3 aspect-video overflow-hidden rounded-lg border bg-black">
-                <video src={post.image_url} controls preload="none" className="w-full h-full object-contain">
-                  Browser Anda tidak mendukung tag video.
-                </video>
-              </div>
-            );
-          }
-          return (
-            <a
-              href={post.image_url}
-              download
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 block border rounded-lg p-3 hover:bg-muted transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <FileText className="h-6 w-6 text-primary flex-shrink-0" />
-                <div className="overflow-hidden">
-                  <p className="text-sm font-medium truncate">{decodeURIComponent(fileName)}</p>
-                  <p className="text-xs text-muted-foreground">Klik untuk mengunduh</p>
-                </div>
-              </div>
-            </a>
-          );
-        })()}
-        <div className="mt-4 text-sm text-muted-foreground">
-          {post.likes_count} suka • {post.comments_count} komentar
-        </div>
-        <div className="mt-3 flex justify-around border-t pt-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`group flex items-center gap-2 ${userHasLiked ? "text-red-500" : "text-muted-foreground"}`}
-            onClick={() => likeMutation.mutate()}
-            disabled={likeMutation.isPending}
-          >
-            <Heart className={`h-5 w-5 ${userHasLiked ? "fill-current" : ""} ${!userHasLiked ? "group-hover:text-red-500" : ""}`} />
-            <span className={!userHasLiked ? "group-hover:text-red-500" : ""}>Suka</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="group flex items-center gap-2 text-muted-foreground"
-            onClick={() => setShowComments(!showComments)}
-          >
-            <MessageCircle className="h-5 w-5 group-hover:text-primary" />
-            <span className="group-hover:text-primary">Komentar</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="group flex items-center gap-2 text-muted-foreground"
-            onClick={() => repostMutation.mutate()}
-            disabled={disableRepost}
-          >
-            <Repeat className={`h-5 w-5 ${!disableRepost ? "group-hover:text-green-500" : ""}`} />
-            <span className={`${!disableRepost ? "group-hover:text-green-500" : ""}`}>
-              {repostMutation.isPending ? "..." : "Repost"}
+    <Card className="bg-card border-border p-6 hover:border-accent/50 transition-[var(--transition-smooth)]">
+      <div className="flex gap-4">
+        <Avatar className="h-12 w-12 border-2 border-accent/20">
+          <AvatarImage src={post.profiles.avatar_url} />
+          <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+            {getInitials(post.profiles.full_name)}
+          </AvatarFallback>
+        </Avatar>
+
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="font-semibold text-foreground">{post.profiles.full_name}</h3>
+            <span className={`text-xs px-2 py-1 rounded-full ${getRoleBadgeColor(post.profiles.role)}`}>
+              {post.profiles.role.charAt(0).toUpperCase() + post.profiles.role.slice(1)}
             </span>
-          </Button>
-        </div>
-        {showComments && currentUserId && currentUserName && currentUserInitials && (
-          <div className="mt-4">
-            <CommentSection
-              postId={post.id}
-              currentUserProfile={{ id: currentUserId, name: currentUserName, avatar_text: currentUserInitials }}
-            />
+            <span className="text-sm text-muted-foreground">
+              · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: id })}
+            </span>
+            
+            {isOwnPost && !isEditing && (
+              <div className="ml-auto">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={startEdit}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Hapus
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
           </div>
-        )}
+
+          {isEditing ? (
+            <div className="space-y-3 mb-4">
+              <MentionInput
+                value={editContent}
+                onChange={setEditContent}
+                placeholder="Edit postingan..."
+                className="min-h-[100px] resize-none"
+                multiline
+                currentUserId={currentUserId}
+              />
+              <div className="flex gap-2">
+                <Button size="sm" onClick={handleEditPost}>
+                  Simpan
+                </Button>
+                <Button size="sm" variant="ghost" onClick={cancelEdit}>
+                  Batal
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p 
+              className="text-foreground mb-2 whitespace-pre-wrap"
+              dangerouslySetInnerHTML={{
+                __html: post.content.replace(
+                  /@\[([^\]]+)\]\([a-f0-9\-]+\)/g,
+                  '<span class="text-primary font-semibold">@$1</span>'
+                )
+              }}
+            />
+          )}
+
+          {!isEditing && post.media_urls && post.media_types && (
+            <MediaCarousel mediaUrls={post.media_urls} mediaTypes={post.media_types} />
+          )}
+
+          <div className="flex items-center gap-6 mt-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`gap-2 ${isLiked ? "text-red-500" : "text-muted-foreground"} hover:text-red-500`}
+              onClick={handleLike}
+            >
+              <Heart className={`h-5 w-5 ${isLiked ? "fill-current" : ""}`} />
+              <span>{likeCount}</span>
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground hover:text-accent"
+            >
+              <MessageCircle className="h-5 w-5" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`gap-2 ${isReposted ? "text-green-500" : "text-muted-foreground"} hover:text-green-500`}
+              onClick={handleRepost}
+            >
+              <Repeat2 className="h-5 w-5" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground hover:text-accent"
+              onClick={handleShare}
+            >
+              <Share2 className="h-5 w-5" />
+            </Button>
+          </div>
+
+          <CommentSection postId={post.id} currentUserId={currentUserId} />
+        </div>
       </div>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Postingan</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus postingan ini? Tindakan ini tidak dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeletePost}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Menghapus..." : "Hapus"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
+
+export default PostCard;

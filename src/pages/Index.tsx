@@ -1,162 +1,422 @@
-import { Navbar } from "@/components/Navbar";
-import { CreatePost } from "@/components/CreatePost";
-import { PostCard, PostWithAuthor } from "@/components/PostCard";
-import { useAuth } from "@/hooks/useAuth";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Skeleton } from "@/components/ui/skeleton";
-import { LeftSidebar } from "@/components/LeftSidebar";
-import { RightSidebar } from "@/components/RightSidebar";
-import { useInfinitePosts } from "@/hooks/useInfinitePosts";
-import { InfiniteScrollTrigger } from "@/components/InfiniteScrollTrigger";
 import { Button } from "@/components/ui/button";
-import { ArrowUp } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Home, User, Users, MessageCircle, Gamepad2, LogOut, Search } from "lucide-react";
+import CreatePost from "@/components/CreatePost";
+import PostCard from "@/components/PostCard";
+import PostSkeleton from "@/components/PostSkeleton";
+import Leaderboard from "@/components/Leaderboard";
+import { Notifications } from "@/components/Notifications";
+import { ChatNotifications } from "@/components/ChatNotifications";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { toast } from "sonner";
 
 const Index = () => {
-  const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [hasNewPosts, setHasNewPosts] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [posts, setPosts] = useState<any[]>([]);
+  const [topFollowers, setTopFollowers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const observerTarget = useRef(null);
 
   useEffect(() => {
-    if (!loading && !user) navigate("/auth");
-  }, [user, loading, navigate]);
+    checkUser();
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        navigate('/auth');
+      } else if (event === 'SIGNED_IN' && session) {
+        setUser(session.user);
+        loadUserData(session.user.id);
+      }
+    });
 
-  const { data: profile } = useQuery({
-    queryKey: ["profile", user?.id],
-    queryFn: async () => {
-      if (!user) return null;
-      const { data } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-      return data;
-    },
-    enabled: !!user,
-  });
+    // Scroll event for navbar transparency
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll);
 
-  const { 
-    posts, 
-    isLoading, 
-    hasNextPage, 
-    isFetchingNextPage, 
-    loadMore,
-    refetch,
-    isRefetching
-  } = useInfinitePosts({
-    currentUserId: user?.id,
-    enabled: !!user,
-    pageSize: 10
-  });
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
+  // Setup realtime subscription for posts
   useEffect(() => {
     if (!user) return;
+
     const channel = supabase
-      .channel('public:posts')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' },
-        (payload) => {
-          if (payload.new.user_id !== user.id) {
-            setHasNewPosts(true);
-          }
+      .channel('posts-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'posts'
+        },
+        () => {
+          // Refresh posts when any change happens
+          loadPosts(true);
         }
       )
       .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
     };
   }, [user]);
 
-  const uniquePostArray = useMemo(() => {
-    const uniquePosts = new Map(posts.map(post => [post.id, post]));
-    return Array.from(uniquePosts.values());
-  }, [posts]);
+  const checkUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
 
-  const handleRefetch = () => {
-    setHasNewPosts(false);
-    refetch();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setUser(user);
+    await loadUserData(user.id);
   };
 
-  if (loading || !user || !profile) {
+  const loadUserData = async (userId: string) => {
+    try {
+      // Load profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) throw profileError;
+      setProfile(profileData);
+
+      // Load posts
+      await loadPosts();
+
+      // Load top followers
+      await loadTopFollowers();
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadPosts = async (reset = false) => {
+    const currentOffset = reset ? 0 : offset;
+    
+    // Load posts with pagination
+    const { data: postsData, error } = await supabase
+      .from('posts')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(currentOffset, currentOffset + 9);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    if (!postsData || postsData.length === 0) {
+      if (reset) {
+        setPosts([]);
+      }
+      setHasMore(false);
+      return;
+    }
+
+    setHasMore(postsData.length === 10);
+
+    // Get unique user IDs
+    const userIds = [...new Set(postsData.map(p => p.user_id))];
+
+    // Fetch profiles
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url, role')
+      .in('id', userIds);
+
+    // Fetch likes
+    const postIds = postsData.map(p => p.id);
+    const { data: likesData } = await supabase
+      .from('likes')
+      .select('post_id, user_id')
+      .in('post_id', postIds);
+
+    // Map data
+    const profilesMap = new Map(
+      (profilesData || []).map(p => [p.id, p])
+    );
+
+    const likesMap = new Map<string, any[]>();
+    (likesData || []).forEach(like => {
+      if (!likesMap.has(like.post_id)) {
+        likesMap.set(like.post_id, []);
+      }
+      likesMap.get(like.post_id)!.push(like);
+    });
+
+    const postsWithData = postsData.map(post => ({
+      ...post,
+      profiles: profilesMap.get(post.user_id),
+      likes: likesMap.get(post.id) || []
+    }));
+
+    if (reset) {
+      setPosts(postsWithData);
+      setOffset(10);
+    } else {
+      setPosts(prev => [...prev, ...postsWithData]);
+      setOffset(currentOffset + 10);
+    }
+  };
+
+  const loadMorePosts = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    
+    setLoadingMore(true);
+    await loadPosts(false);
+    setLoadingMore(false);
+  }, [loadingMore, hasMore, offset]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          loadMorePosts();
+        }
+      },
+      { threshold: 1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loadMorePosts]);
+
+  const refreshPosts = async () => {
+    setOffset(0);
+    setHasMore(true);
+    await loadPosts(true);
+  };
+
+  const loadTopFollowers = async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select(`
+        id,
+        full_name,
+        avatar_url,
+        follows:follows!follows_following_id_fkey(count)
+      `)
+      .limit(5);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    const sortedUsers = (data || [])
+      .map(user => ({
+        ...user,
+        follower_count: user.follows[0]?.count || 0
+      }))
+      .sort((a, b) => b.follower_count - a.follower_count)
+      .slice(0, 5);
+
+    setTopFollowers(sortedUsers);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/auth');
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="min-h-screen bg-muted">
-        <Navbar />
-        <main className="container mx-auto grid grid-cols-10 gap-6 py-6">
-          <aside className="col-span-2 hidden md:block">
-            <Skeleton className="h-40 w-full rounded-lg" />
-          </aside>
-          <section className="col-span-10 md:col-span-5 space-y-4">
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-64 w-full" />
-          </section>
-          <aside className="col-span-10 md:col-span-3 hidden md:block">
-            <Skeleton className="h-40 w-full rounded-lg" />
-          </aside>
-        </main>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Memuat...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-muted">
-      <Navbar userName={profile.name} userInitials={profile.avatar_text} />
-      <main className="container mx-auto grid grid-cols-10 gap-6 py-6">
-        <LeftSidebar />
-        <section className="col-span-10 md:col-span-5 space-y-4">
-          <CreatePost userName={profile.name} userInitials={profile.avatar_text} />
-          {hasNewPosts && (
-            <div className="flex justify-center sticky top-20 z-10">
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className={`sticky top-0 z-50 border-b border-border shadow-lg transition-all duration-300 ${
+        isScrolled 
+          ? 'bg-card/80 backdrop-blur-md' 
+          : 'bg-card'
+      }`}>
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent whitespace-nowrap">
+              EduForum MAN IC Siak
+            </h1>
+            
+            <form onSubmit={handleSearch} className="flex-1 max-w-md mx-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Cari postingan atau user..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </form>
+
+            <div className="flex items-center gap-2">
+              {user && (
+                <>
+                  <ChatNotifications userId={user.id} />
+                  <Notifications userId={user.id} />
+                </>
+              )}
+              <ThemeToggle />
               <Button
-                variant="default"
+                variant="ghost"
                 size="sm"
-                onClick={handleRefetch}
-                disabled={isRefetching || isLoading}
-                className="shadow-lg rounded-full"
+                onClick={handleLogout}
+                className="text-muted-foreground hover:text-accent"
               >
-                <ArrowUp className="h-4 w-4 mr-2" />
-                Lihat Postingan Baru
+                <LogOut className="h-4 w-4 mr-2" />
+                Keluar
               </Button>
             </div>
-          )}
-          {isLoading && (
-            <Skeleton className="h-64 w-full" />
-          )}
-          {uniquePostArray.map((post) => (
-            <PostCard 
-              key={post.id} 
-              post={post as PostWithAuthor} 
-              currentUserName={profile.name} 
-              currentUserInitials={profile.avatar_text} 
-              currentUserId={profile.id}
-            />
-          ))}
-          <InfiniteScrollTrigger
-            onLoadMore={loadMore}
-            disabled={!hasNextPage || isFetchingNextPage}
-          />
-          {isFetchingNextPage && (
-            <Skeleton className="h-64 w-full" />
-          )}
-          {!hasNextPage && !isLoading && (
-            <p className="text-center text-muted-foreground py-4">
-              Anda telah mencapai akhir.
-            </p>
-          )}
-        </section>
-        <RightSidebar />
-      </main>
-      <footer className="border-t py-4 bg-muted/30">
-        <div className="container mx-auto px-4 text-center">
-          <p className="text-sm text-muted-foreground">
-            <a
-              href="https://flamyheart.site"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-primary hover:underline underline-offset-4"
-            >
-              © {new Date().getFullYear()} Andre Saputra
-            </a>
-          </p>
+          </div>
         </div>
-      </footer>
+      </header>
+
+      <div className="container mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Sidebar - Navigation */}
+          <aside className="lg:col-span-3">
+            <nav className="sticky top-24 space-y-2">
+              <Button variant="ghost" className="w-full justify-start gap-3 text-accent">
+                <Home className="h-5 w-5" />
+                Beranda
+              </Button>
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+                onClick={() => navigate('/profile')}
+              >
+                <User className="h-5 w-5" />
+                Profil
+              </Button>
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+                onClick={() => navigate('/groups')}
+              >
+                <Users className="h-5 w-5" />
+                Grup
+              </Button>
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+                onClick={() => navigate('/messages')}
+              >
+                <MessageCircle className="h-5 w-5" />
+                Pesan
+              </Button>
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+                onClick={() => navigate('/games')}
+              >
+                <Gamepad2 className="h-5 w-5" />
+                Games
+              </Button>
+            </nav>
+          </aside>
+
+          {/* Center - Feed */}
+          <main className="lg:col-span-6 space-y-6">
+            {profile && (
+              <CreatePost
+                currentUser={profile}
+                onPostCreated={refreshPosts}
+              />
+            )}
+
+            <div className="space-y-4">
+              {loading ? (
+                // Show skeleton loaders while loading
+                <>
+                  <PostSkeleton />
+                  <PostSkeleton />
+                  <PostSkeleton />
+                </>
+              ) : posts.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">Belum ada postingan</p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Buat postingan pertama Anda!
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {posts.map((post) => (
+                    <PostCard
+                      key={post.id}
+                      post={post}
+                      currentUserId={user?.id}
+                      onLike={refreshPosts}
+                      onPostUpdated={refreshPosts}
+                      onPostDeleted={refreshPosts}
+                    />
+                  ))}
+                  
+                  {/* Infinite scroll trigger */}
+                  <div ref={observerTarget} className="py-4 text-center">
+                    {loadingMore && (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent"></div>
+                        <p className="text-muted-foreground text-sm">Memuat lebih banyak...</p>
+                      </div>
+                    )}
+                    {!hasMore && posts.length > 0 && (
+                      <p className="text-muted-foreground text-sm">Tidak ada postingan lagi</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </main>
+
+          {/* Right Sidebar - Leaderboard */}
+          <aside className="lg:col-span-3">
+            <div className="sticky top-24">
+              <Leaderboard users={topFollowers} />
+            </div>
+          </aside>
+        </div>
+      </div>
     </div>
   );
 };

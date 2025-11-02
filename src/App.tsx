@@ -1,78 +1,46 @@
-import React, { Suspense, useEffect } from "react";
-import { Toaster } from "@/components/ui/toaster";
+import React from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import Index from "./pages/Index";
+import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
+import Groups from "./pages/Groups";
+import GroupDetail from "./pages/GroupDetail";
+import Chat from "./pages/Chat";
+import Messages from "./pages/Messages";
+import Games from "./pages/Games";
+import SearchPage from "./pages/SearchPage";
+import NotFound from "./pages/NotFound";
+import PostPage from "./pages/PostPage";
 
-const Index = React.lazy(() => import("./pages/Index"));
-const Auth = React.lazy(() => import("./pages/Auth"));
-const NotFound = React.lazy(() => import("./pages/NotFound"));
-const SearchPage = React.lazy(() => import("./pages/SearchPage"));
-const ProfileSettingsPage = React.lazy(() => import("./pages/ProfileSettingsPage"));
-const UserProfilePage = React.lazy(() => import("./pages/UserProfilePage"));
-const ChatPage = React.lazy(() => import("./pages/ChatPage"));
-const UpdatePassword = React.lazy(() => import("./pages/UpdatePassword"));
-const PostPage = React.lazy(() => import("./pages/PostPage"));
-
-const PageLoader = () => (
-  <div className="flex h-screen items-center justify-center bg-background">
-    <div>Memuat...</div>
-  </div>
-);
-
-function ScrollToTop() {
-  const { pathname } = useLocation();
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
-  }, [pathname]);
-  return null;
-}
-
-function LegacyNameRedirect() {
-  const { username = "" } = useParams<{ username: string }>();
-  return <Navigate replace to={`/profile/u/${encodeURIComponent(username)}`} />;
-}
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: 1, refetchOnWindowFocus: false, refetchOnReconnect: true, staleTime: 15_000, gcTime: 300_000 },
-    mutations: { retry: 0 },
-  },
-});
-
-function AppRoutes() {
-  return (
-    <>
-      <ScrollToTop />
-      <Suspense fallback={<PageLoader />}>
+const App = () => (
+  <ThemeProvider defaultTheme="system" storageKey="eduforum-theme">
+    <TooltipProvider>
+      <Sonner />
+      <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/profile/:userId?" element={<Profile />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/groups" element={<Groups />} />
+          <Route path="/groups/:groupId" element={<GroupDetail />} />
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/chat/:conversationId" element={<Chat />} />
+          <Route path="/games" element={<Games />} />
           <Route path="/search" element={<SearchPage />} />
-          <Route path="/settings/profile" element={<ProfileSettingsPage />} />
-          <Route path="/profile/u/:username" element={<UserProfilePage />} />
-          <Route path="/profile/name/:name" element={<LegacyNameRedirect />} />
-          <Route path="/update-password" element={<UpdatePassword />} />
           <Route path="/post/:postId" element={<PostPage />} />
-          <Route path="/chat/:roomId" element={<ChatPage />} />
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </Suspense>
-    </>
-  );
-}
+      </BrowserRouter>
+    </TooltipProvider>
+  </ThemeProvider>
+);
 
-export default function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
-  );
-}
+export default App;

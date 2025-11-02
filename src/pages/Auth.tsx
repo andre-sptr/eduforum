@@ -1,184 +1,276 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, GraduationCap } from "lucide-react";
 import { z } from "zod";
 
-const signupSchema = z.object({
-  email: z.string().email("Email tidak valid").max(255),
-  password: z.string().min(6, "Password minimal 6 karakter").max(100),
-  name: z.string().trim().min(2, "Nama minimal 2 karakter").max(100),
-  role: z.enum(["Siswa", "Guru", "Alumni"]),
+// Input validation schemas
+const loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
 });
-const loginSchema = z.object({ email: z.string().email("Email tidak valid"), password: z.string().min(1, "Password harus diisi") });
-const resetSchema = z.object({ email: z.string().email("Email tidak valid") });
 
-type Role = "Siswa" | "Guru" | "Alumni";
-const Brand = () => (
-  <div className="mb-6 text-center">
-    <div className="inline-flex items-center gap-3">
-      <img src="/favicon.png" alt="EduForum Logo" className="h-12 w-12" loading="lazy" decoding="async" />
-      <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">EduForum</h1>
-    </div>
-    <p className="mt-2 text-muted-foreground">Platform Sosial Edukatif MAN IC Siak</p>
-  </div>
-);
+const registerSchema = z.object({
+  fullName: z.string().trim().min(2, "Name must be at least 2 characters").max(100, "Name too long"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  role: z.enum(["siswa", "guru", "alumni"], { required_error: "Please select a role" }),
+});
 
-function Field({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      {children}
-    </div>
-  );
-}
-
-export default function Auth() {
-  const nav = useNavigate();
-  const [tab, setTab] = useState<"login" | "signup">("login");
+const Auth = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [resetMode, setResetMode] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [role, setRole] = useState<string>("");
 
-  // state login
-  const [login, setLogin] = useState({ email: "", password: "" });
-  // state signup
-  const [signup, setSignup] = useState<{ email: string; password: string; name: string; role: Role }>({
-    email: "", password: "", name: "", role: "Siswa",
-  });
-  // state reset
-  const [resetEmail, setResetEmail] = useState("");
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => { if (session) nav("/"); });
-  }, [nav]);
-
-  const safeParse = <T,>(schema: z.ZodSchema<T>, data: unknown) => {
-    const res = schema.safeParse(data);
-    if (!res.success) throw new Error(res.error.errors[0].message);
-    return res.data;
-  };
-
-  const onLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      setLoading(true);
-      const v = safeParse(loginSchema, login);
-      const { email, password } = v;
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return toast.error(error.message.includes("Invalid") ? "Email atau password salah" : error.message);
-      toast.success("Login berhasil!"); nav("/");
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally { setLoading(false); }
-  };
+    setLoading(true);
 
-  const onSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
     try {
-      setLoading(true);
-      const v = safeParse(signupSchema, signup);
-      const { error } = await supabase.auth.signUp({
-        email: v.email, password: v.password,
-        options: { emailRedirectTo: `${window.location.origin}/`, data: { name: v.name, role: v.role } },
+      // Validate input
+      loginSchema.parse({ email, password });
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-      if (error) return toast.error(error.message.includes("already") ? "Email sudah terdaftar" : error.message);
-      toast.success("Akun berhasil dibuat! Silakan login."); setTab("login");
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally { setLoading(false); }
+
+      if (error) throw error;
+
+      toast.success("Login berhasil!");
+      navigate("/");
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const onReset = async (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+
     try {
-      setLoading(true);
-      const v = safeParse(resetSchema, { email: resetEmail });
-      const { error } = await supabase.auth.resetPasswordForEmail(v.email, { redirectTo: `${window.location.origin}/update-password` });
-      if (error) return toast.error(error.message);
-      toast.success("Link reset password telah dikirim!"); setResetMode(false); setResetEmail("");
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally { setLoading(false); }
+      // Validate input
+      registerSchema.parse({
+        fullName,
+        email,
+        password,
+        role,
+      });
+
+      // Sign up the user
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            full_name: fullName,
+            role: role,
+          }
+        },
+      });
+
+      if (signUpError) throw signUpError;
+
+      // Profile will be automatically created by the database trigger
+      // So we only need to handle user_roles
+      if (data.user) {
+        // Insert into user_roles table for secure role management
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert([{
+            user_id: data.user.id,
+            role: role as 'siswa' | 'guru' | 'alumni',
+          }]);
+
+        if (roleError) {
+          console.error("Role insertion error:", roleError);
+          // Don't fail the signup if role insertion fails
+        }
+      }
+
+      toast.success("Registrasi berhasil! Silakan login.");
+      
+      // Clear form
+      setFullName("");
+      setEmail("");
+      setPassword("");
+      setRole("");
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+      } else {
+        toast.error(error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4">
-      <Card className="w-full max-w-md p-6 shadow-xl">
-        <Brand />
-        <Tabs value={tab} onValueChange={(v) => { setTab(v as typeof tab); setResetMode(false); }} className="w-full">
-          {!resetMode && (
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="signup">Daftar</TabsTrigger>
-            </TabsList>
-          )}
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-[var(--shadow-gold)]">
+              <GraduationCap className="w-8 h-8 text-primary-foreground" />
+            </div>
+          </div>
+          <h1 className="text-4xl font-bold text-foreground mb-2">EduForum MAN IC Siak</h1>
+          <p className="text-muted-foreground">Platform Edukasi Interaktif Eksklusif</p>
+        </div>
 
-          <TabsContent value="login">
-            {resetMode ? (
-              <form onSubmit={onReset} className="space-y-4">
-                <div className="border-t" />
-                <div className="text-center mb-2"><h3 className="font-bold text-2xl">Reset Password</h3></div>
-                <Field id="reset-email" label="Email">
-                  <Input id="reset-email" type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} required placeholder="nama@gmail.com" />
-                </Field>
-                <Button type="submit" className="w-full" disabled={loading}>{loading ? "Mengirim..." : "Kirim Link Reset"}</Button>
-                <Button variant="link" type="button" className="w-full" onClick={() => setResetMode(false)} disabled={loading}>Batal (Kembali ke Login)</Button>
-              </form>
-            ) : (
-              <form onSubmit={onLogin} className="space-y-4">
-                <Field id="login-email" label="Email">
-                  <Input id="login-email" type="email" value={login.email} onChange={(e) => setLogin((s) => ({ ...s, email: e.target.value }))} required />
-                </Field>
-                <Field id="login-password" label="Password">
-                  <Input id="login-password" type="password" value={login.password} onChange={(e) => setLogin((s) => ({ ...s, password: e.target.value }))} required />
-                </Field>
-                <div className="text-center">
-                  <Button variant="link" type="button" className="px-0 h-auto py-1 text-sm"
-                    onClick={() => { setResetMode(true); setResetEmail(login.email); }}>
-                    Lupa Password?
+        <Card className="border-border bg-card shadow-xl">
+          <CardHeader>
+            <CardTitle className="text-2xl text-center">Selamat Datang</CardTitle>
+            <CardDescription className="text-center">
+              Bergabung dengan komunitas MAN IC Siak
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="login" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4">
+                <TabsTrigger value="login">Login</TabsTrigger>
+                <TabsTrigger value="register">Register</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="login">
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="login-email">Email</Label>
+                    <Input
+                      id="login-email"
+                      type="email"
+                      placeholder="nama@maniciak.sch.id"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="bg-input border-border"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="login-password">Password</Label>
+                    <Input
+                      id="login-password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      className="bg-input border-border"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-[var(--shadow-gold)] transition-[var(--transition-smooth)]"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Memproses...
+                      </>
+                    ) : (
+                      "Masuk"
+                    )}
                   </Button>
-                </div>
-                <Button type="submit" className="w-full bg-gradient-to-r from-primary to-primary/90" disabled={loading}>
-                  {loading ? "Loading..." : "Login"}
-                </Button>
-              </form>
-            )}
-          </TabsContent>
+                  <div className="text-center">
+                    <a href="/reset-password" className="text-sm text-accent hover:underline">
+                      Lupa Password?
+                    </a>
+                  </div>
+                </form>
+              </TabsContent>
 
-          <TabsContent value="signup">
-            <form onSubmit={onSignup} className="space-y-4">
-              <Field id="signup-name" label="Nama Lengkap">
-                <Input id="signup-name" value={signup.name} onChange={(e) => setSignup((s) => ({ ...s, name: e.target.value }))} required />
-              </Field>
-              <Field id="signup-email" label="Email">
-                <Input id="signup-email" type="email" value={signup.email} onChange={(e) => setSignup((s) => ({ ...s, email: e.target.value }))} required />
-              </Field>
-              <Field id="signup-password" label="Password">
-                <Input id="signup-password" type="password" value={signup.password} onChange={(e) => setSignup((s) => ({ ...s, password: e.target.value }))} required />
-              </Field>
-              <Field id="role" label="Peran">
-                <Select value={signup.role} onValueChange={(v) => setSignup((s) => ({ ...s, role: v as Role }))}>
-                  <SelectTrigger id="role"><SelectValue placeholder="Pilih peran" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Siswa">Siswa</SelectItem>
-                    <SelectItem value="Guru">Guru</SelectItem>
-                    <SelectItem value="Alumni">Alumni</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Button type="submit" className="w-full bg-gradient-to-r from-primary to-primary/90" disabled={loading}>
-                {loading ? "Loading..." : "Daftar"}
-              </Button>
-            </form>
-          </TabsContent>
-        </Tabs>
-      </Card>
+              <TabsContent value="register">
+                <form onSubmit={handleSignup} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="register-name">Nama Lengkap</Label>
+                    <Input
+                      id="register-name"
+                      type="text"
+                      placeholder="Nama Lengkap Anda"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                      className="bg-input border-border"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="register-email">Email</Label>
+                    <Input
+                      id="register-email"
+                      type="email"
+                      placeholder="nama@maniciak.sch.id"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="bg-input border-border"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="register-password">Password</Label>
+                    <Input
+                      id="register-password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      className="bg-input border-border"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="register-role">Role (Tidak dapat diubah)</Label>
+                    <Select value={role} onValueChange={setRole} required>
+                      <SelectTrigger className="bg-input border-border">
+                        <SelectValue placeholder="Pilih Role Anda" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover border-border">
+                        <SelectItem value="siswa">Siswa</SelectItem>
+                        <SelectItem value="guru">Guru</SelectItem>
+                        <SelectItem value="alumni">Alumni</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-[var(--shadow-gold)] transition-[var(--transition-smooth)]"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Memproses...
+                      </>
+                    ) : (
+                      "Daftar"
+                    )}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
-}
+};
+
+export default Auth;

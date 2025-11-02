@@ -1,111 +1,247 @@
-import React, { useMemo, useRef, useState, useEffect } from "react";
-import { useSearchParams, Link, useNavigate } from "react-router-dom";
-import { Navbar } from "@/components/Navbar"; import { LeftSidebar } from "@/components/LeftSidebar"; import { RightSidebar } from "@/components/RightSidebar";
-import { PostCard, PostWithAuthor } from "@/components/PostCard"; import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "@/hooks/useAuth"; import { useQuery } from "@tanstack/react-query"; import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card"; import { UserAvatar } from "@/components/UserAvatar"; import { Button } from "@/components/ui/button"; import { Badge } from "@/components/ui/badge";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ArrowLeft, Search, User, FileText } from "lucide-react";
+import PostCard from "@/components/PostCard";
+import PostSkeleton from "@/components/PostSkeleton";
 import { toast } from "sonner";
 
-type PostLike={user_id:string}; interface Post extends Omit<PostWithAuthor,"viewer_has_liked">{user_like:PostLike[]}
-type SearchedProfile={id:string;name:string;username:string;bio:string|null;avatar_text:string;role:string}
-type CurrentProfileData={id:string;name:string;avatar_text:string}
-const PAGE_SIZE=4;
+const SearchPage = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
+  const [posts, setPosts] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-const AutoLoadMore=({enabled,onLoad,rootMargin="600px"}:{enabled:boolean;onLoad:()=>void;rootMargin?:string})=>{
-  const ref=useRef<HTMLDivElement|null>(null);
-  useEffect(()=>{ if(!enabled||!ref.current) return; let once=false; const io=new IntersectionObserver(e=>{ if(!once&&e[0]?.isIntersecting){ once=true; onLoad(); }},{rootMargin}); io.observe(ref.current); return()=>io.disconnect();},[enabled,onLoad,rootMargin]);
-  return <div ref={ref} aria-hidden className="h-6" />;
-};
-
-export default function SearchPage(){
-  const [sp]=useSearchParams(); const q=sp.get("q")||""; const {user,loading:authLoading}=useAuth(); const nav=useNavigate();
-  const [loadingChat,setLoadingChat]=useState(false); const [pages,setPages]=useState(1);
-
-  const {data:me,isLoading:isProfileLoading}=useQuery<CurrentProfileData|null>({
-    queryKey:["profile",user?.id], enabled:!!user,
-    queryFn:async()=>{ if(!user) return null; const {data}=await supabase.from("profiles").select("id,name,avatar_text").eq("id",user.id).maybeSingle(); return data;}
-  });
-
-  const {data:posts=[],isLoading:isPostsLoading}=useQuery<Post[]>({
-    queryKey:["searchPosts",q,user?.id], enabled:!!q&&!!user,
-    queryFn:async()=>{ if(!q||!user?.id) return[];
-      const {data,error}=await supabase.from("posts").select(`
-        *,profiles!user_id(name,avatar_text,role),
-        original_author:profiles!original_author_id(name,avatar_text,role),
-        user_like:post_likes!left(user_id)
-      `).ilike("content",`%${q}%`).eq("post_likes.user_id",user.id).order("created_at",{ascending:false}).limit(100);
-      if(error) throw error; return (data as Post[])||[];}
-  });
-
-  const {data:users=[],isLoading:isUsersLoading}=useQuery<SearchedProfile[]>({
-    queryKey:["searchUsers",q], enabled:!!q,
-    queryFn:async()=>{ if(!q) return[]; const {data,error}=await supabase.from("profiles").select("id,name,bio,avatar_text,role,username").ilike("name",`%${q}%`).limit(10); if(error) throw error; return data||[];}
-  });
-
-  const visiblePosts=useMemo(()=>posts.slice(0,pages*PAGE_SIZE),[posts,pages]);
-  const canLoadMore=visiblePosts.length<posts.length;
-
-  const startOrGoToChat=async(recipientId:string)=>{
-    if(!me){ toast.error("Gagal memulai chat: Profil pengguna tidak ditemukan."); return; }
-    if(me.id===recipientId){ toast.info("Anda tidak bisa chat dengan diri sendiri."); return; }
-    setLoadingChat(true);
-    try{ const {data:roomId,error}=await supabase.rpc("create_or_get_chat_room",{recipient_id:recipientId}); if(error) throw error; if(!roomId) throw new Error("Gagal mendapatkan ID room chat."); nav(`/chat/${roomId}`);}
-    catch(e){ toast.error(`Gagal memulai chat: ${(e as Error).message}`);}
-    finally{ setLoadingChat(false); }
+  const refreshPosts = async () => {
+    if (searchQuery.trim()) {
+      await handleSearch(searchQuery);
+    }
   };
 
-  if(authLoading||isProfileLoading||!me) return (
-    <div className="min-h-screen bg-muted"><Navbar/>
-      <main className="container mx-auto grid grid-cols-10 gap-6 py-6">
-        <aside className="col-span-2 hidden md:block"><Skeleton className="h-40 w-full rounded-lg"/></aside>
-        <section className="col-span-10 md:col-span-5 space-y-4"><Skeleton className="h-8 w-3/4"/><Skeleton className="h-40 w-full"/><Skeleton className="h-40 w-full"/></section>
-        <aside className="col-span-10 md:col-span-3 hidden md:block"><Skeleton className="h-40 w-full rounded-lg"/><Skeleton className="h-64 w-full rounded-lg mt-6"/></aside>
-      </main>
-    </div>
-  );
+  useEffect(() => {
+    checkUser();
+  }, []);
+
+  useEffect(() => {
+    const query = searchParams.get("q");
+    if (query) {
+      setSearchQuery(query);
+      handleSearch(query);
+    }
+  }, [searchParams]);
+
+  const checkUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      navigate("/auth");
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    setCurrentUser(profile);
+  };
+
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) {
+      setPosts([]);
+      setUsers([]);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Search posts
+      const { data: postsData, error: postsError } = await supabase
+        .from("posts")
+        .select("*")
+        .ilike("content", `%${query}%`)
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (postsError) throw postsError;
+
+      if (postsData && postsData.length > 0) {
+        const userIds = [...new Set(postsData.map(p => p.user_id))];
+        const { data: profilesData } = await supabase
+          .from("profiles")
+          .select("id, full_name, avatar_url, role")
+          .in("id", userIds);
+
+        const postIds = postsData.map(p => p.id);
+        const { data: likesData } = await supabase
+          .from("likes")
+          .select("post_id, user_id")
+          .in("post_id", postIds);
+
+        const profilesMap = new Map(
+          (profilesData || []).map(p => [p.id, p])
+        );
+
+        const likesMap = new Map<string, any[]>();
+        (likesData || []).forEach(like => {
+          if (!likesMap.has(like.post_id)) {
+            likesMap.set(like.post_id, []);
+          }
+          likesMap.get(like.post_id)!.push(like);
+        });
+
+        const postsWithData = postsData.map(post => ({
+          ...post,
+          profiles: profilesMap.get(post.user_id),
+          likes: likesMap.get(post.id) || []
+        }));
+
+        setPosts(postsWithData);
+      } else {
+        setPosts([]);
+      }
+
+      // Search users
+      const { data: usersData, error: usersError } = await supabase
+        .from("profiles")
+        .select("*")
+        .ilike("full_name", `%${query}%`)
+        .limit(20);
+
+      if (usersError) throw usersError;
+      setUsers(usersData || []);
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-muted">
-      <Navbar userName={me.name} userInitials={me.avatar_text}/>
-      <main className="container mx-auto grid grid-cols-10 gap-6 py-6">
-        <LeftSidebar/>
-        <section className="col-span-10 md:col-span-5 space-y-4">
-          <div>
-            <h3 className="text-lg font-medium mb-3 border-b pb-2">Pengguna</h3>
-            {isUsersLoading? <Skeleton className="h-20 w-full"/> : !users.length? <p className="text-center text-muted-foreground py-4">Tidak ada pengguna ditemukan.</p> : (
-              <Card><CardContent className="p-4 space-y-4">
-                {users.map(u=>(
-                  <div key={u.id} className="flex items-center justify-between">
-                    <Link to={`/profile/u/${u.username}`} className="flex items-start gap-3 group">
-                      <UserAvatar name={u.name} initials={u.avatar_text}/>
-                      <div className="min-h-[2.5rem]">
-                        <div className="flex items-baseline gap-1"><h4 className="font-semibold">{u.name}</h4><Badge variant="secondary" className="px-1.5 py-0 text-xs">{u.role}</Badge></div>
-                        <p className="text-xs text-muted-foreground mt-0.5">{u.bio||<i>Tidak ada bio</i>}</p>
-                      </div>
-                    </Link>
-                    {u.id!==me.id&&(<Button size="sm" variant="outline" onClick={()=>startOrGoToChat(u.id)} disabled={loadingChat}>{loadingChat?"...":"Chat"}</Button>)}
-                  </div>
-                ))}
-              </CardContent></Card>
-            )}
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 bg-card border-b border-border shadow-lg">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <form onSubmit={handleSearchSubmit} className="flex-1 max-w-2xl">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Cari postingan atau user..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </form>
           </div>
+        </div>
+      </header>
 
-          <h2 className="text-lg font-medium mb-3 border-b pb-2">Hasil Pencarian untuk: "{q}"</h2>
-          <div className="flex flex-col gap-4">
-            {isPostsLoading? (<><Skeleton className="h-40 w-full"/><Skeleton className="h-40 w-full"/></>) :
-            !posts.length? <p className="text-center text-muted-foreground">Tidak ada hasil postingan ditemukan.</p> :
-            (<>
-              {visiblePosts.map(p=>(
-                <PostCard key={p.id} post={{...p,viewer_has_liked:(p.user_like?.length||0)>0}} currentUserId={me.id} currentUserName={me.name} currentUserInitials={me.avatar_text}/>
-              ))}
-              <AutoLoadMore enabled={canLoadMore} onLoad={()=>setPages(x=>x+1)}/>
-              {canLoadMore&&(<Button className="w-full" variant="outline" onClick={()=>setPages(x=>x+1)}>Muat lebih banyak</Button>)}
-            </>)}
-          </div>
-        </section>
-        <RightSidebar/>
-      </main>
-      <footer className="border-t py-4 bg-muted/30"><div className="container mx-auto px-4 text-center"><p className="text-sm text-muted-foreground"><a href="https://flamyheart.site" target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline underline-offset-4">© {new Date().getFullYear()} Andre Saputra</a></p></div></footer>
+      <div className="container mx-auto px-4 py-6 max-w-4xl">
+        <Tabs defaultValue="posts" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="posts" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Postingan ({posts.length})
+            </TabsTrigger>
+            <TabsTrigger value="users" className="gap-2">
+              <User className="h-4 w-4" />
+              User ({users.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="posts" className="space-y-4">
+            {loading ? (
+              <div className="space-y-4">
+                <PostSkeleton />
+                <PostSkeleton />
+                <PostSkeleton />
+              </div>
+            ) : posts.length > 0 ? (
+              posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  currentUserId={currentUser?.id}
+                  onLike={refreshPosts}
+                  onPostUpdated={refreshPosts}
+                  onPostDeleted={refreshPosts}
+                />
+              ))
+            ) : (
+              <div className="text-center py-12">
+                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  {searchQuery ? "Tidak ada postingan ditemukan" : "Masukkan kata kunci untuk mencari"}
+                </p>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="users" className="space-y-4">
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto"></div>
+                <p className="mt-4 text-muted-foreground">Mencari...</p>
+              </div>
+            ) : users.length > 0 ? (
+              users.map((user) => (
+                <Card 
+                  key={user.id}
+                  className="cursor-pointer hover:bg-accent/5 transition-colors"
+                  onClick={() => navigate(`/profile/${user.id}`)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-4">
+                      <Avatar className="h-12 w-12">
+                        <AvatarImage src={user.avatar_url} alt={user.full_name} />
+                        <AvatarFallback>{user.full_name.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-foreground">{user.full_name}</h3>
+                        {user.bio && (
+                          <p className="text-sm text-muted-foreground line-clamp-1">{user.bio}</p>
+                        )}
+                      </div>
+                      <Button variant="ghost" size="sm">
+                        Lihat Profil
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="text-center py-12">
+                <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  {searchQuery ? "Tidak ada user ditemukan" : "Masukkan kata kunci untuk mencari"}
+                </p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
-}
+};
+
+export default SearchPage;
