@@ -1,24 +1,39 @@
-import { useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 
-const NotFound = () => {
-  const location = useLocation();
-
-  useEffect(() => {
-    console.error("404 Error: User attempted to access non-existent route:", location.pathname);
-  }, [location.pathname]);
+export default function NotFound() {
+  const { pathname } = useLocation(); const nav = useNavigate();
+  const [q, setQ] = useState("");
+  useEffect(() => { console.error("404:", pathname); document.title = "404 • Halaman tidak ditemukan"; }, [pathname]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">404</h1>
-        <p className="mb-4 text-xl text-gray-600">Oops! Page not found</p>
-        <a href="/" className="text-blue-500 underline hover:text-blue-700">
-          Return to Home
-        </a>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-muted/40 via-background to-primary/10 p-6">
+      <div className="w-full max-w-lg rounded-2xl border bg-card shadow-xl p-8 text-center">
+        <div className="mb-3 text-7xl font-extrabold tracking-tight">404</div>
+        <p className="text-sm text-muted-foreground mb-6">Halaman <span className="font-mono break-all">{pathname}</span> tidak ditemukan.</p>
+
+        <form
+          onSubmit={(e)=>{e.preventDefault(); if(q.trim()) nav(`/search?q=${encodeURIComponent(q.trim())}`)}}
+          className="flex gap-2 mb-4"
+        >
+          <input
+            className="flex-1 rounded-lg border px-3 py-2 outline-none focus:ring"
+            placeholder="Cari sesuatu…"
+            value={q} onChange={e=>setQ(e.target.value)}
+          />
+          <button className="rounded-lg px-4 py-2 border hover:bg-muted transition">Cari</button>
+        </form>
+
+        <div className="flex flex-wrap justify-center gap-2">
+          <button onClick={()=>nav(-1)} className="rounded-lg px-4 py-2 border hover:bg-muted transition">← Kembali</button>
+          <Link to="/" className="rounded-lg px-4 py-2 border hover:bg-muted transition">🏠 Beranda</Link>
+          <Link to="/profile/8b65284e-3cec-4634-a0ef-24bf733175be" className="rounded-lg px-4 py-2 border hover:bg-muted transition">👤 Profil</Link>
+        </div>
+
+        <div className="mt-6 text-xs text-muted-foreground">
+          Tip: pastikan URL benar atau gunakan pencarian di atas.
+        </div>
       </div>
     </div>
   );
-};
-
-export default NotFound;
+}

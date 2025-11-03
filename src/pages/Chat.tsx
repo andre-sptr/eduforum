@@ -16,6 +16,8 @@ const messageSchema = z.object({ content: z.string().trim().min(1,"Message canno
 
 interface Message { id:string; user_id:string; content:string; created_at:string; edited_at?:string|null; is_deleted?:boolean; profiles?:{ full_name:string; avatar_url:string|null; role:string } }
 
+const GROUP_WINDOW_MS = 5 * 60 * 1000;
+
 const Chat = () => {
   const navigate = useNavigate();
   const { conversationId } = useParams();
@@ -119,6 +121,13 @@ const Chat = () => {
   const cancelEdit=()=>{ setEditingMessageId(null); setEditContent(""); };
   const formatTime=(ts:string)=>new Date(ts).toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"});
 
+  const isGrouped = (prev?: Message, curr?: Message) => {
+    if (!prev || !curr) return false;
+    if (prev.user_id !== curr.user_id) return false;
+    const dt = new Date(curr.created_at).getTime() - new Date(prev.created_at).getTime();
+    return dt >= 0 && dt <= GROUP_WINDOW_MS;
+  };
+
   if(loading) return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center"><div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-accent"/><p className="mt-4 text-muted-foreground">Memuat chat...</p></div>
@@ -144,21 +153,32 @@ const Chat = () => {
       <div className="container mx-auto px-4 py-6 max-w-4xl flex-1 flex">
         <Card ref={cardRef} className="flex-1 border-border bg-card shadow-sm overflow-hidden flex flex-col">
           <ScrollArea className="flex-1 p-4">
-            <div className="space-y-4">
+            <div className="space-y-2">
               {messages.length===0?(
                 <div className="py-10 text-center text-muted-foreground">Belum ada pesan. Mulai percakapan!</div>
-              ):messages.map(m=>{
-                const mine=m.user_id===currentUser?.id; const editing=editingMessageId===m.id;
+              ):messages.map((m, idx)=>{
+                const mine=m.user_id===currentUser?.id;
+                const editing=editingMessageId===m.id;
+                const prev=messages[idx-1];
+                const grouped=isGrouped(prev,m);
                 return (
-                  <div key={m.id} className={`flex gap-3 ${mine?"flex-row-reverse":"flex-row"}`}>
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={m.profiles?.avatar_url||undefined}/>
-                      <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(m.profiles?.full_name||"U")}</AvatarFallback>
-                    </Avatar>
+                  <div key={m.id} className={`flex ${mine?"flex-row-reverse":"flex-row"} ${grouped?"mt-1":"mt-3"} gap-3`}>
+                    {grouped ? (
+                      <div className="h-8 w-8 opacity-0 pointer-events-none" />
+                    ) : (
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={m.profiles?.avatar_url||undefined}/>
+                        <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(m.profiles?.full_name||"U")}</AvatarFallback>
+                      </Avatar>
+                    )}
+
                     <div className={`max-w-[72%] ${mine?"items-end text-right":"items-start"} flex flex-col`}>
-                      <div className={`mb-1 flex items-baseline gap-2 ${mine ? "flex-row-reverse" : ""}`}>
-                        <Link to={`/profile/${m.user_id}`}className="text-sm font-medium hover:text-accent">{m.profiles?.full_name}</Link>
-                      </div>
+                      {!grouped && (
+                        <div className={`mb-1 flex items-baseline gap-2 ${mine?"flex-row-reverse":""}`}>
+                          <Link to={`/profile/${m.user_id}`} className="text-sm font-medium hover:text-accent">{m.profiles?.full_name}</Link>
+                        </div>
+                      )}
+
                       {editing?(
                         <div className={`flex ${mine?"flex-row-reverse":""} items-center gap-2`}>
                           <Input value={editContent} onChange={e=>setEditContent(e.target.value)} className="h-9" autoFocus onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleEditMessage(m.id); } if(e.key==="Escape") cancelEdit(); }}/>
@@ -180,7 +200,8 @@ const Chat = () => {
                           )}
                         </div>
                       )}
-                      <span className="mt-1 text-[11px] text-muted-foreground">{formatTime(m.created_at)}</span>
+
+                      {!grouped && <span className="mt-1 text-[11px] text-muted-foreground">{formatTime(m.created_at)}</span>}
                     </div>
                   </div>
                 );

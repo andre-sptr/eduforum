@@ -78,7 +78,7 @@ export const MentionInput=({
               <button key={u.id} onClick={()=>insert(u)} className={`flex w-full items-center gap-3 px-3 py-2 text-left transition ${i===sel?"bg-accent/90 text-accent-foreground":"hover:bg-accent/40"}`}>
                 <Avatar className="h-8 w-8 ring-1 ring-border">
                   <AvatarImage src={u.avatar_url||undefined}/>
-                  <AvatarFallback className="bg-primary text-primary-foreground">{initials(u.full_name)}</AvatarFallback>
+                  <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{initials(u.full_name)}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
                   <div className="text-sm font-medium leading-tight">{u.full_name}</div>
