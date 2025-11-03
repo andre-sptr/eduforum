@@ -5,228 +5,87 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-interface User {
-  id: string;
-  full_name: string;
-  avatar_url: string | null;
-  role: string;
-}
-
+interface User { id:string; full_name:string; avatar_url:string|null; role:string }
 interface MentionInputProps {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  className?: string;
-  multiline?: boolean;
-  disabled?: boolean;
-  onKeyDown?: (e: React.KeyboardEvent) => void;
-  allowedUserIds?: string[]; // Filter untuk user yang boleh di-mention
-  currentUserId?: string; // ID user saat ini, untuk exclude dari suggestions
+  value:string; onChange:(v:string)=>void; placeholder?:string; className?:string; multiline?:boolean; disabled?:boolean; onKeyDown?:(e:React.KeyboardEvent)=>void; allowedUserIds?:string[]; currentUserId?:string;
 }
 
-export const MentionInput = ({
-  value,
-  onChange,
-  placeholder = "Ketik pesan...",
-  className = "",
-  multiline = false,
-  disabled = false,
-  onKeyDown,
-  allowedUserIds,
-  currentUserId,
-}: MentionInputProps) => {
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suggestions, setSuggestions] = useState<User[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [mentionSearch, setMentionSearch] = useState("");
-  const [cursorPosition, setCursorPosition] = useState(0);
-  const [dropdownPosition, setDropdownPosition] = useState<'top' | 'bottom'>('bottom');
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
+export const MentionInput=({
+  value,onChange,placeholder="Ketik pesan...",className="",multiline=false,disabled=false,onKeyDown,allowedUserIds,currentUserId
+}:MentionInputProps)=>{
+  const [show,setShow]=useState(false); const [items,setItems]=useState<User[]>([]); const [sel,setSel]=useState(0);
+  const [q,setQ]=useState(""); const [cursor,setCursor]=useState(0); const [pos,setPos]=useState<"top"|"bottom">("bottom");
+  const inputRef=useRef<HTMLInputElement|HTMLTextAreaElement>(null); const listRef=useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (showSuggestions && inputRef.current) {
-      const inputRect = inputRef.current.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const spaceBelow = viewportHeight - inputRect.bottom;
-      const spaceAbove = inputRect.top;
-      
-      // Set dropdown position based on available space
-      // If there's more space below or not enough space above, show below
-      if (spaceBelow > 300 || spaceAbove < 300) {
-        setDropdownPosition('bottom');
-      } else {
-        setDropdownPosition('top');
-      }
-    }
-  }, [showSuggestions]);
+  useEffect(()=>{ if(!show||!inputRef.current) return; const r=inputRef.current.getBoundingClientRect(); const vh=window.innerHeight; setPos(vh-r.bottom>300||r.top<300?"bottom":"top"); },[show]);
 
-  useEffect(() => {
-    const searchMentions = async () => {
-      if (!mentionSearch) {
-        setSuggestions([]);
-        setShowSuggestions(false);
-        return;
-      }
+  useEffect(()=>{ const search=async()=>{ if(!q){ setItems([]); setShow(false); return; }
+    let query=supabase.from("profiles").select("id,full_name,avatar_url,role").ilike("full_name",`%${q}%`);
+    if(currentUserId) query=query.neq("id",currentUserId); if(allowedUserIds?.length) query=query.in("id",allowedUserIds);
+    const {data}=await query.limit(5); if(data?.length){ setItems(data); setShow(true); setSel(0);} else { setItems([]); setShow(false); }
+  }; search(); },[q,allowedUserIds,currentUserId]);
 
-      let query = supabase
-        .from("profiles")
-        .select("id, full_name, avatar_url, role")
-        .ilike("full_name", `%${mentionSearch}%`);
-
-      // Exclude current user from suggestions
-      if (currentUserId) {
-        query = query.neq("id", currentUserId);
-      }
-
-      // Filter by allowed user IDs if provided
-      if (allowedUserIds && allowedUserIds.length > 0) {
-        query = query.in("id", allowedUserIds);
-      }
-
-      const { data } = await query.limit(5);
-
-      if (data && data.length > 0) {
-        setSuggestions(data);
-        setShowSuggestions(true);
-        setSelectedIndex(0);
-      } else {
-        setSuggestions([]);
-        setShowSuggestions(false);
-      }
-    };
-
-    searchMentions();
-  }, [mentionSearch, allowedUserIds, currentUserId]);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const newValue = e.target.value;
-    const newCursor = e.target.selectionStart || 0;
-    
-    onChange(newValue);
-    setCursorPosition(newCursor);
-
-    // Check for @ symbol
-    const textBeforeCursor = newValue.substring(0, newCursor);
-    const lastAtIndex = textBeforeCursor.lastIndexOf("@");
-    
-    if (lastAtIndex !== -1) {
-      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
-      const hasSpace = textAfterAt.includes(" ");
-      
-      if (!hasSpace && textAfterAt.length >= 0) {
-        setMentionSearch(textAfterAt);
-      } else {
-        setMentionSearch("");
-        setShowSuggestions(false);
-      }
-    } else {
-      setMentionSearch("");
-      setShowSuggestions(false);
-    }
+  const handleChange=(e:React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement>)=>{
+    const nv=e.target.value, c=e.target.selectionStart||0; onChange(nv); setCursor(c);
+    const before=nv.substring(0,c); const i=before.lastIndexOf("@");
+    if(i!==-1){ const after=before.substring(i+1); if(!after.includes(" ")){ setQ(after); return; } }
+    setQ(""); setShow(false);
   };
 
-  const insertMention = (user: User) => {
-    const textBeforeCursor = value.substring(0, cursorPosition);
-    const textAfterCursor = value.substring(cursorPosition);
-    const lastAtIndex = textBeforeCursor.lastIndexOf("@");
-    
-    const beforeMention = value.substring(0, lastAtIndex);
-    const mention = `@[${user.full_name}](${user.id})`;
-    const newValue = beforeMention + mention + " " + textAfterCursor;
-    
-    onChange(newValue);
-    setShowSuggestions(false);
-    setMentionSearch("");
-    
-    // Focus back to input
-    setTimeout(() => {
-      if (inputRef.current) {
-        inputRef.current.focus();
-        const newPosition = beforeMention.length + mention.length + 1;
-        inputRef.current.setSelectionRange(newPosition, newPosition);
-      }
-    }, 0);
+  const insert=(u:User)=>{
+    const beforeAll=value.substring(0,cursor), afterAll=value.substring(cursor), i=beforeAll.lastIndexOf("@");
+    const before=beforeAll.substring(0,i), mention=`@[${u.full_name}](${u.id})`, nv=before+mention+" "+afterAll;
+    onChange(nv); setShow(false); setQ("");
+    setTimeout(()=>{ if(inputRef.current){ const p=before.length+mention.length+1; inputRef.current.focus(); inputRef.current.setSelectionRange(p,p);} },0);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (showSuggestions && suggestions.length > 0) {
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev + 1) % suggestions.length);
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setSelectedIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
-      } else if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        insertMention(suggestions[selectedIndex]);
-        return;
-      } else if (e.key === "Escape") {
-        setShowSuggestions(false);
-        setMentionSearch("");
-      }
+  const handleKeys=(e:React.KeyboardEvent<HTMLInputElement|HTMLTextAreaElement>)=>{
+    if(show&&items.length){
+      if(e.key==="ArrowDown"){ e.preventDefault(); setSel(v=>(v+1)%items.length); return; }
+      if(e.key==="ArrowUp"){ e.preventDefault(); setSel(v=>(v-1+items.length)%items.length); return; }
+      if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); insert(items[sel]); return; }
+      if(e.key==="Escape"){ setShow(false); setQ(""); return; }
     }
-    
-    if (onKeyDown) {
-      onKeyDown(e);
-    }
+    onKeyDown?.(e);
   };
 
-  const renderDisplayText = () => {
-    // Replace mention format with display format
-    return value.replace(/@\[([^\]]+)\]\([a-f0-9\-]+\)/g, "@$1");
-  };
-
-  const getInitials = (name: string) => {
-    const names = name.split(" ");
-    if (names.length >= 2) {
-      return `${names[0][0]}${names[1][0]}`.toUpperCase();
-    }
-    return name.slice(0, 2).toUpperCase();
-  };
-
-  const InputComponent = multiline ? Textarea : Input;
+  const renderValue=()=>value.replace(/@\[([^\]]+)\]\([a-f0-9\-]+\)/g,"@$1");
+  const initials=(n:string)=>{const a=n.split(" ");return a.length>=2?(a[0][0]+a[1][0]).toUpperCase():n.slice(0,2).toUpperCase();}
+  const Field=multiline?Textarea:Input;
+  const fieldClass=[
+    "rounded-xl bg-input/60 border-border focus-visible:ring-2 focus-visible:ring-accent/70",
+    "placeholder:text-muted-foreground/70",
+    multiline?"min-h-[100px]":"",
+    className
+  ].filter(Boolean).join(" ");
 
   return (
     <div className="relative w-full">
-      <InputComponent
+      <Field
         ref={inputRef as any}
-        type={multiline ? undefined : "text"}
-        value={renderDisplayText()}
-        onChange={handleInputChange}
-        onKeyDown={handleKeyDown}
+        type={multiline?undefined:"text"}
+        value={renderValue()}
+        onChange={handleChange}
+        onKeyDown={handleKeys}
         placeholder={placeholder}
-        className={className}
         disabled={disabled}
+        className={fieldClass}
       />
-      
-      {showSuggestions && suggestions.length > 0 && (
-        <Card
-          ref={suggestionsRef}
-          className={`absolute ${
-            dropdownPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
-          } left-0 w-full max-h-64 overflow-y-auto bg-card border-border shadow-lg z-50`}
-        >
-          <div className="p-2">
-            {suggestions.map((user, index) => (
-              <div
-                key={user.id}
-                className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
-                  index === selectedIndex ? "bg-accent" : "hover:bg-accent/50"
-                }`}
-                onClick={() => insertMention(user)}
-              >
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={user.avatar_url || undefined} />
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    {getInitials(user.full_name)}
-                  </AvatarFallback>
+      {show&&items.length>0&&(
+        <Card ref={listRef} className={`absolute ${pos==="top"?"bottom-full mb-2":"top-full mt-2"} left-0 z-50 w-full overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl backdrop-blur`}>
+          <div className="divide-y divide-border/60">
+            {items.map((u,i)=>(
+              <button key={u.id} onClick={()=>insert(u)} className={`flex w-full items-center gap-3 px-3 py-2 text-left transition ${i===sel?"bg-accent/90 text-accent-foreground":"hover:bg-accent/40"}`}>
+                <Avatar className="h-8 w-8 ring-1 ring-border">
+                  <AvatarImage src={u.avatar_url||undefined}/>
+                  <AvatarFallback className="bg-primary text-primary-foreground">{initials(u.full_name)}</AvatarFallback>
                 </Avatar>
-                <div>
-                  <p className="text-sm font-medium text-foreground">{user.full_name}</p>
-                  <p className="text-xs text-muted-foreground">{user.role}</p>
+                <div className="flex-1">
+                  <div className="text-sm font-medium leading-tight">{u.full_name}</div>
+                  <div className="text-[11px] text-muted-foreground">{u.role}</div>
                 </div>
-              </div>
+                <kbd className="hidden sm:inline-block rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">Enter</kbd>
+              </button>
             ))}
           </div>
         </Card>

@@ -1,37 +1,31 @@
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const PostSkeleton = () => {
-  return (
-    <Card className="bg-card border-border p-6">
-      <div className="flex items-start gap-4">
-        {/* Avatar skeleton */}
-        <Skeleton className="h-12 w-12 rounded-full" />
-        
-        <div className="flex-1 space-y-3">
-          {/* Header skeleton */}
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-3 w-16" />
-          </div>
-          
-          {/* Content skeleton */}
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-5/6" />
-            <Skeleton className="h-4 w-4/6" />
-          </div>
-          
-          {/* Actions skeleton */}
-          <div className="flex items-center gap-6 pt-2">
-            <Skeleton className="h-8 w-16" />
-            <Skeleton className="h-8 w-16" />
-            <Skeleton className="h-8 w-16" />
-          </div>
+const PostSkeleton = () => (
+  <Card className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm">
+    <div className="flex gap-4">
+      <Skeleton className="h-12 w-12 rounded-full" />
+      <div className="flex-1 space-y-3">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-3 w-16" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-5/6" />
+          <Skeleton className="h-4 w-3/5" />
+        </div>
+        <div className="overflow-hidden rounded-xl border border-border/60">
+          <Skeleton className="h-56 w-full" />
+        </div>
+        <div className="flex items-center gap-4 pt-1">
+          <Skeleton className="h-8 w-16 rounded-full" />
+          <Skeleton className="h-8 w-16 rounded-full" />
+          <Skeleton className="h-8 w-16 rounded-full" />
         </div>
       </div>
-    </Card>
-  );
-};
+    </div>
+  </Card>
+);
 
 export default PostSkeleton;

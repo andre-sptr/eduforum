@@ -1,73 +1,48 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 type Theme = "dark" | "light" | "system";
+type ThemeProviderProps = { children: React.ReactNode; defaultTheme?: Theme; storageKey?: string };
+type ThemeProviderState = { theme: Theme; setTheme: (t: Theme) => void };
 
-type ThemeProviderProps = {
-  children: React.ReactNode;
-  defaultTheme?: Theme;
-  storageKey?: string;
-};
+const ThemeCtx = createContext<ThemeProviderState>({ theme: "system", setTheme: () => null });
 
-type ThemeProviderState = {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
-};
+export function ThemeProvider({ children, defaultTheme = "system", storageKey = "eduforum-theme" }: ThemeProviderProps) {
+  const [theme, setTheme] = useState<Theme>(defaultTheme);
 
-const initialState: ThemeProviderState = {
-  theme: "system",
-  setTheme: () => null,
-};
-
-const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
-
-export function ThemeProvider({
-  children,
-  defaultTheme = "system",
-  storageKey = "eduforum-theme",
-  ...props
-}: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
-  );
-
-  useEffect(() => {
-    const root = window.document.documentElement;
-
+  const apply = (t: Theme) => {
+    const root = document.documentElement;
     root.classList.remove("light", "dark");
-
-    if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches
-        ? "dark"
-        : "light";
-
-      root.classList.add(systemTheme);
-      return;
-    }
-
-    root.classList.add(theme);
-  }, [theme]);
-
-  const value = {
-    theme,
-    setTheme: (theme: Theme) => {
-      localStorage.setItem(storageKey, theme);
-      setTheme(theme);
-    },
+    const resolved = t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : t === "system" ? "light" : t;
+    root.classList.add(resolved);
   };
 
-  return (
-    <ThemeProviderContext.Provider {...props} value={value}>
-      {children}
-    </ThemeProviderContext.Provider>
-  );
+  useEffect(() => {
+    const saved = typeof window !== "undefined" ? (localStorage.getItem(storageKey) as Theme | null) : null;
+    setTheme(saved || defaultTheme);
+  }, [defaultTheme, storageKey]);
+
+  useEffect(() => {
+    apply(theme);
+    if (typeof window === "undefined") return;
+
+    const mql = window.matchMedia("(prefers-color-scheme: dark)");
+    const onSystem = () => theme === "system" && apply("system");
+    const onStorage = (e: StorageEvent) => { if (e.key === storageKey) setTheme((e.newValue as Theme) || defaultTheme); };
+
+    mql.addEventListener?.("change", onSystem);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      mql.removeEventListener?.("change", onSystem);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [theme, storageKey, defaultTheme]);
+
+  const value = useMemo(() => ({
+    theme,
+    setTheme: (t: Theme) => { localStorage.setItem(storageKey, t); setTheme(t); }
+  }), [theme, storageKey]);
+
+  return <ThemeCtx.Provider value={value}>{children}</ThemeCtx.Provider>;
 }
 
-export const useTheme = () => {
-  const context = useContext(ThemeProviderContext);
-
-  if (context === undefined)
-    throw new Error("useTheme must be used within a ThemeProvider");
-
-  return context;
-};
+export const useTheme = () => useContext(ThemeCtx);

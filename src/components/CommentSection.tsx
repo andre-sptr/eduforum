@@ -86,7 +86,7 @@ const CommentSection = ({ postId, currentUserId }: Props) => {
         <div className="flex gap-3">
           <Avatar className="h-8 w-8 ring-1 ring-border">
             <AvatarImage src={c.profiles.avatar_url} />
-            <AvatarFallback className="bg-primary/10 text-primary text-xs">{getInitials(c.profiles.full_name)}</AvatarFallback>
+            <AvatarFallback className="bg-primary text-primary-foreground">{getInitials(c.profiles.full_name)}</AvatarFallback>
           </Avatar>
           <div className="flex-1">
             <div className="rounded-xl border border-border bg-card/60 p-3">
