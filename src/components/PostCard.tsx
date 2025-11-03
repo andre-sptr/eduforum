@@ -83,8 +83,8 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }:
 
           {!isEditing&&total>0&&(
             <>
-              <div role="button" tabIndex={0} onClick={()=>{setLightbox(true);setIdx(0);}} onKeyDown={(e)=>{if(e.key==="Enter"||e.key===" "){setLightbox(true);setIdx(0);}}} className="group mt-3 w-full cursor-pointer">
-                <div className="relative max-h-[420px] overflow-hidden rounded-xl border border-border/60 bg-black/5">
+              <div role="button" tabIndex={0} onClick={() => { setLightbox(true); setIdx(0); }} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setLightbox(true); setIdx(0); } }} className="group mt-3 w-full cursor-pointer">
+                <div className="relative overflow-hidden max-h-[420px]">
                   <MediaCarousel mediaUrls={urls} mediaTypes={types} />
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
                   <span className="absolute bottom-2 right-2 rounded-full bg-black/50 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100">Klik untuk perbesar</span>

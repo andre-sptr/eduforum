@@ -3,198 +3,89 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { CheckCircle, XCircle, Play, RotateCcw } from "lucide-react";
+import { quizBank, QuizQuestion } from "@/data/quizBank";
 
-interface QuizQuestion {
-  question: string;
-  options: string[];
-  correctAnswer: number;
-}
+interface Props { onScoreSubmit:(score:number)=>void }
 
-const quizQuestions: QuizQuestion[] = [
-  {
-    question: "Apa ibu kota Indonesia?",
-    options: ["Bandung", "Jakarta", "Surabaya", "Medan"],
-    correctAnswer: 1,
-  },
-  {
-    question: "Siapa proklamator kemerdekaan Indonesia?",
-    options: ["Soekarno dan Hatta", "Sudirman", "Diponegoro", "Kartini"],
-    correctAnswer: 0,
-  },
-  {
-    question: "Berapa hasil dari 15 × 8?",
-    options: ["100", "110", "120", "130"],
-    correctAnswer: 2,
-  },
-  {
-    question: "Planet terbesar di tata surya adalah?",
-    options: ["Mars", "Venus", "Jupiter", "Saturnus"],
-    correctAnswer: 2,
-  },
-  {
-    question: "Apa warna yang dihasilkan dari campuran merah dan biru?",
-    options: ["Ungu", "Hijau", "Orange", "Coklat"],
-    correctAnswer: 0,
-  },
-];
+const pickRandomQuestions = (n:number) => {
+  const a=[...quizBank];
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a.slice(0,n);
+};
 
-interface QuizGameProps {
-  onScoreSubmit: (score: number) => void;
-}
+export default function QuizGame({ onScoreSubmit }: Props) {
+  const [state,setState]=useState<"idle"|"playing"|"finished">("idle");
+  const [questions,setQuestions]=useState<QuizQuestion[]>([]);
+  const [idx,setIdx]=useState(0);
+  const [score,setScore]=useState(0);
+  const [sel,setSel]=useState<number|null>(null);
+  const [show,setShow]=useState(false);
+  const [time,setTime]=useState(20);
 
-const QuizGame = ({ onScoreSubmit }: QuizGameProps) => {
-  const [gameState, setGameState] = useState<'idle' | 'playing' | 'finished'>('idle');
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [score, setScore] = useState(0);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [showResult, setShowResult] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(30);
+  useEffect(()=>{ let t:any;
+    if(state==="playing"&&time>0&&!show) t=setTimeout(()=>setTime(s=>s-1),1000);
+    else if(time===0&&!show) next();
+    return()=>clearTimeout(t);
+  },[state,time,show]);
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (gameState === 'playing' && timeLeft > 0 && !showResult) {
-      timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-    } else if (timeLeft === 0 && !showResult) {
-      handleNextQuestion();
-    }
-    return () => clearTimeout(timer);
-  }, [gameState, timeLeft, showResult]);
+  const start=()=>{ setQuestions(pickRandomQuestions(5)); setState("playing"); setIdx(0); setScore(0); setSel(null); setShow(false); setTime(30); };
 
-  const startGame = () => {
-    setGameState('playing');
-    setCurrentQuestion(0);
-    setScore(0);
-    setSelectedAnswer(null);
-    setShowResult(false);
-    setTimeLeft(30);
+  const answer=(i:number)=>{ if(show) return; setSel(i); setShow(true); if(i===questions[idx].correctAnswer) setScore(s=>s+10); };
+
+  const next=()=> {
+    if(idx+1<questions.length){ setIdx(i=>i+1); setSel(null); setShow(false); setTime(30); }
+    else { setState("finished"); onScoreSubmit(sel===questions[idx].correctAnswer?score+10:score); }
   };
 
-  const handleAnswerSelect = (answerIndex: number) => {
-    if (showResult) return;
-    
-    setSelectedAnswer(answerIndex);
-    setShowResult(true);
-    
-    if (answerIndex === quizQuestions[currentQuestion].correctAnswer) {
-      setScore(score + 10);
-    }
-  };
+  if(state==="idle") return (
+    <div className="py-8 text-center">
+      <p className="mb-4 text-muted-foreground">Jawab 5 pertanyaan dengan benar!</p>
+      <Button onClick={start} size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90"><Play className="mr-2 h-4 w-4"/>Mulai Quiz</Button>
+    </div>
+  );
 
-  const handleNextQuestion = () => {
-    if (currentQuestion + 1 < quizQuestions.length) {
-      setCurrentQuestion(currentQuestion + 1);
-      setSelectedAnswer(null);
-      setShowResult(false);
-      setTimeLeft(30);
-    } else {
-      setGameState('finished');
-      const finalScore = selectedAnswer === quizQuestions[currentQuestion].correctAnswer ? score + 10 : score;
-      onScoreSubmit(finalScore);
-    }
-  };
+  if(state==="finished") return (
+    <div className="py-8 text-center">
+      <div className="mb-4"><div className="mb-2 text-4xl font-bold text-accent">{score}</div><p className="text-muted-foreground">Skor Akhir</p></div>
+      <p className="mb-4 text-foreground">Anda menjawab {score/10} dari {questions.length} pertanyaan dengan benar!</p>
+      <Button onClick={start} size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90"><RotateCcw className="mr-2 h-4 w-4"/>Main Lagi</Button>
+    </div>
+  );
 
-  if (gameState === 'idle') {
-    return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground mb-4">
-          Jawab 5 pertanyaan dengan benar!
-        </p>
-        <Button
-          onClick={startGame}
-          size="lg"
-          className="bg-primary text-primary-foreground hover:bg-primary/90"
-        >
-          <Play className="mr-2 h-4 w-4" />
-          Mulai Quiz
-        </Button>
-      </div>
-    );
-  }
-
-  if (gameState === 'finished') {
-    return (
-      <div className="text-center py-8">
-        <div className="mb-4">
-          <div className="text-4xl font-bold text-accent mb-2">{score}</div>
-          <p className="text-muted-foreground">Skor Akhir</p>
-        </div>
-        <p className="mb-4 text-foreground">
-          Anda menjawab {score / 10} dari {quizQuestions.length} pertanyaan dengan benar!
-        </p>
-        <Button
-          onClick={startGame}
-          size="lg"
-          className="bg-primary text-primary-foreground hover:bg-primary/90"
-        >
-          <RotateCcw className="mr-2 h-4 w-4" />
-          Main Lagi
-        </Button>
-      </div>
-    );
-  }
-
-  const question = quizQuestions[currentQuestion];
-  const progress = ((currentQuestion + 1) / quizQuestions.length) * 100;
+  const q=questions[idx]; const progress=((idx+1)/questions.length)*100;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>Pertanyaan {currentQuestion + 1}/{quizQuestions.length}</span>
-        <span className="font-mono text-foreground">Waktu: {timeLeft}s</span>
+        <span>Pertanyaan {idx+1}/{questions.length}</span>
+        <span className="font-mono text-foreground">Waktu: {time}s</span>
       </div>
-
-      <Progress value={progress} className="h-2" />
-
-      <Card className="p-4 bg-muted border-border">
-        <h3 className="text-lg font-semibold text-foreground mb-4">
-          {question.question}
-        </h3>
-
+      <Progress value={progress} className="h-2"/>
+      <Card className="border-border bg-muted p-4">
+        <h3 className="mb-4 text-lg font-semibold text-foreground">{q.question}</h3>
         <div className="space-y-2">
-          {question.options.map((option, index) => {
-            const isSelected = selectedAnswer === index;
-            const isCorrect = index === question.correctAnswer;
-            const showCorrect = showResult && isCorrect;
-            const showIncorrect = showResult && isSelected && !isCorrect;
-
+          {q.options.map((opt,i)=>{
+            const isSel=sel===i, isCorrect=i===q.correctAnswer, showC=show&&isCorrect, showW=show&&isSel&&!isCorrect;
             return (
-              <Button
-                key={index}
-                onClick={() => handleAnswerSelect(index)}
-                disabled={showResult}
-                variant={showCorrect ? "default" : showIncorrect ? "destructive" : "outline"}
-                className={`w-full justify-start text-left h-auto py-3 px-4 ${
-                  showCorrect ? 'bg-primary text-primary-foreground' :
-                  showIncorrect ? 'bg-destructive text-destructive-foreground' :
-                  'bg-background text-foreground hover:bg-accent/10'
-                }`}
-              >
-                <span className="flex items-center gap-2 w-full">
-                  <span className="flex-1">{option}</span>
-                  {showCorrect && <CheckCircle className="h-5 w-5" />}
-                  {showIncorrect && <XCircle className="h-5 w-5" />}
+              <Button key={i} onClick={()=>answer(i)} disabled={show}
+                variant={showC?"default":showW?"destructive":"outline"}
+                className={`w-full justify-start gap-2 py-3 text-left ${showC?'bg-primary text-primary-foreground':showW?'bg-destructive text-destructive-foreground':'bg-background text-foreground hover:bg-accent/10'}`}>
+                <span className="flex w-full items-center gap-2">
+                  <span className="flex-1">{opt}</span>
+                  {showC&&<CheckCircle className="h-5 w-5"/>}
+                  {showW&&<XCircle className="h-5 w-5"/>}
                 </span>
               </Button>
             );
           })}
         </div>
       </Card>
-
-      {showResult && (
-        <Button
-          onClick={handleNextQuestion}
-          size="lg"
-          className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-        >
-          {currentQuestion + 1 < quizQuestions.length ? 'Pertanyaan Berikutnya' : 'Lihat Hasil'}
+      {show&&(
+        <Button onClick={next} size="lg" className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+          {idx+1<questions.length?'Pertanyaan Berikutnya':'Lihat Hasil'}
         </Button>
       )}
-
-      <div className="text-center">
-        <p className="text-sm text-muted-foreground">Skor Saat Ini: <span className="font-bold text-accent">{score}</span></p>
-      </div>
+      <p className="text-center text-sm text-muted-foreground">Skor Saat Ini: <span className="font-bold text-accent">{score}</span></p>
     </div>
   );
-};
-
-export default QuizGame;
+}

@@ -2,120 +2,89 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, RotateCcw } from "lucide-react";
 
-interface NumberPuzzleProps {
-  onScoreSubmit: (score: number) => void;
-}
+interface Props { onScoreSubmit:(score:number)=>void }
 
-export default function NumberPuzzle({ onScoreSubmit }: NumberPuzzleProps) {
-  const [gameState, setGameState] = useState<'idle' | 'playing' | 'finished'>('idle');
-  const [tiles, setTiles] = useState<number[]>([]);
-  const [moves, setMoves] = useState(0);
-  const [time, setTime] = useState(0);
+const N = 3;
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (gameState === 'playing') {
-      interval = setInterval(() => {
-        setTime(prev => prev + 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [gameState]);
+const isSolved = (t:number[]) => t.every((v,i)=> i===N*N-1 ? v===0 : v===i+1);
+const inversions = (t:number[]) => {
+  const a=t.filter(v=>v!==0); let inv=0;
+  for(let i=0;i<a.length;i++) for(let j=i+1;j<a.length;j++) if(a[i]>a[j]) inv++;
+  return inv;
+};
+const fisherYates = (arr:number[]) => { const a=[...arr]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+const genSolvable = () => {
+  const base=[...Array(N*N-1)].map((_,i)=>i+1).concat(0);
+  let s=fisherYates(base);
+  while(inversions(s)%2!==0 || isSolved(s)) s=fisherYates(base);
+  return s;
+};
+const isAdj = (a:number,b:number) => { const r1=Math.floor(a/N),c1=a%N,r2=Math.floor(b/N),c2=b%N; return (Math.abs(r1-r2)===1&&c1===c2)||(Math.abs(c1-c2)===1&&r1===r2); };
 
-  const initializeGame = () => {
-    const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 0];
-    const shuffled = [...numbers].sort(() => Math.random() - 0.5);
-    setTiles(shuffled);
-    setMoves(0);
-    setTime(0);
-    setGameState('playing');
+export default function NumberPuzzle({ onScoreSubmit }: Props) {
+  const [state,setState]=useState<"idle"|"playing"|"finished">("idle");
+  const [tiles,setTiles]=useState<number[]>([]);
+  const [moves,setMoves]=useState(0);
+  const [time,setTime]=useState(0);
+
+  useEffect(()=>{ let i:any; if(state==="playing") i=setInterval(()=>setTime(p=>p+1),1000); return()=>clearInterval(i); },[state]);
+
+  const init=()=>{ setTiles(genSolvable()); setMoves(0); setTime(0); setState("playing"); };
+
+  const click=(idx:number)=> {
+    const empty=tiles.indexOf(0); if(!isAdj(idx,empty)) return;
+    const t=[...tiles]; [t[idx],t[empty]]=[t[empty],t[idx]];
+    setTiles(t); setMoves(m=>m+1);
+    if(isSolved(t)) finish();
   };
 
-  const isAdjacent = (index1: number, index2: number): boolean => {
-    const row1 = Math.floor(index1 / 3);
-    const col1 = index1 % 3;
-    const row2 = Math.floor(index2 / 3);
-    const col2 = index2 % 3;
-    
-    return (Math.abs(row1 - row2) === 1 && col1 === col2) || 
-           (Math.abs(col1 - col2) === 1 && row1 === row2);
-  };
+  const finish=()=>{ setState("finished"); onScoreSubmit(Math.max(1000-(moves*10)-time,100)); };
 
-  const handleTileClick = (index: number) => {
-    const emptyIndex = tiles.indexOf(0);
-    if (isAdjacent(index, emptyIndex)) {
-      const newTiles = [...tiles];
-      [newTiles[index], newTiles[emptyIndex]] = [newTiles[emptyIndex], newTiles[index]];
-      setTiles(newTiles);
-      setMoves(prev => prev + 1);
+  if(state==="idle") return (
+    <div className="grid place-items-center gap-4 py-10 text-center">
+      <p className="text-muted-foreground">Susun angka 1–8 berurutan!</p>
+      <Button onClick={init} size="lg" className="rounded-2xl bg-accent text-accent-foreground hover:bg-accent/90"><Play className="mr-2 h-4 w-4"/>Mulai Game</Button>
+    </div>
+  );
 
-      const isSolved = newTiles.every((tile, idx) => idx === 8 ? tile === 0 : tile === idx + 1);
-      if (isSolved) {
-        finishGame();
-      }
-    }
-  };
-
-  const finishGame = () => {
-    setGameState('finished');
-    const score = Math.max(1000 - (moves * 10) - time, 100);
-    onScoreSubmit(score);
-  };
-
-  if (gameState === 'idle') {
-    return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground mb-4">
-          Susun angka 1-8 berurutan!
-        </p>
-        <Button onClick={initializeGame} size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
-          <Play className="mr-2 h-4 w-4" />
-          Mulai Game
-        </Button>
+  if(state==="finished"){
+    const s=Math.max(1000-(moves*10)-time,100);
+    return(
+      <div className="grid place-items-center gap-4 py-10 text-center">
+        <div><div className="mb-1 text-4xl font-extrabold tracking-tight text-accent">{s}</div><p className="text-muted-foreground">Skor Akhir</p></div>
+        <p className="text-foreground">Langkah: {moves} • Waktu: {time}s</p>
+        <Button onClick={init} size="lg" className="rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90"><RotateCcw className="mr-2 h-4 w-4"/>Main Lagi</Button>
       </div>
     );
   }
 
-  if (gameState === 'finished') {
-    return (
-      <div className="text-center py-8">
-        <div className="mb-4">
-          <div className="text-4xl font-bold text-accent mb-2">{Math.max(1000 - (moves * 10) - time, 100)}</div>
-          <p className="text-muted-foreground">Skor Akhir</p>
-        </div>
-        <p className="mb-4 text-foreground">
-          Langkah: {moves} | Waktu: {time}s
-        </p>
-        <Button onClick={initializeGame} size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90">
-          <RotateCcw className="mr-2 h-4 w-4" />
-          Main Lagi
-        </Button>
-      </div>
-    );
-  }
+  const empty=tiles.indexOf(0);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">Langkah: <span className="font-bold text-foreground">{moves}</span></span>
-        <span className="text-muted-foreground">Waktu: <span className="font-bold text-foreground">{time}s</span></span>
+        <span className="text-muted-foreground">Langkah: <span className="font-bold">{moves}</span></span>
+        <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-semibold text-accent">Waktu <span className="ml-1 text-base text-foreground">{time}s</span></span>
       </div>
-
-      <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto">
-        {tiles.map((tile, index) => (
-          <button
-            key={index}
-            onClick={() => tile !== 0 && handleTileClick(index)}
-            className={`aspect-square flex items-center justify-center text-2xl font-bold rounded-lg transition-all transform hover:scale-105
-              ${tile === 0 
-                ? 'bg-muted cursor-default' 
-                : 'bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer'
-              }`}
-          >
-            {tile !== 0 && tile}
-          </button>
-        ))}
+      <div className="mx-auto max-w-xs rounded-2xl border border-border/60 bg-card/60 p-3 shadow-sm backdrop-blur">
+        <div className="grid grid-cols-3 gap-2">
+          {tiles.map((v,i)=>{
+            const canMove=v!==0&&isAdj(i,empty);
+            return (
+              <button
+                key={i}
+                onClick={()=>v!==0&&click(i)}
+                className={`aspect-square rounded-xl text-2xl font-bold transition-all
+                  ${v===0?"bg-muted/70":"bg-primary text-primary-foreground hover:scale-[1.02]"}
+                  ${canMove?"ring-2 ring-accent/60":"ring-0"} shadow-sm`}
+              >
+                {v!==0&&v}
+              </button>
+            );
+          })}
+        </div>
       </div>
+      <div className="text-center"><Button onClick={init} variant="outline" className="rounded-xl">Reset</Button></div>
     </div>
   );
 }
