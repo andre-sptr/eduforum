@@ -1,9 +1,10 @@
 // src/components/PostCard.tsx
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Heart, MessageCircle, Repeat2, Share2, MoreVertical, Pencil, Trash2, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { Heart, Repeat2, Share2, MoreVertical, Pencil, Trash2, ChevronLeft, ChevronRight, Download, GraduationCap, Shield, BookOpen } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { id } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,7 +32,8 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }:
   const checkRepost=async()=>{ if(!currentUserId) return; const {data}=await supabase.from("reposts").select("id").eq("user_id",currentUserId).eq("post_id",post.id).maybeSingle(); setIsReposted(!!data); };
 
   const getInitials=(n:string)=>{ const a=n.trim().split(" "); return (a[0][0]+(a[1]?.[0]||a[0][1]||"")).toUpperCase(); };
-  const getRoleBadgeColor=(r:string)=>r==="siswa"?"bg-blue-500/20 text-blue-400":r==="guru"?"bg-green-500/20 text-green-400":r==="alumni"?"bg-purple-500/20 text-purple-400":"bg-muted text-muted-foreground";
+  const roleBadge=(r:string)=>r==="siswa"?"bg-blue-500/12 text-blue-500 ring-1 ring-blue-500/20":r==="guru"?"bg-green-500/12 text-green-500 ring-1 ring-green-500/20":r==="alumni"?"bg-purple-500/12 text-purple-500 ring-1 ring-purple-500/20":"bg-muted text-muted-foreground";
+  const roleIcon=(r:string)=>r==="siswa"?<BookOpen className="h-3.5 w-3.5"/>:r==="guru"?<Shield className="h-3.5 w-3.5"/>:<GraduationCap className="h-3.5 w-3.5"/>;
 
   const handleLike=async()=>{ if(!currentUserId) return toast.error("Silakan login terlebih dahulu"); try{ if(isLiked){ const {error}=await supabase.from("likes").delete().eq("user_id",currentUserId).eq("post_id",post.id); if(error) throw error; setIsLiked(false); setLikeCount(v=>v-1);} else { const {error}=await supabase.from("likes").insert({user_id:currentUserId,post_id:post.id}); if(error) throw error; setIsLiked(true); setLikeCount(v=>v+1);} onLike?.(); }catch(e:any){ toast.error(e.message); } };
   const handleRepost=async()=>{ if(!currentUserId) return toast.error("Silakan login terlebih dahulu"); try{ if(isReposted){ const {error}=await supabase.from("reposts").delete().eq("user_id",currentUserId).eq("post_id",post.id); if(error) throw error; setIsReposted(false); toast.success("Repost dibatalkan"); } else { const {error}=await supabase.from("reposts").insert({user_id:currentUserId,post_id:post.id}); if(error) throw error; setIsReposted(true); toast.success("Berhasil di-repost!"); } }catch(e:any){ toast.error(e.message); } };
@@ -50,9 +52,13 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }:
         </Avatar>
         <div className="flex-1">
           <div className="mb-2 flex items-center gap-2">
-            <h3 className="font-semibold">{post.profiles.full_name}</h3>
-            <span className={`rounded-full px-2 py-0.5 text-xs ${getRoleBadgeColor(post.profiles.role)}`}>{post.profiles.role[0].toUpperCase()+post.profiles.role.slice(1)}</span>
-            <span className="text-sm text-muted-foreground">· {formatDistanceToNow(new Date(post.created_at),{addSuffix:true,locale:id})}</span>
+            <Link to={`/profile/${post.profiles.id}`} className="rounded-xl px-2 py-1 font-semibold hover:bg-accent/10 transition">
+              {post.profiles.full_name}
+            </Link>
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${roleBadge(post.profiles.role)}`}>
+              {roleIcon(post.profiles.role)} {post.profiles.role[0].toUpperCase()+post.profiles.role.slice(1)}
+            </span>
+            <span className="text-sm text-muted-foreground">• {formatDistanceToNow(new Date(post.created_at),{addSuffix:true,locale:id})}</span>
             {isOwnPost&&!isEditing&&(
               <div className="ml-auto">
                 <DropdownMenu>
@@ -77,17 +83,11 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }:
 
           {!isEditing&&total>0&&(
             <>
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => { setLightbox(true); setIdx(0); }}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { setLightbox(true); setIdx(0); } }}
-                className="group w-full mt-3 cursor-pointer"
-              >
+              <div role="button" tabIndex={0} onClick={()=>{setLightbox(true);setIdx(0);}} onKeyDown={(e)=>{if(e.key==="Enter"||e.key===" "){setLightbox(true);setIdx(0);}}} className="group mt-3 w-full cursor-pointer">
                 <div className="relative max-h-[420px] overflow-hidden rounded-xl border border-border/60 bg-black/5">
                   <MediaCarousel mediaUrls={urls} mediaTypes={types} />
                   <div className="absolute left-2 top-2 rounded-full bg-black/50 px-2 py-1 text-xs text-white">{total} media</div>
-                  <div className="pointer-events-none absolute inset-0 opacity-0 transition group-hover:opacity-100 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
                   <span className="absolute bottom-2 right-2 rounded-full bg-black/50 px-2 py-1 text-[11px] text-white opacity-0 transition group-hover:opacity-100">Klik untuk perbesar</span>
                 </div>
               </div>
@@ -110,7 +110,6 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }:
 
           <div className="mt-4 flex items-center gap-4">
             <Button variant="ghost" size="sm" className={`gap-2 ${isLiked?"text-red-500":"text-muted-foreground"} hover:text-red-500`} onClick={handleLike}><Heart className={`h-5 w-5 ${isLiked?"fill-current":""}`}/><span>{likeCount}</span></Button>
-            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-accent"><MessageCircle className="h-5 w-5"/></Button>
             <Button variant="ghost" size="sm" className={`gap-2 ${isReposted?"text-green-500":"text-muted-foreground"} hover:text-green-500`} onClick={handleRepost}><Repeat2 className="h-5 w-5"/></Button>
             <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-accent" onClick={handleShare}><Share2 className="h-5 w-5"/></Button>
           </div>
