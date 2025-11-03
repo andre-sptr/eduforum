@@ -1,241 +1,203 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+// src/pages/Profile.tsx
+import { useEffect,useMemo,useRef,useState } from "react";
+import { useNavigate,useParams,Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Avatar,AvatarFallback,AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Settings, UserPlus, UserMinus, MessageCircle } from "lucide-react";
+import { ArrowLeft,Settings,UserPlus,UserMinus,MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import PostCard from "@/components/PostCard";
 import PostSkeleton from "@/components/PostSkeleton";
+import { Dialog,DialogContent,DialogDescription,DialogHeader,DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
-const Profile = () => {
-  const navigate = useNavigate();
-  const { userId } = useParams();
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [posts, setPosts] = useState<any[]>([]);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [followerCount, setFollowerCount] = useState(0);
-  const [followingCount, setFollowingCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+type PostFilter="all"|"media"|"text";
+const POSTS_PROFILES_FK="posts_user_id_fkey";
+const POST_SELECT=`*, profiles:profiles!${POSTS_PROFILES_FK}(id,full_name,avatar_url,role), likes(user_id)`;
+const POSTS_PAGE_SIZE=10;
+const LIST_PAGE_SIZE=20;
 
-  const refreshPosts = async () => {
-    const profileId = userId || currentUser?.id;
-    if (!profileId) return;
+const Profile=()=> {
+  const navigate=useNavigate(); const { userId }=useParams();
+  const [currentUser,setCurrentUser]=useState<any>(null);
+  const [profile,setProfile]=useState<any>(null);
+  const [isFollowing,setIsFollowing]=useState(false);
+  const [followerCount,setFollowerCount]=useState(0);
+  const [followingCount,setFollowingCount]=useState(0);
+  const [loading,setLoading]=useState(true);
 
-    const { data: postsData } = await supabase
-      .from("posts")
-      .select(
-        `
-        *,
-        profiles (
-          id,
-          full_name,
-          avatar_url,
-          role
-        ),
-        likes (
-          user_id
-        )
-      `,
-      )
-      .eq("user_id", profileId)
-      .order("created_at", { ascending: false });
+  const [postFilter,setPostFilter]=useState<PostFilter>("all");
+  const [posts,setPosts]=useState<any[]>([]);
+  const [postsLoading,setPostsLoading]=useState(false);
+  const [postsPage,setPostsPage]=useState(0);
+  const [postsHasMore,setPostsHasMore]=useState(true);
+  const loadMoreRef=useRef<HTMLDivElement|null>(null);
 
-    setPosts(postsData || []);
+  const [openList,setOpenList]=useState<null|"followers"|"following">(null);
+  const [listLoading,setListLoading]=useState(false);
+  const [dialogSearch,setDialogSearch]=useState("");
+  const [followers,setFollowers]=useState<any[]>([]);
+  const [following,setFollowing]=useState<any[]>([]);
+  const [followersPage,setFollowersPage]=useState(0);
+  const [followingPage,setFollowingPage]=useState(0);
+  const [followersHasMore,setFollowersHasMore]=useState(true);
+  const [followingHasMore,setFollowingHasMore]=useState(true);
+  const [followingIds,setFollowingIds]=useState<Set<string>>(new Set());
+
+  const getInitials=(n:string)=>{ const a=n.split(" "); return a.length>=2?(a[0][0]+a[1][0]).toUpperCase():n.slice(0,2).toUpperCase(); };
+  const getRoleBadgeColor=(r:string)=> r==="siswa"?"bg-blue-500/20 text-blue-400":r==="guru"?"bg-green-500/20 text-green-400":r==="alumni"?"bg-purple-500/20 text-purple-400":"bg-muted text-muted-foreground";
+
+  useEffect(()=>{ loadProfile(); },[userId]);
+
+  useEffect(()=>{ if(!profile) return; setPosts([]); setPostsPage(0); setPostsHasMore(true); loadPosts(0,true); },[profile?.id,postFilter]);
+
+  useEffect(()=>{
+    if(!loadMoreRef.current) return;
+    const io=new IntersectionObserver((entries)=>{ const first=entries[0]; if(first.isIntersecting&&postsHasMore&&!postsLoading) loadPosts(postsPage+1); });
+    io.observe(loadMoreRef.current); return()=>io.disconnect();
+  },[loadMoreRef.current,postsHasMore,postsLoading,postsPage]);
+
+  const loadProfile=async()=> {
+    try{
+      const { data:{ user } }=await supabase.auth.getUser(); if(!user){ navigate("/auth"); return; }
+      setCurrentUser(user); const pid=userId||user.id;
+      const [{ data:profileData,error:pe },{ data:followData },followersRes,followingRes,myFollowingList]=await Promise.all([
+        supabase.from("profiles").select("*").eq("id",pid).single(),
+        pid!==user.id?supabase.from("follows").select("*").eq("follower_id",user.id).eq("following_id",pid).maybeSingle():Promise.resolve({ data:null }),
+        supabase.from("follows").select("*",{ count:"exact",head:true }).eq("following_id",pid),
+        supabase.from("follows").select("*",{ count:"exact",head:true }).eq("follower_id",pid),
+        supabase.from("follows").select("following_id").eq("follower_id",user.id)
+      ]);
+      if(pe) throw pe;
+      setProfile(profileData); setIsFollowing(!!followData);
+      setFollowerCount(followersRes.count||0); setFollowingCount(followingRes.count||0);
+      setFollowingIds(new Set((myFollowingList.data||[]).map((r:any)=>r.following_id)));
+    }catch(e:any){ toast.error(e.message); }finally{ setLoading(false); }
   };
 
-  useEffect(() => {
-    loadProfile();
-  }, [userId]);
+  const basePostQuery=(pid:string)=> {
+    let q=supabase.from("posts").select(POST_SELECT).eq("user_id",pid).order("created_at",{ascending:false});
+    if(postFilter==="media") q=q.not("media_urls","is",null);
+    if(postFilter==="text") q=q.is("media_urls",null);
+    return q;
+  };
 
-  const loadProfile = async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        navigate("/auth");
-        return;
+  const loadPosts=async(page=0,reset=false)=> {
+    if(!profile?.id) return; setPostsLoading(true);
+    try{
+      const from=page*POSTS_PAGE_SIZE, to=from+POSTS_PAGE_SIZE-1;
+      const { data,error }=await basePostQuery(profile.id).range(from,to);
+      if(error) throw error;
+      const rows=data||[];
+      setPosts(p=>reset?rows:[...p,...rows]); setPostsPage(page); setPostsHasMore(rows.length===POSTS_PAGE_SIZE);
+    }catch(e:any){ toast.error(e.message); }finally{ setPostsLoading(false); }
+  };
+
+  const refreshPosts=async()=>{ if(!profile?.id) return; await loadPosts(0,true); };
+
+  const handleFollow=async()=> {
+    if(!currentUser||!profile) return;
+    try{
+      if(isFollowing){
+        const { error }=await supabase.from("follows").delete().eq("follower_id",currentUser.id).eq("following_id",profile.id);
+        if(error) throw error; setIsFollowing(false); setFollowerCount(p=>p-1);
+        setFollowingIds(s=>{ const n=new Set(s); n.delete(profile.id); return n; }); toast.success("Berhenti mengikuti");
+      }else{
+        const { error }=await supabase.from("follows").insert({ follower_id:currentUser.id,following_id:profile.id });
+        if(error) throw error; setIsFollowing(true); setFollowerCount(p=>p+1);
+        setFollowingIds(s=>new Set(s).add(profile.id)); toast.success("Berhasil mengikuti");
       }
-      setCurrentUser(user);
+    }catch(e:any){ toast.error(e.message); }
+  };
 
-      const profileId = userId || user.id;
-
-      // Load profile
-      const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", profileId)
-        .single();
-
-      if (profileError) throw profileError;
-      setProfile(profileData);
-
-      // Load posts
-      const { data: postsData } = await supabase
-        .from("posts")
-        .select(
-          `
-          *,
-          profiles (
-            id,
-            full_name,
-            avatar_url,
-            role
-          ),
-          likes (
-            user_id
-          )
-        `,
-        )
-        .eq("user_id", profileId)
-        .order("created_at", { ascending: false });
-
-      setPosts(postsData || []);
-
-      // Check if following
-      if (user.id !== profileId) {
-        const { data: followData } = await supabase
-          .from("follows")
-          .select("*")
-          .eq("follower_id", user.id)
-          .eq("following_id", profileId)
-          .single();
-
-        setIsFollowing(!!followData);
+  const toggleFollowUser=async(targetId:string)=> {
+    if(!currentUser||targetId===currentUser.id) return;
+    try{
+      if(followingIds.has(targetId)){
+        const { error }=await supabase.from("follows").delete().eq("follower_id",currentUser.id).eq("following_id",targetId);
+        if(error) throw error; setFollowingIds(s=>{ const n=new Set(s); n.delete(targetId); return n; }); toast.success("Berhenti mengikuti");
+      }else{
+        const { error }=await supabase.from("follows").insert({ follower_id:currentUser.id,following_id:targetId });
+        if(error) throw error; setFollowingIds(s=>new Set(s).add(targetId)); toast.success("Mengikuti");
       }
-
-      // Load follower/following counts
-      const { count: followers } = await supabase
-        .from("follows")
-        .select("*", { count: "exact", head: true })
-        .eq("following_id", profileId);
-
-      const { count: following } = await supabase
-        .from("follows")
-        .select("*", { count: "exact", head: true })
-        .eq("follower_id", profileId);
-
-      setFollowerCount(followers || 0);
-      setFollowingCount(following || 0);
-    } catch (error: any) {
-      toast.error(error.message);
-    } finally {
-      setLoading(false);
-    }
+    }catch(e:any){ toast.error(e.message); }
   };
 
-  const handleFollow = async () => {
-    if (!currentUser || !profile) return;
-
-    try {
-      if (isFollowing) {
-        // Unfollow
-        const { error } = await supabase
-          .from("follows")
-          .delete()
-          .eq("follower_id", currentUser.id)
-          .eq("following_id", profile.id);
-
-        if (error) throw error;
-
-        setIsFollowing(false);
-        setFollowerCount((prev) => prev - 1);
-        toast.success("Berhenti mengikuti");
-      } else {
-        // Follow
-        const { error } = await supabase.from("follows").insert({
-          follower_id: currentUser.id,
-          following_id: profile.id,
-        });
-
-        if (error) throw error;
-
-        setIsFollowing(true);
-        setFollowerCount((prev) => prev + 1);
-        toast.success("Berhasil mengikuti");
-      }
-    } catch (error: any) {
-      toast.error(error.message);
-    }
+  const handleStartChat=async()=> {
+    if(!currentUser||!profile) return;
+    try{ const { data:id,error }=await supabase.rpc("create_direct_conversation",{ target_user_id:profile.id }); if(error) throw error; if(id) navigate(`/chat/${id}`); }
+    catch(e:any){ toast.error("Gagal membuat chat: "+e.message); }
   };
 
-  const handleStartChat = async () => {
-    if (!currentUser || !profile) return;
-
-    try {
-      // Use RPC function to create/find direct conversation
-      const { data: conversationId, error } = await supabase.rpc("create_direct_conversation", {
-        target_user_id: profile.id,
-      });
-
-      if (error) {
-        console.error("Error creating chat:", error);
-        throw error;
-      }
-
-      if (conversationId) {
-        navigate(`/chat/${conversationId}`);
-      }
-    } catch (error: any) {
-      toast.error("Gagal membuat chat: " + error.message);
-    }
+  const startChatWith=async(targetId:string)=> {
+    try{ const { data:id,error }=await supabase.rpc("create_direct_conversation",{ target_user_id:targetId }); if(error) throw error; if(id) navigate(`/chat/${id}`); }
+    catch(e:any){ toast.error("Gagal membuat chat: "+e.message); }
   };
 
-  const getInitials = (name: string) => {
-    const names = name.split(" ");
-    if (names.length >= 2) {
-      return `${names[0][0]}${names[1][0]}`.toUpperCase();
-    }
-    return name.slice(0, 2).toUpperCase();
+  const openFollowers=async()=> {
+    if(!profile) return; setDialogSearch(""); setFollowers([]); setFollowersPage(0); setFollowersHasMore(true); setOpenList("followers");
+    await loadFollowersPage(profile.id,0,true);
   };
 
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case "siswa":
-        return "bg-blue-500/20 text-blue-400";
-      case "guru":
-        return "bg-green-500/20 text-green-400";
-      case "alumni":
-        return "bg-purple-500/20 text-purple-400";
-      default:
-        return "bg-muted text-muted-foreground";
-    }
+  const openFollowing=async()=> {
+    if(!profile) return; setDialogSearch(""); setFollowing([]); setFollowingPage(0); setFollowingHasMore(true); setOpenList("following");
+    await loadFollowingPage(profile.id,0,true);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Memuat...</p>
-        </div>
-      </div>
-    );
-  }
+  const loadFollowersPage=async(pid:string,page=0,reset=false)=> {
+    setListLoading(true);
+    try{
+      const { data,error }=await supabase.from("follows")
+        .select(`follower_id, profiles:follower_id(id,full_name,avatar_url,role)`)
+        .eq("following_id",pid).order("created_at",{ascending:false})
+        .range(page*LIST_PAGE_SIZE,page*LIST_PAGE_SIZE+LIST_PAGE_SIZE-1);
+      if(error) throw error;
+      const rows=(data||[]).map((r:any)=>r.profiles).filter(Boolean);
+      setFollowers(prev=>reset?rows:[...prev,...rows]); setFollowersPage(page); setFollowersHasMore(rows.length===LIST_PAGE_SIZE);
+    }catch(e:any){ toast.error(e.message); }finally{ setListLoading(false); }
+  };
 
-  if (!profile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <p className="text-muted-foreground">Profil tidak ditemukan</p>
-      </div>
-    );
-  }
+  const loadFollowingPage=async(pid:string,page=0,reset=false)=> {
+    setListLoading(true);
+    try{
+      const { data,error }=await supabase.from("follows")
+        .select(`following_id, profiles:following_id(id,full_name,avatar_url,role)`)
+        .eq("follower_id",pid).order("created_at",{ascending:false})
+        .range(page*LIST_PAGE_SIZE,page*LIST_PAGE_SIZE+LIST_PAGE_SIZE-1);
+      if(error) throw error;
+      const rows=(data||[]).map((r:any)=>r.profiles).filter(Boolean);
+      setFollowing(prev=>reset?rows:[...prev,...rows]); setFollowingPage(page); setFollowingHasMore(rows.length===LIST_PAGE_SIZE);
+    }catch(e:any){ toast.error(e.message); }finally{ setListLoading(false); }
+  };
 
-  const isOwnProfile = currentUser?.id === profile.id;
+  const listRaw=openList==="followers"?followers:following;
+  const list=useMemo(()=>listRaw.filter(u=>u.full_name.toLowerCase().includes(dialogSearch.toLowerCase())),[listRaw,dialogSearch]);
+
+  const onDialogScroll=async(e:React.UIEvent<HTMLDivElement>)=>{
+    const el=e.currentTarget; const nearBottom=el.scrollTop+el.clientHeight>=el.scrollHeight-48;
+    if(!nearBottom||listLoading||!profile) return;
+    if(openList==="followers"&&followersHasMore) await loadFollowersPage(profile.id,followersPage+1);
+    if(openList==="following"&&followingHasMore) await loadFollowingPage(profile.id,followingPage+1);
+  };
+
+  if(loading) return (
+    <div className="min-h-screen grid place-items-center bg-background">
+      <div className="text-center"><div className="animate-spin h-12 w-12 rounded-full border-b-2 border-accent mx-auto"/><p className="mt-4 text-muted-foreground">Memuat...</p></div>
+    </div>
+  );
+
+  if(!profile) return (<div className="min-h-screen grid place-items-center bg-background"><p className="text-muted-foreground">Profil tidak ditemukan</p></div>);
+
+  const isOwnProfile=currentUser?.id===profile.id;
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-card border-b border-border shadow-lg">
+      <header className="sticky top-0 z-50 bg-card border-b border-border">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Profil
-          </h1>
+          <Button variant="ghost" size="icon" onClick={()=>navigate("/")}><ArrowLeft className="h-5 w-5"/></Button>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Profil</h1>
         </div>
       </header>
 
@@ -243,72 +205,31 @@ const Profile = () => {
         <Card className="bg-card border-border p-8 mb-6">
           <div className="flex items-start gap-6">
             <Avatar className="h-24 w-24 border-4 border-accent/20">
-              <AvatarImage src={profile.avatar_url} />
-              <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
-                {getInitials(profile.full_name)}
-              </AvatarFallback>
+              <AvatarImage src={profile.avatar_url||undefined}/>
+              <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">{getInitials(profile.full_name)}</AvatarFallback>
             </Avatar>
 
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <h2 className="text-2xl font-bold text-foreground">{profile.full_name}</h2>
-                <span className={`text-sm px-3 py-1 rounded-full ${getRoleBadgeColor(profile.role)}`}>
-                  {profile.role.charAt(0).toUpperCase() + profile.role.slice(1)}
-                </span>
+                <h2 className="text-2xl font-bold">{profile.full_name}</h2>
+                <span className={`text-sm px-3 py-1 rounded-full ${getRoleBadgeColor(profile.role)}`}>{profile.role?.[0]?.toUpperCase()+profile.role?.slice(1)}</span>
               </div>
-
-              {profile.bio && <p className="text-muted-foreground mb-4">{profile.bio}</p>}
+              {profile.bio&&<p className="text-muted-foreground mb-4">{profile.bio}</p>}
 
               <div className="flex gap-6 mb-4">
-                <div>
-                  <span className="font-bold text-foreground">{followerCount}</span>
-                  <span className="text-muted-foreground ml-1">Pengikut</span>
-                </div>
-                <div>
-                  <span className="font-bold text-foreground">{followingCount}</span>
-                  <span className="text-muted-foreground ml-1">Mengikuti</span>
-                </div>
+                <button onClick={openFollowers} className="text-left"><span className="font-bold">{followerCount}</span><span className="text-muted-foreground ml-1">Pengikut</span></button>
+                <button onClick={openFollowing} className="text-left"><span className="font-bold">{followingCount}</span><span className="text-muted-foreground ml-1">Mengikuti</span></button>
               </div>
 
               <div className="flex gap-2">
-                {isOwnProfile ? (
-                  <Button
-                    onClick={() => navigate("/settings")}
-                    className="bg-accent text-accent-foreground hover:bg-accent/90"
-                  >
-                    <Settings className="h-4 w-4 mr-2" />
-                    Edit Profil
-                  </Button>
-                ) : (
+                {isOwnProfile?(
+                  <Button onClick={()=>navigate("/settings")} className="bg-accent text-accent-foreground hover:bg-accent/90"><Settings className="h-4 w-4 mr-2"/>Edit Profil</Button>
+                ):(
                   <>
-                    <Button
-                      onClick={handleFollow}
-                      className={
-                        isFollowing
-                          ? "bg-muted text-foreground hover:bg-muted/80"
-                          : "bg-accent text-accent-foreground hover:bg-accent/90 shadow-[var(--shadow-gold)]"
-                      }
-                    >
-                      {isFollowing ? (
-                        <>
-                          <UserMinus className="h-4 w-4 mr-2" />
-                          Berhenti Mengikuti
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus className="h-4 w-4 mr-2" />
-                          Ikuti
-                        </>
-                      )}
+                    <Button onClick={handleFollow} className={isFollowing?"bg-muted text-foreground hover:bg-muted/80":"bg-accent text-accent-foreground hover:bg-accent/90"}>
+                      {isFollowing?(<><UserMinus className="h-4 w-4 mr-2"/>Berhenti Mengikuti</>):(<><UserPlus className="h-4 w-4 mr-2"/>Ikuti</>)}
                     </Button>
-                    <Button
-                      onClick={handleStartChat}
-                      variant="outline"
-                      className="border-accent text-accent hover:bg-accent hover:text-accent-foreground"
-                    >
-                      <MessageCircle className="h-4 w-4 mr-2" />
-                      Chat
-                    </Button>
+                    <Button onClick={handleStartChat} variant="outline" className="border-accent text-accent hover:bg-accent hover:text-accent-foreground"><MessageCircle className="h-4 w-4 mr-2"/>Chat</Button>
                   </>
                 )}
               </div>
@@ -317,31 +238,67 @@ const Profile = () => {
         </Card>
 
         <div className="space-y-4">
-          <h3 className="text-xl font-bold text-foreground">Postingan</h3>
-          {loading ? (
-            <div className="space-y-4">
-              <PostSkeleton />
-              <PostSkeleton />
-              <PostSkeleton />
-            </div>
-          ) : posts.length === 0 ? (
-            <Card className="bg-card border-border p-8 text-center">
-              <p className="text-muted-foreground">Belum ada postingan</p>
-            </Card>
-          ) : (
-            posts.map((post) => (
-              <PostCard 
-                key={post.id} 
-                post={post} 
-                currentUserId={currentUser?.id}
-                onLike={refreshPosts}
-                onPostUpdated={refreshPosts}
-                onPostDeleted={refreshPosts}
-              />
-            ))
+          <div className="flex items-center gap-2">
+            <Button variant={postFilter==="all"?"default":"outline"} onClick={()=>setPostFilter("all")} className="rounded-xl">Semua</Button>
+            <Button variant={postFilter==="media"?"default":"outline"} onClick={()=>setPostFilter("media")} className="rounded-xl">Media</Button>
+            <Button variant={postFilter==="text"?"default":"outline"} onClick={()=>setPostFilter("text")} className="rounded-xl">Tanpa Media</Button>
+          </div>
+
+          {posts.length===0&&postsLoading?(
+            <div className="space-y-4"><PostSkeleton/><PostSkeleton/><PostSkeleton/></div>
+          ):posts.length===0?(
+            <Card className="p-8 text-center"><p className="text-muted-foreground">Belum ada postingan</p></Card>
+          ):(
+            <>
+              {posts.map(p=>(
+                <PostCard key={p.id} post={p} currentUserId={currentUser?.id} onLike={refreshPosts} onPostUpdated={refreshPosts} onPostDeleted={refreshPosts}/>
+              ))}
+              {postsLoading&&(<div className="space-y-4"><PostSkeleton/></div>)}
+              <div ref={loadMoreRef} className="h-6"/>
+            </>
           )}
         </div>
       </div>
+
+      <Dialog open={!!openList} onOpenChange={v=>!v&&setOpenList(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>{openList==="followers"?"Pengikut":"Mengikuti"}</DialogTitle>
+            <DialogDescription className="sr-only">Daftar {openList==="followers"?"pengikut":"akun yang diikuti"}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input value={dialogSearch} onChange={e=>setDialogSearch(e.target.value)} placeholder={`Cari ${openList==="followers"?"pengikut":"mengikuti"}...`} className="bg-input border-border"/>
+            <ScrollArea className="max-h-[60vh] pr-2" onScroll={onDialogScroll}>
+              <div className="space-y-2">
+                {listLoading&&(openList==="followers"?followers.length===0:following.length===0)?(
+                  <div className="py-10 text-center text-muted-foreground">Memuat...</div>
+                ):list.length===0?(
+                  <div className="py-8 text-center text-muted-foreground">Tidak ada data</div>
+                ):(
+                  list.map(u=>(
+                    <div key={u.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/10">
+                      <Link to={`/profile/${u.id}`} onClick={()=>setOpenList(null)} className="flex items-center gap-3 min-w-0">
+                        <Avatar className="h-8 w-8"><AvatarImage src={u.avatar_url||undefined}/><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(u.full_name||"U")}</AvatarFallback></Avatar>
+                        <div className="min-w-0"><p className="truncate text-sm font-medium">{u.full_name}</p><p className="truncate text-xs text-muted-foreground">{u.role}</p></div>
+                      </Link>
+                      <div className="ml-auto flex items-center gap-2">
+                        {u.id!==currentUser?.id&&(followingIds.has(u.id)?(
+                          <Button size="sm" onClick={()=>toggleFollowUser(u.id)} className="bg-muted text-foreground hover:bg-muted/80"><UserMinus className="h-4 w-4 mr-1"/>Unfollow</Button>
+                        ):(
+                          <Button size="sm" onClick={()=>toggleFollowUser(u.id)} className="bg-accent text-accent-foreground hover:bg-accent/90"><UserPlus className="h-4 w-4 mr-1"/>Follow</Button>
+                        ))}
+                        <Button size="sm" variant="outline" onClick={()=>startChatWith(u.id)} className="border-accent text-accent hover:bg-accent hover:text-accent-foreground"><MessageCircle className="h-4 w-4 mr-1"/>Chat</Button>
+                      </div>
+                    </div>
+                  ))
+                )}
+                {openList==="followers"&&followersHasMore&&<div className="py-3 text-center text-xs text-muted-foreground">Gulir untuk muat lagi…</div>}
+                {openList==="following"&&followingHasMore&&<div className="py-3 text-center text-xs text-muted-foreground">Gulir untuk muat lagi…</div>}
+              </div>
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

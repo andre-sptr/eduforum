@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Send, MessageCircle, Users, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Send, MessageCircle, Users, MoreVertical, Pencil, Trash2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { z } from "zod";
@@ -28,12 +28,11 @@ const Messages=()=> {
   const [userGroups,setUserGroups]=useState<any[]>([]);
   const [editingMessageId,setEditingMessageId]=useState<string|null>(null);
   const [editContent,setEditContent]=useState("");
+  const [followQuery,setFollowQuery]=useState("");
   const messagesViewportRef=useRef<HTMLDivElement>(null);
 
   useEffect(()=>{ checkUser(); },[]);
-  useEffect(()=>{ scrollToBottom(); },[messages]);
-
-  const scrollToBottom=()=>{ const el=messagesViewportRef.current; if(el) el.scrollTop=el.scrollHeight; };
+  useEffect(()=>{ const el=messagesViewportRef.current; if(el) el.scrollTop=el.scrollHeight; },[messages]);
 
   const checkUser=async()=>{
     const { data:{ user } }=await supabase.auth.getUser();
@@ -47,8 +46,8 @@ const Messages=()=> {
     try{
       let { data:globalConv }=await supabase.from("conversations").select("*").eq("type","global").maybeSingle();
       if(!globalConv){
-        const { data:newGlobal,error:createErr }=await supabase.from("conversations").insert({ name:"Global Chat",type:"global",created_by:userId }).select().single();
-        if(createErr){ toast.error("Gagal membuat global chat: "+createErr.message); return; }
+        const { data:newGlobal,error:e }=await supabase.from("conversations").insert({ name:"Global Chat",type:"global",created_by:userId }).select().single();
+        if(e){ toast.error("Gagal membuat global chat: "+e.message); return; }
         globalConv=newGlobal;
       }
       if(globalConv){
@@ -73,7 +72,7 @@ const Messages=()=> {
   const loadMessages=async(conversationId:string)=>{
     const { data:rows,error }=await supabase.from("messages").select("*").eq("conversation_id",conversationId).order("created_at",{ascending:true}).limit(100);
     if(error){ toast.error(error.message); return; }
-    if(!rows||rows.length===0){ setMessages([]); return; }
+    if(!rows?.length){ setMessages([]); return; }
     const uids=[...new Set(rows.map(m=>m.user_id))];
     const { data:profiles }=await supabase.from("profiles").select("id,full_name,avatar_url,role").in("id",uids);
     const map=new Map((profiles||[]).map(p=>[p.id,p]));
@@ -86,13 +85,13 @@ const Messages=()=> {
       .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:`conversation_id=eq.${conversationId}`},async payload=>{
         const { data:m }=await supabase.from("messages").select("*").eq("id",payload.new.id).single(); if(!m) return;
         const { data:p }=await supabase.from("profiles").select("id,full_name,avatar_url,role").eq("id",m.user_id).single();
-        setMessages(prev=>[...prev,{...m,profiles:p||{full_name:"Unknown User",avatar_url:null,role:"siswa"}}]);
+        setMessages(v=>[...v,{...m,profiles:p||{full_name:"Unknown User",avatar_url:null,role:"siswa"}}]);
       })
-      .on("postgres_changes",{event:"UPDATE",schema:"public",table:"messages",filter:`conversation_id=eq.${conversationId}`},payload=>{
-        setMessages(prev=>prev.map(x=>x.id===payload.new.id?{...x,content:payload.new.content,edited_at:payload.new.edited_at,is_deleted:payload.new.is_deleted}:x));
+      .on("postgres_changes",{event:"UPDATE",schema:"public",table:"messages",filter:`conversation_id=eq.${conversationId}`},p=>{
+        setMessages(v=>v.map(x=>x.id===p.new.id?{...x,content:p.new.content,edited_at:p.new.edited_at,is_deleted:p.new.is_deleted}:x));
       })
-      .on("postgres_changes",{event:"DELETE",schema:"public",table:"messages",filter:`conversation_id=eq.${conversationId}`},payload=>{
-        setMessages(prev=>prev.filter(x=>x.id!==payload.old.id));
+      .on("postgres_changes",{event:"DELETE",schema:"public",table:"messages",filter:`conversation_id=eq.${conversationId}`},p=>{
+        setMessages(v=>v.filter(x=>x.id!==p.old.id));
       }).subscribe();
     return()=>{ supabase.removeChannel(channel); };
   };
@@ -102,38 +101,20 @@ const Messages=()=> {
     try{ messageSchema.parse({content:newMessage}); }catch(err){ if(err instanceof z.ZodError) toast.error(err.errors[0].message); return; }
     if(!globalConversation){ toast.error("Global chat belum tersedia"); return; }
     setSending(true);
-    try{
-      const { error }=await supabase.from("messages").insert({ conversation_id:globalConversation.id,user_id:currentUser.id,content:newMessage.trim() });
-      if(error) throw error;
-      setNewMessage(""); scrollToBottom();
-    }catch(err:any){ toast.error("Gagal mengirim pesan: "+err.message); }finally{ setSending(false); }
+    try{ const { error }=await supabase.from("messages").insert({ conversation_id:globalConversation.id,user_id:currentUser.id,content:newMessage.trim() }); if(error) throw error; setNewMessage(""); const el=messagesViewportRef.current; if(el) el.scrollTop=el.scrollHeight; }catch(err:any){ toast.error("Gagal mengirim pesan: "+err.message); }finally{ setSending(false); }
   };
 
-  const createDirectChat=async(userId:string)=>{
-    try{ const { data:id,error }=await supabase.rpc("create_direct_conversation",{ target_user_id:userId }); if(error) throw error; if(id) navigate(`/chat/${id}`); }
-    catch(err:any){ toast.error("Gagal membuat chat: "+err.message); }
-  };
+  const createDirectChat=async(id:string)=>{ try{ const { data:cid,error }=await supabase.rpc("create_direct_conversation",{ target_user_id:id }); if(error) throw error; if(cid) navigate(`/chat/${cid}`); }catch(err:any){ toast.error("Gagal membuat chat: "+err.message); } };
+  const createGroupChat=async(id:string)=>{ try{ const { data:cid,error }=await supabase.rpc("create_group_conversation",{ p_group_id:id }); if(error) throw error; if(cid) navigate(`/chat/${cid}`); }catch(err:any){ toast.error("Gagal membuat chat grup: "+err.message); } };
 
-  const createGroupChat=async(groupId:string)=>{
-    try{ const { data:id,error }=await supabase.rpc("create_group_conversation",{ p_group_id:groupId }); if(error) throw error; if(id) navigate(`/chat/${id}`); }
-    catch(err:any){ toast.error("Gagal membuat chat grup: "+err.message); }
-  };
-
-  const getInitials=(name:string)=>{ const a=name.trim().split(" "); const s=((a[0]?.[0]||"")+(a[1]?.[0]||"")).toUpperCase(); return s||"U"; };
+  const getInitials=(n:string)=>{ const a=n.trim().split(" "); const s=((a[0]?.[0]||"")+(a[1]?.[0]||"")).toUpperCase(); return s||"U"; };
   const startEdit=(m:Message)=>{ setEditingMessageId(m.id); setEditContent(m.content); };
   const cancelEdit=()=>{ setEditingMessageId(null); setEditContent(""); };
-  const handleEditMessage=async(id:string)=>{
-    if(!editContent.trim()){ toast.error("Pesan tidak boleh kosong"); return; }
-    try{ messageSchema.parse({content:editContent}); }catch(err){ if(err instanceof z.ZodError) toast.error(err.errors[0].message); return; }
-    try{
-      const { error }=await supabase.from("messages").update({ content:editContent.trim(),edited_at:new Date().toISOString() }).eq("id",id);
-      if(error) throw error; setEditingMessageId(null); setEditContent(""); toast.success("Pesan berhasil diubah");
-    }catch(err:any){ toast.error("Gagal mengubah pesan: "+err.message); }
-  };
-  const handleDeleteMessage=async(id:string)=>{
-    try{ const { error }=await supabase.from("messages").delete().eq("id",id); if(error) throw error; toast.success("Pesan berhasil dihapus"); }catch(err:any){ toast.error("Gagal menghapus pesan: "+err.message); }
-  };
+  const handleEditMessage=async(id:string)=>{ if(!editContent.trim()){ toast.error("Pesan tidak boleh kosong"); return; } try{ messageSchema.parse({content:editContent}); }catch(err){ if(err instanceof z.ZodError) toast.error(err.errors[0].message); return; } try{ const { error }=await supabase.from("messages").update({ content:editContent.trim(),edited_at:new Date().toISOString() }).eq("id",id); if(error) throw error; setEditingMessageId(null); setEditContent(""); toast.success("Pesan berhasil diubah"); }catch(err:any){ toast.error("Gagal mengubah pesan: "+err.message); } };
+  const handleDeleteMessage=async(id:string)=>{ try{ const { error }=await supabase.from("messages").delete().eq("id",id); if(error) throw error; toast.success("Pesan berhasil dihapus"); }catch(err:any){ toast.error("Gagal menghapus pesan: "+err.message); } };
   const formatTime=(ts:string)=>new Date(ts).toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"});
+
+  const filteredFollowed=followedUsers.filter(u=>(u.full_name||"").toLowerCase().includes(followQuery.toLowerCase()));
 
   if(loading) return (
     <div className="min-h-screen grid place-items-center bg-gradient-to-b from-background to-background/60">
@@ -154,25 +135,16 @@ const Messages=()=> {
         <Card className="flex-1 border-border bg-card/60 backdrop-blur rounded-2xl flex flex-col h-[calc(100vh-125px)]">
           <div ref={messagesViewportRef} className="flex-1 overflow-y-auto p-4">
             <div className="space-y-4">
-              {messages.length===0?(
-                <div className="text-center py-10 text-muted-foreground">Belum ada pesan. Mulai percakapan!</div>
-              ):messages.map(m=>{
+              {messages.length===0?(<div className="text-center py-10 text-muted-foreground">Belum ada pesan. Mulai percakapan!</div>):messages.map(m=>{
                 const own=m.user_id===currentUser?.id; const editing=editingMessageId===m.id;
                 return (
                   <div key={m.id} className={`flex gap-3 ${own?"flex-row-reverse":"flex-row"}`}>
                     <Link to={`/profile/${m.user_id}`} className="shrink-0" onClick={(e)=>e.stopPropagation()}>
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={m.profiles?.avatar_url || undefined}/>
-                        <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-                          {getInitials(m.profiles?.full_name || "U")}
-                        </AvatarFallback>
-                      </Avatar>
+                      <Avatar className="h-8 w-8"><AvatarImage src={m.profiles?.avatar_url||undefined}/><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(m.profiles?.full_name||"U")}</AvatarFallback></Avatar>
                     </Link>
                     <div className={`flex flex-col max-w-[70%] ${own?"items-end":"items-start"}`}>
                       <div className="flex items-baseline gap-2 mb-1">
-                        <Link to={`/profile/${m.user_id}`} className="text-sm font-medium" onClick={(e)=>e.stopPropagation()}>
-                          {m.profiles?.full_name}
-                        </Link>
+                        <Link to={`/profile/${m.user_id}`} className="text-sm font-medium" onClick={(e)=>e.stopPropagation()}>{m.profiles?.full_name}</Link>
                         <span className="text-xs text-muted-foreground">{m.profiles?.role}</span>
                       </div>
                       {editing?(
@@ -216,10 +188,16 @@ const Messages=()=> {
 
         <div className="w-80 space-y-4 hidden lg:block">
           <Card className="p-4 border-border bg-card/60 backdrop-blur rounded-2xl">
-            <h3 className="font-semibold mb-4 flex items-center gap-2"><MessageCircle className="h-4 w-4"/>User yang Diikuti</h3>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-semibold flex items-center gap-2"><MessageCircle className="h-4 w-4"/>User yang Diikuti</h3>
+            </div>
+            <div className="relative mb-3">
+              <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
+              <Input value={followQuery} onChange={e=>setFollowQuery(e.target.value)} placeholder="Cari pengguna..." className="pl-9 h-9 bg-input/60 border-border rounded-xl"/>
+            </div>
             <ScrollArea className="h-72">
               <div className="space-y-2 pr-2">
-                {followedUsers.length===0?(<p className="text-sm text-muted-foreground text-center py-4">Belum mengikuti siapa pun</p>):followedUsers.map(u=>(
+                {filteredFollowed.length===0?(<p className="text-sm text-muted-foreground text-center py-4">Tidak ada hasil</p>):filteredFollowed.map(u=>(
                   <div key={u.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/10 cursor-pointer transition-colors" onClick={()=>createDirectChat(u.id)}>
                     <Avatar className="h-8 w-8"><AvatarImage src={u.avatar_url||undefined}/><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(u.full_name||"U")}</AvatarFallback></Avatar>
                     <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{u.full_name}</p><p className="text-xs text-muted-foreground">{u.role}</p></div>
@@ -235,9 +213,7 @@ const Messages=()=> {
               <div className="space-y-2 pr-2">
                 {userGroups.length===0?(<p className="text-sm text-muted-foreground text-center py-4">Belum bergabung grup</p>):userGroups.map(g=>(
                   <div key={g.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/10 cursor-pointer transition-colors" onClick={()=>createGroupChat(g.id)}>
-                    <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center shrink-0 overflow-hidden">
-                      {g.cover_image?(<img src={g.cover_image} alt={g.name} className="h-full w-full object-cover"/>):(<Users className="h-4 w-4 text-accent-foreground"/>)}
-                    </div>
+                    <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center shrink-0 overflow-hidden">{g.cover_image?(<img src={g.cover_image} alt={g.name} className="h-full w-full object-cover"/>):(<Users className="h-4 w-4 text-accent-foreground"/>)}</div>
                     <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{g.name}</p></div>
                   </div>
                 ))}
