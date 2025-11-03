@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TrendingUp, Trophy, Medal, Award, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@radix-ui/react-tooltip";
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface LeaderboardUser {
   id: string;
@@ -16,49 +16,32 @@ interface LeaderboardProps {
 }
 
 const freeTools = [
-  { 
-    name: "PDF Tools", 
-    websiteUrl: "https://pdf.flamyheart.site/" 
-  },
-  { 
-    name: "AI Agent", 
-    iconUrl: "/maskot.png",
-    websiteUrl: "https://ai.flamyheart.site/" 
-  },
-  { 
-    name: "ChatBot", 
-    iconUrl: "/whatsapp.png",
-    websiteUrl: "https://wa.me/6287790596246" 
-  },
-  { 
-    name: "AetherNet", 
-    iconUrl: "/logo.jpg",
-    websiteUrl: "https://aethernet.flamyheart.site/" 
-  },
+  { name: "PDF Tools", websiteUrl: "https://pdf.flamyheart.site/" },
+  { name: "AI Agent", iconUrl: "/maskot.png", websiteUrl: "https://ai.flamyheart.site/" },
+  { name: "ChatBot", iconUrl: "/whatsapp.png", websiteUrl: "https://wa.me/6287790596246" },
+  { name: "AetherNet", iconUrl: "/logo.jpg", websiteUrl: "https://aethernet.flamyheart.site/" },
 ];
+
+const getInitials = (name: string) => {
+  const names = name.split(" ");
+  return (names.length >= 2
+    ? `${names[0][0]}${names[1][0]}`
+    : name.slice(0, 2)
+  ).toUpperCase();
+};
+
+const rankIcons = [
+  <Trophy className="h-5 w-5 text-accent" key="rank-1" />,
+  <Medal className="h-5 w-5 text-gray-400" key="rank-2" />,
+  <Award className="h-5 w-5 text-amber-600" key="rank-3" />,
+];
+
+const getRankIcon = (index: number) => {
+  return rankIcons[index] ?? <span className="text-muted-foreground font-bold">#{index + 1}</span>;
+};
 
 const Leaderboard = ({ users }: LeaderboardProps) => {
   const navigate = useNavigate();
-  const getInitials = (name: string) => {
-    const names = name.split(" ");
-    if (names.length >= 2) {
-      return `${names[0][0]}${names[1][0]}`.toUpperCase();
-    }
-    return name.slice(0, 2).toUpperCase();
-  };
-
-  const getRankIcon = (index: number) => {
-    switch (index) {
-      case 0:
-        return <Trophy className="h-5 w-5 text-accent" />;
-      case 1:
-        return <Medal className="h-5 w-5 text-gray-400" />;
-      case 2:
-        return <Award className="h-5 w-5 text-amber-600" />;
-      default:
-        return <span className="text-muted-foreground font-bold">#{index + 1}</span>;
-    }
-  };
 
   return (
     <div className="space-y-4">
@@ -84,7 +67,7 @@ const Leaderboard = ({ users }: LeaderboardProps) => {
                           <img
                             src={tool.iconUrl}
                             alt={tool.name}
-                            className="h-3/5 w-3/5 object-contain" 
+                            className="h-3/5 w-3/5 object-contain"
                             loading="lazy"
                             decoding="async"
                           />
