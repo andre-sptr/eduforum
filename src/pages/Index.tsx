@@ -213,30 +213,14 @@ const Index = () => {
   };
 
   const loadTopFollowers = async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select(`
-        id,
-        full_name,
-        avatar_url,
-        follows:follows!follows_following_id_fkey(count)
-      `)
-      .limit(5);
+    const { data, error } = await supabase.rpc('get_top_5_followers');
 
     if (error) {
       toast.error(error.message);
       return;
     }
 
-    const sortedUsers = (data || [])
-      .map(user => ({
-        ...user,
-        follower_count: user.follows[0]?.count || 0
-      }))
-      .sort((a, b) => b.follower_count - a.follower_count)
-      .slice(0, 5);
-
-    setTopFollowers(sortedUsers);
+    setTopFollowers(data || []);
   };
 
   const handleLogout = async () => {
