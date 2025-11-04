@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Music, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface MediaCarouselProps {
@@ -17,16 +17,22 @@ const MediaCarousel = ({ mediaUrls, mediaTypes }: MediaCarouselProps) => {
   const renderMedia = () => {
     const url = mediaUrls[currentIndex];
     const type = mediaTypes[currentIndex];
-    if (type === "image")
-      return <img src={url} alt="" className="h-full w-full object-contain" />;
-    if (type === "video")
-      return <video src={url} controls className="h-full w-full rounded-lg" />;
-    if (type === "audio")
-      return (
-        <div className="grid h-full w-full place-items-center p-6">
-          <audio src={url} controls className="w-full max-w-md" />
+    if (type === "image") return <img src={url} alt="" className="h-full w-full object-contain" />;
+    if (type === "video") return (
+      <div className="relative h-full w-full flex items-center justify-center">
+        <video src={url} className="h-full w-full object-contain" />
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="p-4 bg-black/60 rounded-full text-white opacity-80 transition-all duration-300 group-hover:bg-black/70 group-hover:scale-110 group-hover:opacity-100">
+            <Play className="h-10 w-10 fill-current" />
+          </div>
         </div>
-      );
+      </div>
+    );
+    if (type === "audio") return (
+      <div className="relative h-full w-full flex items-center justify-center">
+        <div className="flex items-center justify-center p-4 rounded-full bg-black/40 text-white opacity-80 transition-all duration-300 group-hover:bg-black/60 group-hover:scale-110 group-hover:opacity-100"><Music className="h-16 w-16" /></div>
+      </div>
+    );
     return null;
   };
 
@@ -38,18 +44,18 @@ const MediaCarousel = ({ mediaUrls, mediaTypes }: MediaCarouselProps) => {
         <div className="absolute left-3 top-3 rounded-full bg-black/60 px-2 py-1 text-xs text-white">{currentIndex + 1} / {mediaUrls.length}</div>
         {mediaUrls.length > 1 && (
           <>
-            <Button aria-label="Sebelumnya" variant="ghost" size="icon" onClick={goToPrevious} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 text-white backdrop-blur hover:bg-black/60">
+            <Button aria-label="Sebelumnya" variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); goToPrevious(); }} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 text-white backdrop-blur hover:bg-black/60">
               <ChevronLeft className="h-5 w-5" />
             </Button>
-            <Button aria-label="Berikutnya" variant="ghost" size="icon" onClick={goToNext} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 text-white backdrop-blur hover:bg-black/60">
+            <Button aria-label="Berikutnya" variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); goToNext(); }} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/40 text-white backdrop-blur hover:bg-black/60">
               <ChevronRight className="h-5 w-5" />
             </Button>
-            <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
+            <div className="absolute bottom-7 left-1/2 flex -translate-x-1/2 gap-1.5">
               {mediaUrls.map((_, i) => (
                 <button
                   key={i}
                   aria-label={`Ke media ${i + 1}`}
-                  onClick={() => setCurrentIndex(i)}
+                  onClick={(e) => { e.stopPropagation(); setCurrentIndex(i); }}
                   className={`h-1.5 rounded-full transition-all ${i === currentIndex ? "w-6 bg-white" : "w-1.5 bg-white/60 hover:bg-white/80"}`}
                 />
               ))}

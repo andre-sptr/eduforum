@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Heart, Repeat2, Share2, MoreVertical, Pencil, Trash2, ChevronLeft, ChevronRight, Download, GraduationCap, Shield, BookOpen } from "lucide-react";
+import { Heart, Repeat2, Share2, MoreVertical, Pencil, Trash2, ChevronLeft, ChevronRight, Download, GraduationCap, Shield, BookOpen, Music } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { id } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +14,7 @@ import CommentSection from "./CommentSection";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MentionInput } from "./MentionInput";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface PostCardProps {
   post:{ id:string; content:string; created_at:string; updated_at?:string; media_urls?:string[]; media_types?:string[]; profiles:{ id:string; full_name:string; avatar_url?:string; role:string }; likes:any[] };
@@ -26,6 +26,7 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }:
   const [isReposted,setIsReposted]=useState(false); const [isEditing,setIsEditing]=useState(false);
   const [editContent,setEditContent]=useState(post.content); const [showDeleteDialog,setShowDeleteDialog]=useState(false);
   const [isDeleting,setIsDeleting]=useState(false); const [lightbox,setLightbox]=useState(false); const [idx,setIdx]=useState(0);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(true);
   const isOwnPost=currentUserId===post.profiles.id; const urls=post.media_urls||[]; const types=post.media_types||[]; const total=urls.length;
 
   useEffect(()=>{ if(currentUserId){ const liked=post.likes.some(l=>l.user_id===currentUserId); setIsLiked(liked); checkRepost(); } setLikeCount(post.likes.length); },[post.likes,currentUserId]);
@@ -91,16 +92,17 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }:
                 </div>
               </div>
 
-              <Dialog open={lightbox} onOpenChange={setLightbox}>
+              <Dialog open={lightbox} onOpenChange={(open) => { setLightbox(open); if (open) { setIsAudioPlaying(true); } }}>
                 <DialogContent className="max-w-5xl bg-black/90 p-0">
-                  <div className="relative flex items-center justify-center bg-black">
-                    {types[idx]?.startsWith("video")?(<video src={urls[idx]} controls className="max-h-[80vh] max-w-[95vw] rounded-lg"/>):(<img src={urls[idx]} alt="" className="max-h-[80vh] max-w-[95vw] rounded-lg object-contain"/>)}
+                  <DialogHeader className="sr-only"><DialogTitle>Media Viewer</DialogTitle><DialogDescription>Menampilkan gambar atau video postingan dalam ukuran penuh.</DialogDescription></DialogHeader>
+                  <div className="relative flex items-center justify-center bg-black min-h-[400px]">
+                    {types[idx]?.startsWith("video")?(<video src={urls[idx]} controls autoPlay className="max-h-[80vh] max-w-[95vw] rounded-lg"/>):types[idx] === 'audio' ? (<div className="flex flex-col items-center gap-8 p-8 text-white w-full"><Music className={`h-48 w-48 text-accent transition-all duration-300 ${isAudioPlaying ? 'scale-105 drop-shadow-[0_0_15px_hsl(var(--accent)/0.5)]' : 'scale-100 opacity-70'}`}/><audio src={urls[idx]} controls autoPlay onPlay={() => setIsAudioPlaying(true)} onPause={() => setIsAudioPlaying(false)} onEnded={() => setIsAudioPlaying(false)} className="w-full max-w-lg"/></div>):(<img src={urls[idx]} alt="" className="max-h-[80vh] max-w-[95vw] rounded-lg object-contain"/>)}
                     {total>1&&(<><Button variant="ghost" size="icon" onClick={prev} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 text-white hover:bg-white/20"><ChevronLeft className="h-5 w-5"/></Button><Button variant="ghost" size="icon" onClick={next} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 text-white hover:bg-white/20"><ChevronRight className="h-5 w-5"/></Button></>)}
                     <div className="absolute left-3 bottom-3 rounded-full bg-white/10 px-2 py-1 text-xs text-white">{idx+1} / {total}</div>
-                    <div className="absolute right-3 bottom-3 flex gap-2">
+                    {/* <div className="absolute right-3 bottom-3 flex gap-2">
                       <Button size="sm" variant="secondary" onClick={downloadCurrent} className="gap-2"><Download className="h-4 w-4"/>Unduh</Button>
                       {total>1&&(<DropdownMenu><DropdownMenuTrigger asChild><Button size="sm" variant="secondary">Unduh Semua</Button></DropdownMenuTrigger><DropdownMenuContent align="end">{urls.map((u,i)=>(<DropdownMenuItem key={u} onClick={()=>{const a=document.createElement("a");a.href=u;a.download=u.split("/").pop()||`media-${i+1}`;document.body.appendChild(a);a.click();a.remove();}}>Media {i+1}</DropdownMenuItem>))}</DropdownMenuContent></DropdownMenu>)}
-                    </div>
+                    </div> */}
                   </div>
                 </DialogContent>
               </Dialog>
