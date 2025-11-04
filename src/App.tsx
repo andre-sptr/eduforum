@@ -26,6 +26,7 @@ const Games = lazy(() => import("./pages/Games"));
 const SearchPage = lazy(() => import("./pages/SearchPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PostPage = lazy(() => import("./pages/PostPage"));
+const UpdatePassword = lazy(() => import("./pages/UpdatePassword"));
 
 const App = () => (
   <ThemeProvider defaultTheme="system" storageKey="eduforum-theme">
@@ -37,6 +38,7 @@ const App = () => (
             {/* Halaman tanpa navbar */}
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/update-password" element={<UpdatePassword />} />
 
             {/* Semua halaman ini pakai Navbar */}
             <Route element={<AppLayout />}>
