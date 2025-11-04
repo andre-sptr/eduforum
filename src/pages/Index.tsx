@@ -3,15 +3,11 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Home, User, Users, MessageCircle, Gamepad2, LogOut, Search } from "lucide-react";
+import { Home, User, Users, MessageCircle, Gamepad2 } from "lucide-react";
 import CreatePost from "@/components/CreatePost";
 import PostCard from "@/components/PostCard";
 import PostSkeleton from "@/components/PostSkeleton";
 import Leaderboard from "@/components/Leaderboard";
-import { Notifications } from "@/components/Notifications";
-import { ChatNotifications } from "@/components/ChatNotifications";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { toast } from "sonner";
 
 const Index = () => {
@@ -21,8 +17,6 @@ const Index = () => {
   const [posts, setPosts] = useState<any[]>([]);
   const [topFollowers, setTopFollowers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isScrolled, setIsScrolled] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [offset, setOffset] = useState(0);
@@ -35,14 +29,15 @@ const Index = () => {
       if (event === "SIGNED_OUT") navigate("/auth");
       else if (event === "SIGNED_IN" && session) { setUser(session.user); loadUserData(session.user.id); }
     });
-    const handleScroll = () => setIsScrolled(window.scrollY > 10);
-    window.addEventListener("scroll", handleScroll);
-    return () => { subscription.unsubscribe(); window.removeEventListener("scroll", handleScroll); };
+    return () => { subscription.unsubscribe(); };
   }, []);
 
   useEffect(() => {
     if (!user) return;
-    const channel = supabase.channel("posts-changes").on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => loadPosts(true)).subscribe();
+    const channel = supabase
+      .channel("posts-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => loadPosts(true))
+      .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
@@ -125,8 +120,6 @@ const Index = () => {
 
   const refreshPosts = async () => { setOffset(0); setHasMore(true); await loadPosts(true); };
   const loadTopFollowers = async () => { const { data, error } = await supabase.rpc("get_top_5_followers"); if (error) { toast.error(error.message); return; } setTopFollowers(data || []); };
-  const handleLogout = async () => { await supabase.auth.signOut(); navigate("/auth"); };
-  const handleSearch = (e: React.FormEvent) => { e.preventDefault(); if (searchQuery.trim()) navigate(`/search?q=${encodeURIComponent(searchQuery)}`); };
 
   if (loading) return (
     <div className="min-h-screen grid place-items-center bg-gradient-to-b from-background to-muted/40">
@@ -139,30 +132,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/40">
-      <header className={`sticky top-0 z-50 border-b border-border transition-all duration-300 ${isScrolled ? "bg-card/90 shadow-lg" : "bg-card"}`}>
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <img src="/favicon.ico" alt="Logo" className="h-8 w-8 rounded-md shadow" />
-              <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">EduForum MAN IC Siak</h1>
-            </div>
-            <form onSubmit={handleSearch} className="flex-1 max-w-md mx-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input type="text" placeholder="Cari postingan atau user..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 rounded-xl bg-input/60 border-border focus-visible:ring-2 focus-visible:ring-accent" />
-              </div>
-            </form>
-            <div className="flex items-center gap-2">
-              {user && (<><ChatNotifications userId={user.id} /><Notifications userId={user.id} /></>)}
-              <ThemeToggle />
-              <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-foreground rounded-xl">
-                <LogOut className="h-4 w-4 mr-2" />Keluar
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
       <div className="container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <aside className="lg:col-span-3">

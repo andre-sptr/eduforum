@@ -1,9 +1,11 @@
+// src/App.tsx
 import React, { lazy, Suspense } from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { Loader2 } from "lucide-react";
+import AppLayout from "@/components/AppLayout"; 
 
 const PageLoader = () => (
   <div className="flex justify-center items-center h-screen w-full">
@@ -32,19 +34,24 @@ const App = () => (
       <BrowserRouter>
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            <Route path="/" element={<Index />} />
+            {/* Halaman tanpa navbar */}
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/profile/:userId?" element={<Profile />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/groups" element={<Groups />} />
-            <Route path="/groups/:groupId" element={<GroupDetail />} />
-            <Route path="/messages" element={<Messages />} />
-            <Route path="/chat/:conversationId" element={<Chat />} />
-            <Route path="/games" element={<Games />} />
-            <Route path="/search" element={<SearchPage />} />
-            <Route path="/post/:postId" element={<PostPage />} />
-            <Route path="*" element={<NotFound />} />
+
+            {/* Semua halaman ini pakai Navbar */}
+            <Route element={<AppLayout />}>
+              <Route path="/" element={<Index />} />
+              <Route path="/profile/:userId?" element={<Profile />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/groups" element={<Groups />} />
+              <Route path="/groups/:groupId" element={<GroupDetail />} />
+              <Route path="/messages" element={<Messages />} />
+              <Route path="/chat/:conversationId" element={<Chat />} />
+              <Route path="/games" element={<Games />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/post/:postId" element={<PostPage />} />
+              <Route path="*" element={<NotFound />} />
+            </Route>
           </Routes>
         </Suspense>
       </BrowserRouter>
