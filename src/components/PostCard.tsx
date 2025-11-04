@@ -21,7 +21,7 @@ interface PostCardProps {
     id: string; content: string; created_at: string;
     media_urls?: string[]; media_types?: string[];
     profiles: { id: string; full_name: string; avatar_url?: string; role: string };
-    likes: any[]; reposts: any[]; quote_reposts: any[]; repost_of_id?: string | null; quoted_post?: any;
+    likes: any[]; reposts: any[]; quote_reposts: any[]; reposted_by_user?: any; repost_of_id?: string | null; quoted_post?: any;
   };
   currentUserId?: string; onLike?: () => void; onPostUpdated?: () => void; onPostDeleted?: () => void;
 }
@@ -51,7 +51,7 @@ const QuotedPostCard = ({ post }: QuotedPostProps) => {
       <div className="flex items-center gap-2 mb-2">
         <Avatar className="h-5 w-5">
           <AvatarImage src={post.profiles.avatar_url} />
-          <AvatarFallback className="text-xs">{getInitials(post.profiles.full_name)}</AvatarFallback>
+          <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(post.profiles.full_name)}</AvatarFallback>
         </Avatar>
         <span className="text-sm font-medium">{post.profiles.full_name}</span>
         <span className="text-xs text-muted-foreground">• {formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: id })}</span>
@@ -161,6 +161,15 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }:
 
   return (
     <Card className="rounded-2xl border border-border bg-card/80 p-5 shadow hover:shadow-lg transition">
+      {post.reposted_by_user && (
+        <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+          <Repeat2 className="h-4 w-4" />
+          <Link to={`/profile/${post.reposted_by_user.id}`} className="font-semibold hover:underline">
+            {post.reposted_by_user.id === currentUserId ? "Anda" : post.reposted_by_user.full_name}
+          </Link>
+          me-repost
+        </div>
+      )}
       <div className="flex gap-4">
         <Link to={`/profile/${post.profiles.id}`}>
           <Avatar className="h-12 w-12 border border-border/60">

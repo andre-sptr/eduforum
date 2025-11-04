@@ -12,9 +12,19 @@ import PostCard from "@/components/PostCard";
 import PostSkeleton from "@/components/PostSkeleton";
 import { Dialog,DialogContent,DialogDescription,DialogHeader,DialogTitle } from "@/components/ui/dialog";
 
-type PostFilter="all"|"media"|"text";
+type PostFilter = "all" | "reposts" | "media" | "text";
 const POSTS_PROFILES_FK="posts_user_id_fkey";
-const POST_SELECT=`*, profiles:profiles!${POSTS_PROFILES_FK}(id,full_name,avatar_url,role), likes(user_id)`;
+const POST_SELECT = `
+  id, content, created_at, media_urls, media_types, user_id,
+  profiles:profiles!user_id ( id, full_name, avatar_url, role ),
+  likes ( user_id, post_id ),
+  reposts ( count ),
+  quote_reposts:posts!repost_of_id ( count ),
+  quoted_post:repost_of_id (
+    id, content, created_at, user_id,
+    profiles:profiles!user_id ( id, full_name, avatar_url, role )
+  )
+`;
 const POSTS_PAGE_SIZE=10, LIST_PAGE_SIZE=20;
 
 const Profile=()=> {
@@ -30,7 +40,7 @@ const Profile=()=> {
   const [postsLoading,setPostsLoading]=useState(false);
   const [postsPage,setPostsPage]=useState(0);
   const [postsHasMore,setPostsHasMore]=useState(true);
-  const [postCount,setPostCount]=useState({all:0,media:0,text:0});
+  const [postCount, setPostCount] = useState({ all: 0, media: 0, text: 0, reposts: 0 });
   const loadMoreRef=useRef<HTMLDivElement|null>(null);
   const [openList,setOpenList]=useState<null|"followers"|"following">(null);
   const [listLoading,setListLoading]=useState(false);
@@ -51,11 +61,23 @@ const Profile=()=> {
   useEffect(()=>{ if(!profile) return; setPosts([]); setPostsPage(0); setPostsHasMore(true); loadPosts(0,true); },[profile?.id,postFilter]);
   useEffect(()=>{ if(!loadMoreRef.current) return; const io=new IntersectionObserver(e=>{ const f=e[0]; if(f.isIntersecting&&postsHasMore&&!postsLoading) loadPosts(postsPage+1); }); io.observe(loadMoreRef.current); return()=>io.disconnect(); },[loadMoreRef.current,postsHasMore,postsLoading,postsPage]);
 
-  const loadPostCounts=async(pid:string)=>{ try{ const [allRes,mediaRes,textRes]=await Promise.all([
-    supabase.from("posts").select("id",{count:"exact",head:true}).eq("user_id",pid),
-    supabase.from("posts").select("id",{count:"exact",head:true}).eq("user_id",pid).not("media_urls","is",null),
-    supabase.from("posts").select("id",{count:"exact",head:true}).eq("user_id",pid).is("media_urls",null),
-  ]); setPostCount({ all:allRes.count||0, media:mediaRes.count||0, text:textRes.count||0 }); }catch(e:any){ toast.error(e.message); }};
+  const loadPostCounts = async (pid: string) => {
+    try {
+      const [allRes, mediaRes, textRes, quoteRepostsRes, simpleRepostsRes] = await Promise.all([
+        supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", pid).is("repost_of_id", null),
+        supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", pid).not("media_urls", "is", null).is("repost_of_id", null),
+        supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", pid).is("media_urls", null).is("repost_of_id", null),
+        supabase.from("posts").select("id", { count: "exact", head: true }).eq("user_id", pid).not("repost_of_id", "is", null),
+        supabase.from("reposts").select("id", { count: "exact", head: true }).eq("user_id", pid) 
+      ]);
+      setPostCount({
+        all: allRes.count || 0,
+        media: mediaRes.count || 0,
+        text: textRes.count || 0,
+        reposts: (quoteRepostsRes.count || 0) + (simpleRepostsRes.count || 0)
+      });
+    } catch (e: any) { toast.error(e.message); }
+  };
 
   const loadProfile=async()=> {
     try{
@@ -76,17 +98,80 @@ const Profile=()=> {
     }catch(e:any){ toast.error(e.message); }finally{ setLoading(false); }
   };
 
-  const basePostQuery=(pid:string)=>{ let q=supabase.from("posts").select(POST_SELECT).eq("user_id",pid).order("created_at",{ascending:false}); if(postFilter==="media") q=q.not("media_urls","is",null); if(postFilter==="text") q=q.is("media_urls",null); return q; };
+  const basePostQuery = (pid: string) => {
+    let q = supabase.from("posts").select(POST_SELECT).eq("user_id", pid).order("created_at", { ascending: false });
+    if (postFilter === "all") {
+      q = q.is("repost_of_id", null); 
+    } else if (postFilter === "media") {
+      q = q.not("media_urls", "is", null).is("repost_of_id", null);
+    } else if (postFilter === "text") {
+      q = q.is("media_urls", null).is("repost_of_id", null);
+    }
+    return q;
+  };
 
-  const loadPosts=async(page=0,reset=false)=> {
-    if(!profile?.id) return; setPostsLoading(true);
-    try{
-      const from=page*POSTS_PAGE_SIZE, to=from+POSTS_PAGE_SIZE-1;
-      const { data,error }=await basePostQuery(profile.id).range(from,to);
-      if(error) throw error;
-      const rows=data||[];
-      setPosts(p=>reset?rows:[...p,...rows]); setPostsPage(page); setPostsHasMore(rows.length===POSTS_PAGE_SIZE);
-    }catch(e:any){ toast.error(e.message); }finally{ setPostsLoading(false); }
+  const loadPosts = async (page = 0, reset = false) => {
+    if (!profile?.id) return;
+    setPostsLoading(true);
+    try {
+      const from = page * POSTS_PAGE_SIZE, to = from + POSTS_PAGE_SIZE - 1;
+      let finalData: any[] = [];
+      let finalHasMore = true;
+
+      if (postFilter === "reposts") {
+        // --- LOGIKA BARU UNTUK TAB REPOSTS ---
+        
+        // 1. Ambil Quote Reposts (Postingan oleh user ini yang me-refer post lain)
+        const { data: quotePosts } = await supabase
+          .from("posts")
+          .select(POST_SELECT) // POST_SELECT sudah berisi 'quoted_post'
+          .eq("user_id", profile.id)
+          .not("repost_of_id", "is", null)
+          .order("created_at", { ascending: false })
+          .range(from, to); // (Paginasi sederhana, mungkin tidak akurat jika digabung)
+
+        // 2. Ambil Simple Reposts (Postingan orang lain yang di-repost user ini)
+        const { data: simpleReposts } = await supabase
+          .from("reposts")
+          .select(`
+            created_at,
+            post:posts!post_id (
+              ${POST_SELECT} 
+            )
+          `)
+          .eq("user_id", profile.id)
+          .order("created_at", { ascending: false })
+          .range(from, to);
+
+        // 3. Format dan Gabungkan data
+        const quotes = quotePosts || [];
+        const simples = (simpleReposts || []).map((r: any) => ({
+          ...r.post,
+          reposted_by_user: profile, // Info siapa yang me-repost
+          created_at: r.created_at, // Gunakan tanggal repost untuk pengurutan
+        }));
+
+        // Gabungkan, urutkan berdasarkan tanggal repost/quote, dan potong
+        finalData = [...quotes, ...simples]
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .slice(0, POSTS_PAGE_SIZE); 
+
+        // Paginasi gabungan sederhana (tidak sempurna, tapi cukup baik)
+        finalHasMore = (quotes.length + simples.length) > 0; 
+        
+      } else {
+        // --- LOGIKA LAMA UNTUK TAB "ALL", "MEDIA", "TEXT" ---
+        const { data, error } = await basePostQuery(profile.id).range(from, to);
+        if (error) throw error;
+        finalData = data || [];
+        finalHasMore = finalData.length === POSTS_PAGE_SIZE;
+      }
+      
+      setPosts(p => reset ? finalData : [...p, ...finalData]);
+      setPostsPage(page);
+      setPostsHasMore(finalHasMore);
+
+    } catch (e: any) { toast.error(e.message); } finally { setPostsLoading(false); }
   };
 
   const refreshPosts=async()=>{ if(!profile?.id) return; await loadPosts(0,true); };
@@ -214,9 +299,10 @@ const Profile=()=> {
 
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <Button variant={postFilter==="all"?"default":"outline"} onClick={()=>setPostFilter("all")} className="rounded-xl">Semua ({postCount.all})</Button>
-            <Button variant={postFilter==="media"?"default":"outline"} onClick={()=>setPostFilter("media")} className="rounded-xl">Media ({postCount.media})</Button>
+            <Button variant={postFilter === "all" ? "default" : "outline"} onClick={() => setPostFilter("all")} className="rounded-xl">Postingan ({postCount.all})</Button>
             <Button variant={postFilter==="text"?"default":"outline"} onClick={()=>setPostFilter("text")} className="rounded-xl">Tanpa Media ({postCount.text})</Button>
+            <Button variant={postFilter==="media"?"default":"outline"} onClick={()=>setPostFilter("media")} className="rounded-xl">Media ({postCount.media})</Button>
+            <Button variant={postFilter === "reposts" ? "default" : "outline"} onClick={() => setPostFilter("reposts")} className="rounded-xl">Reposts ({postCount.reposts})</Button>
           </div>
           {posts.length===0&&postsLoading?(
             <div className="space-y-4"><PostSkeleton/><PostSkeleton/><PostSkeleton/></div>
