@@ -21,7 +21,7 @@ interface PostCardProps {
     id: string; content: string; created_at: string;
     media_urls?: string[]; media_types?: string[];
     profiles: { id: string; full_name: string; avatar_url?: string; role: string };
-    likes: any[]; repost_of_id?: string | null; quoted_post?: any;
+    likes: any[]; reposts: any[]; quote_reposts: any[]; repost_of_id?: string | null; quoted_post?: any;
   };
   currentUserId?: string; onLike?: () => void; onPostUpdated?: () => void; onPostDeleted?: () => void;
 }
@@ -65,6 +65,7 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }:
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [isReposted, setIsReposted] = useState(false);
+  const [repostCount, setRepostCount] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -85,7 +86,10 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }:
   useEffect(() => {
     if (currentUserId) { setIsLiked(post.likes.some((l) => l.user_id === currentUserId)); checkRepost(); }
     setLikeCount(post.likes.length);
-  }, [post.likes, currentUserId]);
+    const simpleReposts = post.reposts?.[0]?.count ?? 0;
+    const quoteReposts = post.quote_reposts?.[0]?.count ?? 0;
+    setRepostCount(simpleReposts + quoteReposts);
+  }, [post.likes, post.reposts, post.quote_reposts, currentUserId]);
 
   const checkRepost = async () => {
     if (!currentUserId) return;
@@ -109,26 +113,28 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }:
 
   const handleSimpleRepost = async () => {
     if (!currentUserId) return toast.error("Silakan login terlebih dahulu");
+    if (isOwnPost) return toast.error("Tidak dapat me-repost postingan sendiri");
     setIsReposting(true);
     try {
       if (isReposted) {
         const { error } = await supabase.from("reposts").delete().eq("user_id", currentUserId).eq("post_id", post.id);
-        if (error) throw error; setIsReposted(false); toast.success("Repost dibatalkan");
+        if (error) throw error; setIsReposted(false); setRepostCount((v) => v - 1); toast.success("Repost dibatalkan");
       } else {
         const { error } = await supabase.from("reposts").insert({ user_id: currentUserId, post_id: post.id });
-        if (error) throw error; setIsReposted(true); toast.success("Berhasil di-repost!");
+        if (error) throw error; setIsReposted(true); setRepostCount((v) => v + 1); toast.success("Berhasil di-repost!");
       }
     } catch (e: any) { toast.error(e.message); } finally { setIsReposting(false); }
   };
 
   const handleQuoteRepost = async () => {
     if (!currentUserId) return toast.error("Silakan login terlebih dahulu");
+    if (isOwnPost) return toast.error("Tidak dapat me-repost postingan sendiri");
     if (!quoteContent.trim()) return toast.error("Caption tidak boleh kosong");
     setIsReposting(true);
     try {
       const { error } = await supabase.from("posts").insert({ user_id: currentUserId, content: quoteContent.trim(), repost_of_id: post.id });
       if (error) throw error;
-      toast.success("Postingan berhasil di-quote!"); setShowQuoteModal(false); setQuoteContent(""); onPostUpdated?.();
+      setRepostCount((v) => v + 1); toast.success("Postingan berhasil di-quote!"); setShowQuoteModal(false); setQuoteContent(""); onPostUpdated?.();
     } catch (e: any) { toast.error(e.message); } finally { setIsReposting(false); }
   };
 
@@ -261,8 +267,9 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }:
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className={`gap-2 ${isReposted ? "text-green-500" : "text-muted-foreground"} hover:text-green-500`}>
+                <Button variant="ghost" size="sm" className={`gap-2 ${isReposted ? "text-green-500" : "text-muted-foreground"} ${!isOwnPost ? "hover:text-green-500" : ""}`} disabled={isOwnPost} title={isOwnPost ? "Tidak dapat me-repost postingan sendiri" : "Repost"}>
                   <Repeat2 className="h-5 w-5" />
+                  {repostCount > 0 && <span>{repostCount}</span>}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
