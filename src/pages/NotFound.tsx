@@ -7,7 +7,7 @@ export default function NotFound() {
   useEffect(()=>{ console.error("404:", pathname); document.title="404 • Halaman tidak ditemukan"; },[pathname]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(ellipse_at_top_left,theme(colors.primary/10),transparent_50%),radial-gradient(ellipse_at_bottom_right,theme(colors.accent/10),transparent_50%)] p-6">
+    <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(ellipse_at_top_left,_hsl(var(--primary)/0.1),_transparent_50%),radial-gradient(ellipse_at_bottom_right,_hsl(var(--accent)/0.1),_transparent_50%)] p-6">
       <div className="relative w-full max-w-xl">
         <div className="absolute -inset-1 rounded-3xl bg-gradient-to-br from-primary/20 via-accent/20 to-muted/20 blur-2xl" />
         <div className="relative w-full rounded-3xl border border-border/60 bg-card/70 backdrop-blur-xl shadow-xl p-8">
