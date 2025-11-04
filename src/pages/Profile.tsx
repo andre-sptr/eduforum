@@ -42,7 +42,7 @@ const Profile=()=> {
   const [followersHasMore,setFollowersHasMore]=useState(true);
   const [followingHasMore,setFollowingHasMore]=useState(true);
   const [followingIds,setFollowingIds]=useState<Set<string>>(new Set());
-  const [viewerOpen,setViewerOpen]=useState(false); // NEW
+  const [viewerOpen,setViewerOpen]=useState(false);
 
   const getInitials=(n:string)=>{ const a=n.split(" "); return a.length>=2?(a[0][0]+a[1][0]).toUpperCase():n.slice(0,2).toUpperCase(); };
   const getRoleBadgeColor=(r:string)=> r==="siswa"?"bg-blue-500/20 text-blue-400":r==="guru"?"bg-green-500/20 text-green-400":r==="alumni"?"bg-purple-500/20 text-purple-400":"bg-muted text-muted-foreground";

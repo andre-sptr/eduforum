@@ -61,7 +61,6 @@ const TicTacToe = ({ currentUserId, onScoreSubmit }: TicTacToeProps) => {
   const findMatch = async () => {
     setIsSearching(true);
     try {
-      // Join matchmaking queue
       const { data: queueEntry, error: queueError } = await supabase
         .from("matchmaking_queue")
         .insert({ user_id: currentUserId, game_type: "tictactoe" })
@@ -70,7 +69,6 @@ const TicTacToe = ({ currentUserId, onScoreSubmit }: TicTacToeProps) => {
 
       if (queueError) throw queueError;
 
-      // Look for waiting opponent
       const { data: waitingSessions } = await supabase
         .from("game_sessions")
         .select("*")
@@ -82,7 +80,6 @@ const TicTacToe = ({ currentUserId, onScoreSubmit }: TicTacToeProps) => {
         .single();
 
       if (waitingSessions) {
-        // Join existing session
         const { data: updated, error: updateError } = await supabase
           .from("game_sessions")
           .update({
@@ -107,7 +104,6 @@ const TicTacToe = ({ currentUserId, onScoreSubmit }: TicTacToeProps) => {
         setIsMyTurn(false);
         toast.success("Lawan ditemukan!");
       } else {
-        // Create new session
         const { data: newSession, error: sessionError } = await supabase
           .from("game_sessions")
           .insert({
@@ -123,7 +119,6 @@ const TicTacToe = ({ currentUserId, onScoreSubmit }: TicTacToeProps) => {
         setGameSession(newSession);
         setMySymbol("X");
 
-        // Wait for opponent
         const channel = supabase
           .channel("matchmaking:tictactoe")
           .on(

@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { z } from "zod";
 
-// Skema validasi untuk password baru
 const updatePasswordSchema = z
   .object({
     password: z.string().min(6, "Password minimal harus 6 karakter"),
@@ -18,7 +17,7 @@ const updatePasswordSchema = z
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Password tidak cocok",
-    path: ["confirmPassword"], // Menampilkan error di field konfirmasi
+    path: ["confirmPassword"],
   });
 
 const UpdatePassword = () => {
@@ -31,7 +30,6 @@ const UpdatePassword = () => {
     e.preventDefault();
     setLoading(true);
 
-    // 1. Validasi input menggunakan Zod
     try {
       updatePasswordSchema.parse({ password, confirmPassword });
     } catch (error: any) {
@@ -44,9 +42,7 @@ const UpdatePassword = () => {
       return;
     }
 
-    // 2. Update password di Supabase
     try {
-      // Supabase client otomatis menggunakan sesi dari token di URL
       const { error } = await supabase.auth.updateUser({
         password: password,
       });
@@ -54,7 +50,7 @@ const UpdatePassword = () => {
       if (error) throw error;
 
       toast.success("Password berhasil diperbarui! Silakan login kembali.");
-      navigate("/auth"); // Arahkan ke halaman login
+      navigate("/auth"); 
     } catch (error: any) {
       toast.error(error.message || "Gagal memperbarui password");
     } finally {
@@ -62,7 +58,6 @@ const UpdatePassword = () => {
     }
   };
 
-  // Kelas styling konsisten dari Auth.tsx
   const inputCls = "bg-input/60 border-border focus-visible:ring-2 focus-visible:ring-accent";
   const btnCls = "w-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg";
 

@@ -10,6 +10,17 @@ import PostSkeleton from "@/components/PostSkeleton";
 import Leaderboard from "@/components/Leaderboard";
 import { toast } from "sonner";
 
+const postSelect =
+  `
+  id, content, created_at, updated_at, media_urls, media_types, user_id,
+  profiles ( id, full_name, avatar_url, role ),
+  likes ( user_id, post_id ),
+  quoted_post:repost_of_id (
+    id, content, created_at,
+    profiles ( id, full_name, avatar_url, role )
+  )
+`.trim();
+
 const Index = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
@@ -24,6 +35,12 @@ const Index = () => {
   const observerRef = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { navigate("/auth"); return; }
+      setUser(user);
+      await loadUserData(user.id);
+    };
     checkUser();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT") navigate("/auth");
@@ -41,53 +58,61 @@ const Index = () => {
     return () => { supabase.removeChannel(channel); };
   }, [user]);
 
-  const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { navigate("/auth"); return; }
-    setUser(user); await loadUserData(user.id);
-  };
-
-  const loadUserData = async (userId: string) => {
+  const loadUserData = useCallback(async (userId: string) => {
     try {
       const { data: profileData, error: profileError } = await supabase.from("profiles").select("*").eq("id", userId).single();
       if (profileError) throw profileError;
       setProfile(profileData);
-      await loadPosts();
+      await loadPosts(true);
       await loadTopFollowers();
     } catch (e: any) { toast.error(e.message); } finally { setLoading(false); }
-  };
+  }, []);
 
-  const loadPosts = async (reset = false) => {
+  const loadPosts = useCallback(async (reset = false) => {
     const currentOffset = reset ? 0 : offset;
-    const { data: postsData, error } = await supabase.from("posts").select("*").order("created_at", { ascending: false }).range(currentOffset, currentOffset + 9);
+    const { data: postsData, error } = await supabase
+      .from("posts")
+      .select(`
+        id, content, created_at, media_urls, media_types, user_id,
+        profiles:profiles!user_id ( id, full_name, avatar_url, role ),
+        likes ( user_id, post_id ),
+        quoted_post:repost_of_id (
+          id, content, created_at, user_id,
+          profiles:profiles!user_id ( id, full_name, avatar_url, role )
+        )
+      `)
+      .order("created_at", { ascending: false })
+      .range(currentOffset, currentOffset + 9);
     if (error) { toast.error(error.message); return; }
     if (!postsData || postsData.length === 0) { if (reset) setPosts([]); setHasMore(false); return; }
     setHasMore(postsData.length === 10);
-    const userIds = [...new Set(postsData.map(p => p.user_id))];
-    const { data: profilesData } = await supabase.from("profiles").select("id, full_name, avatar_url, role").in("id", userIds);
-    const postIds = postsData.map(p => p.id);
-    const { data: likesData } = await supabase.from("likes").select("post_id, user_id").in("post_id", postIds);
-    const profilesMap = new Map((profilesData || []).map(p => [p.id, p]));
-    const likesMap = new Map<string, any[]>();
-    (likesData || []).forEach(like => { if (!likesMap.has(like.post_id)) likesMap.set(like.post_id, []); likesMap.get(like.post_id)!.push(like); });
-    const postsWithData = postsData.map(post => ({ ...post, profiles: profilesMap.get(post.user_id), likes: likesMap.get(post.id) || [] }));
-    if (reset) { setPosts(postsWithData); setOffset(10); } else {
-      setPosts(prev => { const map = new Map(prev.map(p => [p.id, p])); postsWithData.forEach(p => map.set(p.id, p)); return Array.from(map.values()); });
+    const postsWithData = postsData;
+    if (reset) { setPosts(postsData); setOffset(10); }
+    else {
+      setPosts(prev => { const map = new Map(prev.map(p => [p.id, p])); postsData.forEach(p => map.set(p.id, p)); return Array.from(map.values()); });
       setOffset(currentOffset + 10);
     }
-  };
+  }, [offset]);
 
-  const refreshOnePost = async (postId: string) => {
+  const refreshOnePost = useCallback(async (postId: string) => {
     try {
-      const { data: p } = await supabase.from("posts").select("*").eq("id", postId).single();
-      if (!p) return;
-      const [{ data: profile }, { data: likes }] = await Promise.all([
-        supabase.from("profiles").select("id, full_name, avatar_url, role").eq("id", p.user_id).single(),
-        supabase.from("likes").select("post_id, user_id").eq("post_id", postId),
-      ]);
-      setPosts(prev => prev.map(x => x.id === postId ? { ...p, profiles: profile, likes: likes || [] } : x));
+      const { data: p, error } = await supabase
+        .from("posts")
+        .select(`
+          id, content, created_at, media_urls, media_types, user_id,
+          profiles:profiles!user_id ( id, full_name, avatar_url, role ),
+          likes ( user_id, post_id ),
+          quoted_post:repost_of_id (
+            id, content, created_at, user_id,
+            profiles:profiles!user_id ( id, full_name, avatar_url, role )
+          )
+        `)
+        .eq("id", postId)
+        .single();
+      if (error) throw error;
+      if (p) setPosts(prev => prev.map(x => x.id === postId ? p : x));
     } catch {}
-  };
+  }, []);
 
   const loadMorePosts = useCallback(async () => {
     if (loadingMore || !hasMore) return;
@@ -96,7 +121,7 @@ const Index = () => {
     await loadPosts(false);
     setLoadingMore(false);
     if (observerRef.current && observerTarget.current) observerRef.current.observe(observerTarget.current);
-  }, [loadingMore, hasMore, offset]);
+  }, [loadingMore, hasMore, offset, loadPosts]);
 
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect();
@@ -107,7 +132,7 @@ const Index = () => {
     const el = observerTarget.current;
     if (el) observerRef.current.observe(el);
     return () => observerRef.current?.disconnect();
-  }, [hasMore, loadMorePosts]);
+  }, [hasMore, loadMorePosts, loadingMore]);
 
   useEffect(() => {
     const ensureFill = () => {
@@ -118,8 +143,8 @@ const Index = () => {
     ensureFill();
   }, [posts, hasMore, loadingMore, loadMorePosts]);
 
-  const refreshPosts = async () => { setOffset(0); setHasMore(true); await loadPosts(true); };
-  const loadTopFollowers = async () => { const { data, error } = await supabase.rpc("get_top_5_followers"); if (error) { toast.error(error.message); return; } setTopFollowers(data || []); };
+  const refreshPosts = useCallback(async () => { setOffset(0); setHasMore(true); await loadPosts(true); }, [loadPosts]);
+  const loadTopFollowers = useCallback(async () => { const { data, error } = await supabase.rpc("get_top_5_followers"); if (error) { toast.error(error.message); return; } setTopFollowers(data || []); }, []);
 
   if (loading) return (
     <div className="min-h-screen grid place-items-center bg-gradient-to-b from-background to-muted/40">
@@ -148,13 +173,17 @@ const Index = () => {
             {profile && <div className="rounded-2xl bg-card shadow-xl border border-border p-2"><CreatePost currentUser={profile} onPostCreated={refreshPosts} /></div>}
             <div className="rounded-2xl bg-card shadow-xl border border-border">
               <div className="p-4 space-y-4">
-                {loading ? (<><PostSkeleton /><PostSkeleton /><PostSkeleton /></>) : posts.length === 0 ? (
+                {loading ? (
+                  <>
+                    <PostSkeleton /><PostSkeleton /><PostSkeleton />
+                  </>
+                ) : posts.length === 0 ? (
                   <div className="text-center py-12"><p className="text-muted-foreground">Belum ada postingan</p></div>
                 ) : (
                   <>
                     {posts.map(post => (
                       <PostCard
-                        key={`${post.id}-${post.updated_at ?? post.created_at}`}
+                        key={`${post.id}-${post.created_at}`}
                         post={post}
                         currentUserId={user?.id}
                         onLike={() => refreshOnePost(post.id)}
