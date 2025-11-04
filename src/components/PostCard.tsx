@@ -47,10 +47,12 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }:
   return (
     <Card className="rounded-2xl border border-border bg-card/80 p-5 shadow hover:shadow-lg transition">
       <div className="flex gap-4">
-        <Avatar className="h-12 w-12 border border-border/60">
-          <AvatarImage src={post.profiles.avatar_url} />
-          <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(post.profiles.full_name)}</AvatarFallback>
-        </Avatar>
+        <Link to={`/profile/${post.profiles.id}`}>
+          <Avatar className="h-12 w-12 border border-border/60">
+            <AvatarImage src={post.profiles.avatar_url} />
+            <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(post.profiles.full_name)}</AvatarFallback>
+          </Avatar>
+        </Link>
         <div className="flex-1">
           <div className="mb-2 flex items-center gap-2">
             <Link to={`/profile/${post.profiles.id}`} className="rounded-xl px-2 py-1 font-semibold hover:bg-accent/10 transition">

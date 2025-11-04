@@ -166,10 +166,12 @@ const Chat = () => {
                     {grouped ? (
                       <div className="h-8 w-8 opacity-0 pointer-events-none" />
                     ) : (
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={m.profiles?.avatar_url||undefined}/>
-                        <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(m.profiles?.full_name||"U")}</AvatarFallback>
-                      </Avatar>
+                      <Link to={`/profile/${m.user_id}`}>
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={m.profiles?.avatar_url||undefined}/>
+                          <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(m.profiles?.full_name||"U")}</AvatarFallback>
+                        </Avatar>
+                      </Link>
                     )}
 
                     <div className={`max-w-[72%] ${mine?"items-end text-right":"items-start"} flex flex-col`}>
@@ -216,7 +218,7 @@ const Chat = () => {
                 <Input value={newMessage} onChange={e=>setNewMessage(e.target.value)} placeholder="Ketik pesan..." className="flex-1 rounded-xl" disabled={sending}
                   onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleSendMessage(e as any); } }}/>
               ):(
-                <MentionInput value={newMessage} onChange={setNewMessage} placeholder="Ketik pesan... (gunakan @ untuk mention)" className="flex-1 rounded-xl" disabled={sending}
+                <MentionInput value={newMessage} onChange={setNewMessage} placeholder="Ketik pesan..." className="flex-1 rounded-xl" disabled={sending}
                   currentUserId={currentUser?.id} allowedUserIds={conversation?.type==="group"?groupMembers:undefined}
                   onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleSendMessage(e as any); } }}/>
               )}
