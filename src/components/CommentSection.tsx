@@ -10,6 +10,7 @@ import { id } from "date-fns/locale";
 import { z } from "zod";
 import { MentionInput } from "./MentionInput";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Link } from "react-router-dom";
 
 const commentSchema = z.object({ content: z.string().trim().min(1,"Comment cannot be empty").max(1000,"Comment is too long (max 1000 characters)") });
 
@@ -84,15 +85,17 @@ const CommentSection = ({ postId, currentUserId }: Props) => {
     return (
       <div key={c.id} className={`${depth>0?"ml-12 mt-3":"mt-4"}`}>
         <div className="flex gap-3">
-          <Avatar className="h-8 w-8 ring-1 ring-border">
-            <AvatarImage src={c.profiles.avatar_url} />
-            <AvatarFallback className="bg-primary text-primary-foreground">{getInitials(c.profiles.full_name)}</AvatarFallback>
-          </Avatar>
+          <Link to={`/profile/${c.user_id}`}>
+            <Avatar className="h-8 w-8 ring-1 ring-border">
+              <AvatarImage src={c.profiles.avatar_url} />
+              <AvatarFallback className="bg-primary text-primary-foreground">{getInitials(c.profiles.full_name)}</AvatarFallback>
+            </Avatar>
+          </Link>
           <div className="flex-1">
             <div className="rounded-xl border border-border bg-card/60 p-3">
               <div className="mb-1 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold">{c.profiles.full_name}</span>
+                  <Link to={`/profile/${c.user_id}`}><span className="text-sm font-semibold">{c.profiles.full_name}</span></Link>
                   <span className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(c.created_at),{addSuffix:true,locale:id})}</span>
                 </div>
                 {isOwner&&!isEditing&&(
