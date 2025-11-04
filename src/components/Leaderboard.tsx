@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { TrendingUp, Trophy, Medal, Award, FileText } from "lucide-react";
+import { TrendingUp, Trophy, Medal, Award, FileText, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
@@ -11,8 +11,16 @@ interface LeaderboardUser {
   follower_count: number;
 }
 
+interface LeaderboardLikeUser {
+  id: string;
+  full_name: string;
+  avatar_url?: string;
+  total_likes: number;
+}
+
 interface LeaderboardProps {
   users: LeaderboardUser[];
+  likedUsers: LeaderboardLikeUser[];
 }
 
 const freeTools = [
@@ -40,7 +48,7 @@ const getRankIcon = (index: number) => {
   return rankIcons[index] ?? <span className="text-muted-foreground font-bold">#{index + 1}</span>;
 };
 
-const Leaderboard = ({ users }: LeaderboardProps) => {
+const Leaderboard = ({ users, likedUsers }: LeaderboardProps) => { 
   const navigate = useNavigate();
 
   return (
@@ -94,7 +102,7 @@ const Leaderboard = ({ users }: LeaderboardProps) => {
             Leaderboard
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-4">
           {users.length === 0 ? (
             <p className="text-muted-foreground text-sm text-center py-4">
               Belum ada data
@@ -119,6 +127,46 @@ const Leaderboard = ({ users }: LeaderboardProps) => {
                   <p className="font-semibold text-foreground truncate">{user.full_name}</p>
                   <p className="text-sm text-muted-foreground">
                     {user.follower_count} followers
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="bg-card border-border">
+        <CardHeader className="border-b border-border">
+          <CardTitle className="text-xl flex items-center gap-2">
+            <Heart className="h-5 w-5 text-red-500" />
+            Top Likes
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-4">
+          {likedUsers.length === 0 ? (
+            <p className="text-muted-foreground text-sm text-center py-4">
+              Belum ada data
+            </p>
+          ) : (
+            likedUsers.map((user, index) => (
+              <div
+                key={user.id}
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-[var(--transition-smooth)] cursor-pointer"
+                onClick={() => navigate(`/profile/${user.id}`)}
+              >
+                <div className="flex-shrink-0 w-6">{getRankIcon(index)}</div>
+                
+                <Avatar className="h-10 w-10 border-2 border-accent/20">
+                  <AvatarImage src={user.avatar_url} />
+                  <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
+                    {getInitials(user.full_name)}
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-foreground truncate">{user.full_name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {user.total_likes} likes
                   </p>
                 </div>
               </div>

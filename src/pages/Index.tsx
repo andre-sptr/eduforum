@@ -27,6 +27,7 @@ const Index = () => {
   const [profile, setProfile] = useState<any>(null);
   const [posts, setPosts] = useState<any[]>([]);
   const [topFollowers, setTopFollowers] = useState<any[]>([]);
+  const [topLiked, setTopLiked] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -65,6 +66,7 @@ const Index = () => {
       setProfile(profileData);
       await loadPosts(true);
       await loadTopFollowers();
+      await loadTopLiked();
     } catch (e: any) { toast.error(e.message); } finally { setLoading(false); }
   }, []);
 
@@ -149,6 +151,14 @@ const Index = () => {
 
   const refreshPosts = useCallback(async () => { setOffset(0); setHasMore(true); await loadPosts(true); }, [loadPosts]);
   const loadTopFollowers = useCallback(async () => { const { data, error } = await supabase.rpc("get_top_5_followers"); if (error) { toast.error(error.message); return; } setTopFollowers(data || []); }, []);
+  const loadTopLiked = async () => {
+    const { data, error } = await supabase.rpc("get_top_5_liked_users");
+    if (error) { 
+      toast.error(error.message); 
+      return; 
+    }
+    setTopLiked(data || []);
+  };
 
   if (loading) return (
     <div className="min-h-screen grid place-items-center bg-gradient-to-b from-background to-muted/40">
@@ -207,7 +217,7 @@ const Index = () => {
 
           <aside className="lg:col-span-3">
             <div className="rounded-2xl bg-card shadow-xl border border-border p-2">
-              <Leaderboard users={topFollowers} />
+              <Leaderboard users={topFollowers} likedUsers={topLiked} />
             </div>
           </aside>
         </div>
