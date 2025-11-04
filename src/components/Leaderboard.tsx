@@ -48,6 +48,43 @@ const getRankIcon = (index: number) => {
   return rankIcons[index] ?? <span className="text-muted-foreground font-bold">#{index + 1}</span>;
 };
 
+const rankConfig = {
+  follower: [
+    {},
+    { icon: Trophy, style: "bg-accent text-accent-foreground ring-accent/50", text: "Top #1 Follower" },
+    { icon: Medal, style: "bg-gray-400 text-gray-900 ring-gray-400/50", text: "Top #2 Follower" },
+    { icon: Award, style: "bg-amber-600 text-white ring-amber-600/50", text: "Top #3 Follower" }
+  ],
+  like: [
+    {},
+    { icon: Heart, style: "bg-red-500 text-white ring-red-500/50 fill-current", text: "Top #1 Likes" },
+    { icon: Heart, style: "bg-gray-400 text-gray-900 ring-gray-400/50", text: "Top #2 Likes" },
+    { icon: Heart, style: "bg-amber-600 text-white ring-amber-600/50", text: "Top #3 Likes" }
+  ]
+};
+
+const RankBadge = ({ rank, type }: { rank: number | null, type: "follower" | "like" }) => {
+  if (!rank || rank < 1 || rank > 3) return null;
+  const { icon: Icon, style, text } = rankConfig[type][rank];
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger>
+          <div
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold ring-2 ${style}`}
+          >
+            <Icon className="h-3 w-3" />
+            <span>#{rank}</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{text}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
+
 const Leaderboard = ({ users, likedUsers }: LeaderboardProps) => { 
   const navigate = useNavigate();
 
@@ -124,7 +161,10 @@ const Leaderboard = ({ users, likedUsers }: LeaderboardProps) => {
                 </Avatar>
 
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-foreground truncate">{user.full_name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-foreground truncate">{user.full_name}</p>
+                    <RankBadge rank={index + 1} type="follower" />
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     {user.follower_count} followers
                   </p>
@@ -164,7 +204,10 @@ const Leaderboard = ({ users, likedUsers }: LeaderboardProps) => {
                 </Avatar>
 
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-foreground truncate">{user.full_name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-foreground truncate">{user.full_name}</p>
+                    <RankBadge rank={index + 1} type="like" />
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     {user.total_likes} likes
                   </p>

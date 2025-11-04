@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar,AvatarFallback,AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft,Settings,UserPlus,UserMinus,MessageCircle, Maximize2 } from "lucide-react";
+import { ArrowLeft, Settings, UserPlus, UserMinus, MessageCircle, Maximize2, Heart, Trophy, Medal, Award } from "lucide-react";
 import { toast } from "sonner";
 import PostCard from "@/components/PostCard";
 import PostSkeleton from "@/components/PostSkeleton";
 import { Dialog,DialogContent,DialogDescription,DialogHeader,DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type PostFilter = "all" | "reposts" | "media" | "text";
 const POSTS_PROFILES_FK="posts_user_id_fkey";
@@ -53,6 +54,8 @@ const Profile=()=> {
   const [followingHasMore,setFollowingHasMore]=useState(true);
   const [followingIds,setFollowingIds]=useState<Set<string>>(new Set());
   const [viewerOpen,setViewerOpen]=useState(false);
+  const [followerRank, setFollowerRank] = useState<number | null>(null);
+  const [likerRank, setLikerRank] = useState<number | null>(null);
 
   const getInitials=(n:string)=>{ const a=n.split(" "); return a.length>=2?(a[0][0]+a[1][0]).toUpperCase():n.slice(0,2).toUpperCase(); };
   const getRoleBadgeColor=(r:string)=> r==="siswa"?"bg-blue-500/20 text-blue-400":r==="guru"?"bg-green-500/20 text-green-400":r==="alumni"?"bg-purple-500/20 text-purple-400":"bg-muted text-muted-foreground";
@@ -83,17 +86,26 @@ const Profile=()=> {
     try{
       const { data:{ user } }=await supabase.auth.getUser(); if(!user){ navigate("/auth"); return; }
       setCurrentUser(user); const pid=userId||user.id;
-      const [{ data:profileData,error:pe },{ data:followData },followersRes,followingRes,myFollowingList]=await Promise.all([
+      const [{ data:profileData,error:pe },{ data:followData },followersRes,followingRes,myFollowingList,{ data: topFollowersData, error: tfError },{ data: topLikedData, error: tlError }]=await Promise.all([
         supabase.from("profiles").select("*").eq("id",pid).single(),
         pid!==user.id?supabase.from("follows").select("*").eq("follower_id",user.id).eq("following_id",pid).maybeSingle():Promise.resolve({ data:null }),
         supabase.from("follows").select("*",{ count:"exact",head:true }).eq("following_id",pid),
         supabase.from("follows").select("*",{ count:"exact",head:true }).eq("follower_id",pid),
-        supabase.from("follows").select("following_id").eq("follower_id",user.id)
+        supabase.from("follows").select("following_id").eq("follower_id",user.id),
+        supabase.rpc("get_top_5_followers"),supabase.rpc("get_top_5_liked_users")
       ]);
       if(pe) throw pe;
       setProfile(profileData); setIsFollowing(!!followData);
       setFollowerCount(followersRes.count||0); setFollowingCount(followingRes.count||0);
       setFollowingIds(new Set((myFollowingList.data||[]).map((r:any)=>r.following_id)));
+      if (!tfError && topFollowersData) {
+        const rankIndex = topFollowersData.slice(0, 3).findIndex((u: any) => u.id === pid);
+        setFollowerRank(rankIndex !== -1 ? rankIndex + 1 : null);
+      }
+      if (!tlError && topLikedData) {
+        const rankIndex = topLikedData.slice(0, 3).findIndex((u: any) => u.id === pid);
+        setLikerRank(rankIndex !== -1 ? rankIndex + 1 : null);
+      }
       await loadPostCounts(pid);
     }catch(e:any){ toast.error(e.message); }finally{ setLoading(false); }
   };
@@ -119,18 +131,15 @@ const Profile=()=> {
       let finalHasMore = true;
 
       if (postFilter === "reposts") {
-        // --- LOGIKA BARU UNTUK TAB REPOSTS ---
-        
-        // 1. Ambil Quote Reposts (Postingan oleh user ini yang me-refer post lain)
+
         const { data: quotePosts } = await supabase
           .from("posts")
-          .select(POST_SELECT) // POST_SELECT sudah berisi 'quoted_post'
+          .select(POST_SELECT) 
           .eq("user_id", profile.id)
           .not("repost_of_id", "is", null)
           .order("created_at", { ascending: false })
-          .range(from, to); // (Paginasi sederhana, mungkin tidak akurat jika digabung)
+          .range(from, to);
 
-        // 2. Ambil Simple Reposts (Postingan orang lain yang di-repost user ini)
         const { data: simpleReposts } = await supabase
           .from("reposts")
           .select(`
@@ -143,24 +152,20 @@ const Profile=()=> {
           .order("created_at", { ascending: false })
           .range(from, to);
 
-        // 3. Format dan Gabungkan data
         const quotes = quotePosts || [];
         const simples = (simpleReposts || []).map((r: any) => ({
           ...r.post,
-          reposted_by_user: profile, // Info siapa yang me-repost
-          created_at: r.created_at, // Gunakan tanggal repost untuk pengurutan
+          reposted_by_user: profile,
+          created_at: r.created_at, 
         }));
 
-        // Gabungkan, urutkan berdasarkan tanggal repost/quote, dan potong
         finalData = [...quotes, ...simples]
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
           .slice(0, POSTS_PAGE_SIZE); 
 
-        // Paginasi gabungan sederhana (tidak sempurna, tapi cukup baik)
         finalHasMore = (quotes.length + simples.length) > 0; 
         
       } else {
-        // --- LOGIKA LAMA UNTUK TAB "ALL", "MEDIA", "TEXT" ---
         const { data, error } = await basePostQuery(profile.id).range(from, to);
         if (error) throw error;
         finalData = data || [];
@@ -274,6 +279,8 @@ const Profile=()=> {
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
                 <h2 className="text-2xl font-bold">{profile.full_name}</h2>
+                <RankBadge rank={followerRank} type="follower" />
+                <RankBadge rank={likerRank} type="like" />
                 <span className={`text-sm px-3 py-1 rounded-full ${getRoleBadgeColor(profile.role)}`}>{profile.role?.[0]?.toUpperCase()+profile.role?.slice(1)}</span>
               </div>
               {profile.bio&&<p className="text-muted-foreground mb-4">{profile.bio}</p>}
@@ -363,7 +370,6 @@ const Profile=()=> {
         </DialogContent>
       </Dialog>
 
-      {/* Viewer foto profil ukuran penuh */}
       <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden">
           <DialogHeader className="px-6 pt-6"><DialogTitle>Foto Profil</DialogTitle></DialogHeader>
@@ -379,3 +385,42 @@ const Profile=()=> {
 };
 
 export default Profile;
+
+const rankConfig = {
+  follower: [
+    {},
+    { icon: Trophy, style: "bg-accent text-accent-foreground ring-accent/50", text: "Top #1 Follower" }, 
+    { icon: Medal, style: "bg-gray-400 text-gray-900 ring-gray-400/50", text: "Top #2 Follower" }, 
+    { icon: Award, style: "bg-amber-600 text-white ring-amber-600/50", text: "Top #3 Follower" } 
+  ],
+  like: [
+    {},
+    { icon: Heart, style: "bg-red-500 text-white ring-red-500/50 fill-current", text: "Top #1 Likes" }, 
+    { icon: Heart, style: "bg-gray-400 text-gray-900 ring-gray-400/50", text: "Top #2 Likes" },  
+    { icon: Heart, style: "bg-amber-600 text-white ring-amber-600/50", text: "Top #3 Likes" }  
+  ]
+};
+
+const RankBadge = ({ rank, type }: { rank: number | null, type: "follower" | "like" }) => {
+  if (!rank || rank < 1 || rank > 3) return null;
+
+  const { icon: Icon, style, text } = rankConfig[type][rank];
+
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger>
+          <div
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-bold ring-2 ${style}`}
+          >
+            <Icon className="h-3 w-3" />
+            <span>#{rank}</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{text}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
