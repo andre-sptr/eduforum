@@ -28,7 +28,7 @@ export const ContentRenderer = ({ content, className }: ContentRendererProps) =>
         <Link
           key={i}
           to={`/profile/${id}`}
-          className="text-primary font-semibold hover:underline"
+          className="text-primary font-semibold"
           onClick={(e) => e.stopPropagation()}
         >
           @{name}

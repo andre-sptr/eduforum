@@ -33,6 +33,7 @@ interface PostCardProps {
   onPostDeleted?: () => void;
   topFollowers?: any[];
   topLiked?: any[];
+  allowedUserIds?: string[];
 }
 
 interface QuotedPostProps {
@@ -70,7 +71,7 @@ const QuotedPostCard = ({ post }: QuotedPostProps) => {
   );
 };
 
-const PostCard = ({ post, postType = "global", currentUserId, onLike, onPostUpdated, onPostDeleted, topFollowers, topLiked }: PostCardProps) => {
+const PostCard = ({ post, postType = "global", currentUserId, onLike, onPostUpdated, onPostDeleted, topFollowers, topLiked, allowedUserIds }: PostCardProps) => {
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [isReposted, setIsReposted] = useState(false);
@@ -329,7 +330,7 @@ const PostCard = ({ post, postType = "global", currentUserId, onLike, onPostUpda
             <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-accent" onClick={handleShare}><Share2 className="h-5 w-5" /></Button>
           </div>
 
-          <CommentSection postId={post.id} currentUserId={currentUserId} postType={postType} />
+          <CommentSection postId={post.id} currentUserId={currentUserId} postType={postType} allowedUserIds={allowedUserIds}/>
         </div>
       </div>
 

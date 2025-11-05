@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { RankBadge } from "@/components/RankBadge";
 import { Input } from "@/components/ui/input";
+// Impor MentionInput
+import { MentionInput } from "@/components/MentionInput";
 
 const getInitials = (n: string) => {
   const a = n.split(" ");
@@ -47,6 +49,9 @@ const GroupDetail = () => {
 
   const followerRankMap = useMemo(() => new Map(topFollowers.slice(0, 3).map((u, i) => [u.id, i + 1])), [topFollowers]);
   const likerRankMap = useMemo(() => new Map(topLiked.slice(0, 3).map((u, i) => [u.id, i + 1])), [topLiked]);
+  
+  // Buat daftar ID anggota untuk difilter di MentionInput
+  const memberIds = useMemo(() => members.map(m => m.user_id), [members]);
 
   const loadGroupData = async (userId: string) => {
     try {
@@ -388,7 +393,28 @@ const GroupDetail = () => {
 
           <main className="space-y-6">
             {group.description && (<Card className="border-border bg-card/60 p-5"><p className="text-sm leading-relaxed text-foreground/90">{group.description}</p></Card>)}
-            {isMember && (<Card className="border-border bg-card/60 p-5"><Textarea value={newPostContent} onChange={e => setNewPostContent(e.target.value)} placeholder="Bagikan sesuatu dengan grup..." className="mb-3 min-h-[110px] resize-none rounded-xl bg-input/60" /><MediaUploader onMediaChange={setMediaFiles} /><div className="mt-4 flex justify-end"><Button onClick={handleCreatePost} disabled={posting || (!newPostContent.trim() && mediaFiles.length === 0)} className="rounded-xl bg-accent text-accent-foreground hover:bg-accent/90"><Send className="mr-2 h-4 w-4" />{posting ? "Memposting..." : "Posting"}</Button></div></Card>)}
+            
+            {/* GANTI DARI TEXTAREA KE MENTIONINPUT */}
+            {isMember && (
+              <Card className="border-border bg-card/60 p-5">
+                <MentionInput 
+                  value={newPostContent} 
+                  onChange={setNewPostContent} 
+                  placeholder="Bagikan sesuatu dengan grup..." 
+                  className="mb-3 min-h-[110px] resize-none rounded-xl bg-input/60"
+                  multiline
+                  currentUserId={currentUser?.id}
+                  allowedUserIds={memberIds}
+                />
+                <MediaUploader onMediaChange={setMediaFiles} />
+                <div className="mt-4 flex justify-end">
+                  <Button onClick={handleCreatePost} disabled={posting || (!newPostContent.trim() && mediaFiles.length === 0)} className="rounded-xl bg-accent text-accent-foreground hover:bg-accent/90">
+                    <Send className="mr-2 h-4 w-4" />{posting ? "Memposting..." : "Posting"}
+                  </Button>
+                </div>
+              </Card>
+            )}
+            
             {posts.length === 0 ? (
               <Card className="grid place-items-center border-border bg-card/60 p-10 text-sm text-muted-foreground">
                 {isMember ? "Belum ada postingan. Jadilah yang pertama!" : "Bergabung untuk melihat postingan"}
@@ -405,6 +431,7 @@ const GroupDetail = () => {
                     topLiked={topLiked}
                     onLike={() => loadPosts(true)}
                     onPostDeleted={() => setPosts(currentPosts => currentPosts.filter(post => post.id !== p.id))}
+                    allowedUserIds={memberIds}
                   />
                 ))}
               </div>

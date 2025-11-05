@@ -16,9 +16,9 @@ import { ContentRenderer } from "@/components/ContentRenderer";
 const commentSchema = z.object({ content: z.string().trim().min(1, "Comment cannot be empty").max(1000, "Comment is too long (max 1000 characters)") });
 
 interface Comment { id: string; content: string; created_at: string; user_id: string; parent_id: string | null; profiles: { id: string; full_name: string; avatar_url?: string; role: string }; replies?: Comment[] }
-interface Props { postId: string; currentUserId?: string; postType: "global" | "group" }
+interface Props { postId: string; currentUserId?: string; postType: "global" | "group"; allowedUserIds?: string[] }
 
-const CommentSection = ({ postId, currentUserId, postType = "global" }: Props) => {
+const CommentSection = ({ postId, currentUserId, postType = "global", allowedUserIds }: Props) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState(""); const [replyTo, setReplyTo] = useState<string | null>(null);
   const [loading, setLoading] = useState(false); const [showComments, setShowComments] = useState(false);
@@ -139,7 +139,7 @@ const CommentSection = ({ postId, currentUserId, postType = "global" }: Props) =
               </div>
               {isEditing ? (
                 <div className="mt-2 space-y-2">
-                  <MentionInput value={editContent} onChange={setEditContent} placeholder="Edit komentar..." className="min-h-[60px] resize-none text-sm" multiline currentUserId={currentUserId} />
+                  <MentionInput value={editContent} onChange={setEditContent} placeholder="Edit komentar..." className="min-h-[60px] resize-none text-sm" multiline currentUserId={currentUserId} allowedUserIds={postType === "group" ? allowedUserIds : undefined}/>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => handleEditComment(c.id)} disabled={loading || !editContent.trim()} className="h-8 px-3 text-xs"><Check className="mr-1 h-3.5 w-3.5" />Simpan</Button>
                     <Button size="sm" variant="outline" onClick={() => { setEditingCommentId(null); setEditContent(""); }} disabled={loading} className="h-8 px-3 text-xs"><X className="mr-1 h-3.5 w-3.5" />Batal</Button>
@@ -180,7 +180,7 @@ const CommentSection = ({ postId, currentUserId, postType = "global" }: Props) =
               </div>
             )}
             <div className="flex gap-2">
-              <MentionInput value={newComment} onChange={setNewComment} placeholder="Tulis komentar..." className="min-h-[60px] flex-1 resize-none text-sm" multiline currentUserId={currentUserId} />
+              <MentionInput value={newComment} onChange={setNewComment} placeholder="Tulis komentar..." className="min-h-[60px] flex-1 resize-none text-sm" multiline currentUserId={currentUserId} allowedUserIds={postType === "group" ? allowedUserIds : undefined}/>
               <Button onClick={handleSubmitComment} disabled={loading || !newComment.trim()} size="icon" className="h-[60px] w-10 self-end rounded-xl bg-accent text-accent-foreground hover:bg-accent/90"><Send className="h-4 w-4" /></Button>
             </div>
           </div>
