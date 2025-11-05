@@ -1,19 +1,20 @@
-// src/pages/Games.tsx
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, Brain, Zap, Target, ArrowLeft, Medal, Award } from "lucide-react";
+import { Trophy, Brain, Zap, Target, ArrowLeft, Medal, Award, Hash, CaseUpper, Scissors } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import QuizGame from "@/components/games/QuizGame";
 import MemoryGame from "@/components/games/MemoryGame";
 import NumberPuzzle from "@/components/games/NumberPuzzle";
-import ColorMatch from "@/components/games/ColorMatch";
 import GameLeaderboard from "@/components/GameLeaderboard";
+import TicTacToe from "@/components/games/TicTacToe";
+import WordScramble from "@/components/games/WordScramble";
+import RockPaperScissors from "@/components/games/RockPaperScissors";
 
 type Profile={id:string;full_name:string;avatar_url?:string|null};
 type ScoreRow={user_id:string;score:number};
@@ -37,13 +38,34 @@ const Games=()=>{
         ?<Award className="h-5 w-5 text-amber-600"/>
         :<span className="font-bold text-muted-foreground">#{i+1}</span>;
 
-  useEffect(()=>{(async()=>{
-    const {data:{user}}=await supabase.auth.getUser();
-    if(!user){navigate("/auth");return}
-    const {data:profile,error}=await supabase.from("profiles").select("id,full_name,avatar_url").eq("id",user.id).single();
-    if(error||!profile){toast.error("Gagal memuat profil");return}
-    setCurrentUser(profile);setLoading(false);
-  })()},[]);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          navigate("/auth");
+          return;
+        }
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("id,full_name,avatar_url")
+          .eq("id", user.id)
+          .single();
+
+        if (error || !profile) {
+          toast.error("Gagal memuat profil");
+          return;
+        }
+        if (alive) setCurrentUser(profile);
+      } catch (e: any) {
+        toast.error(e?.message ?? "Terjadi kesalahan saat memuat profil");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [navigate]);
 
   useEffect(()=>{if(currentUser){fetchUserStats();fetchTopUsers()}},[currentUser?.id]);
 
@@ -116,23 +138,112 @@ const Games=()=>{
 
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <Tabs defaultValue="games" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="games" className="gap-2"><Target className="h-4 w-4"/>Games</TabsTrigger>
-            <TabsTrigger value="leaderboard" className="gap-2"><Trophy className="h-4 w-4"/>Leaderboard</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 mb-6 bg-muted/60 p-1 h-auto rounded-xl">
+            <TabsTrigger value="games" className="gap-2 rounded-lg data-[state=active]:bg-card data-[state=active]:text-accent-foreground data-[state=active]:shadow-md"><Target className="h-4 w-4"/>Games</TabsTrigger>
+            <TabsTrigger value="leaderboard" className="gap-2 rounded-lg data-[state=active]:bg-card data-[state=active]:text-accent-foreground data-[state=active]:shadow-md"><Trophy className="h-4 w-4"/>Leaderboard</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="games" className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              <Card className="bg-card border-border"><CardHeader><CardTitle className="flex items-center gap-2"><Brain className="h-5 w-5 text-primary"/>Quiz Pengetahuan</CardTitle><CardDescription>Uji pengetahuan umum Anda</CardDescription></CardHeader><CardContent><QuizGame onScoreSubmit={s=>handleScoreSubmit("quiz",s)}/></CardContent></Card>
-              <Card className="bg-card border-border"><CardHeader><CardTitle className="flex items-center gap-2"><Zap className="h-5 w-5 text-accent"/>Memory Match</CardTitle><CardDescription>Cocokkan kartu dengan cepat</CardDescription></CardHeader><CardContent><MemoryGame onScoreSubmit={s=>handleScoreSubmit("memory",s)}/></CardContent></Card>
-              <Card className="bg-card border-border"><CardHeader><CardTitle className="flex items-center gap-2"><Target className="h-5 w-5 text-primary"/>Number Puzzle</CardTitle><CardDescription>Susun angka 1-8 berurutan</CardDescription></CardHeader><CardContent><NumberPuzzle onScoreSubmit={s=>handleScoreSubmit("puzzle",s)}/></CardContent></Card>
-              <Card className="bg-card border-border"><CardHeader><CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-accent"/>Color Match</CardTitle><CardDescription>Cocokkan kata dengan warna</CardDescription></CardHeader><CardContent><ColorMatch onScoreSubmit={s=>handleScoreSubmit("color",s)}/></CardContent></Card>
+          <TabsContent value="games" className="space-y-8">
+            
+            <h3 className="text-xl font-semibold text-muted-foreground tracking-tight">Single Player</h3>
+            <div className="grid md:grid-cols-3 gap-6">
+              <Card className="bg-card border-border shadow-sm hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Brain className="h-5 w-5 text-primary"/>Quiz Pengetahuan</CardTitle>
+                  <CardDescription>Uji pengetahuan umum Anda</CardDescription>
+                </CardHeader>
+                <CardContent><QuizGame onScoreSubmit={s=>handleScoreSubmit("quiz",s)}/></CardContent>
+              </Card>
+              <Card className="bg-card border-border shadow-sm hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Zap className="h-5 w-5 text-accent"/>Memory Match</CardTitle>
+                  <CardDescription>Cocokkan kartu dengan cepat</CardDescription>
+                </CardHeader>
+                <CardContent><MemoryGame onScoreSubmit={s=>handleScoreSubmit("memory",s)}/></CardContent>
+              </Card>
+              <Card className="bg-card border-border shadow-sm hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Target className="h-5 w-5 text-primary"/>Number Puzzle</CardTitle>
+                  <CardDescription>Susun angka 1-8 berurutan</CardDescription>
+                </CardHeader>
+                <CardContent><NumberPuzzle onScoreSubmit={s=>handleScoreSubmit("puzzle",s)}/></CardContent>
+              </Card>
             </div>
+
+            <h3 className="text-xl font-semibold text-muted-foreground tracking-tight">Multiplayer (vs)</h3>
+            {currentUser ? (
+              <div className="grid md:grid-cols-3 gap-6">
+                {/* Tic Tac Toe */}
+                <Card className="relative overflow-hidden bg-card text-foreground ring-1 ring-border shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+                  <div className="pointer-events-none absolute inset-0 opacity-50 bg-gradient-to-br from-emerald-500/10 via-transparent to-cyan-500/10" />
+                  <CardHeader className="relative">
+                    <CardTitle className="flex items-center gap-2">
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 ring-1 ring-emerald-500/30">
+                        <Hash className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+                      </span>
+                      Tic Tac Toe
+                    </CardTitle>
+                    <CardDescription className="text-muted-foreground">Lawan pemain lain</CardDescription>
+                  </CardHeader>
+                  <CardContent className="relative">
+                    <TicTacToe currentUserId={currentUser.id} onScoreSubmit={(s)=>handleScoreSubmit("tictactoe", s)} />
+                  </CardContent>
+                </Card>
+
+                {/* Word Scramble */}
+                <Card className="relative overflow-hidden bg-card text-foreground ring-1 ring-border shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+                  <div className="pointer-events-none absolute inset-0 opacity-50 bg-gradient-to-br from-amber-500/10 via-transparent to-rose-500/10" />
+                  <CardHeader className="relative">
+                    <CardTitle className="flex items-center gap-2">
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15 ring-1 ring-amber-500/30">
+                        <CaseUpper className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+                      </span>
+                      Word Scramble
+                    </CardTitle>
+                    <CardDescription className="text-muted-foreground">Tebak kata acak</CardDescription>
+                  </CardHeader>
+                  <CardContent className="relative">
+                    <WordScramble currentUserId={currentUser.id} onScoreSubmit={(s)=>handleScoreSubmit("wordscramble", s)} />
+                  </CardContent>
+                </Card>
+
+                {/* Rock Paper Scissors */}
+                <Card className="relative overflow-hidden bg-card text-foreground ring-1 ring-border shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+                  <div className="pointer-events-none absolute inset-0 opacity-50 bg-gradient-to-br from-indigo-500/10 via-transparent to-fuchsia-500/10" />
+                  <CardHeader className="relative">
+                    <CardTitle className="flex items-center gap-2">
+                      <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/15 ring-1 ring-indigo-500/30">
+                        <Scissors className="h-4 w-4 text-indigo-700 dark:text-indigo-400" />
+                      </span>
+                      Rock Paper Scissors
+                    </CardTitle>
+                    <CardDescription className="text-muted-foreground">Best of 3</CardDescription>
+                  </CardHeader>
+                  <CardContent className="relative">
+                    <RockPaperScissors currentUserId={currentUser.id} onScoreSubmit={(s)=>handleScoreSubmit("rps", s)} />
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-3 gap-6">
+                {Array.from({length:3}).map((_,i)=>(
+                  <Card key={i} className="bg-muted/50 ring-1 ring-border border-none">
+                    <CardHeader>
+                      <CardTitle className="h-6 w-40 bg-muted rounded" />
+                      <CardDescription className="h-4 w-52 bg-muted rounded mt-2" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-24 w-full bg-muted rounded" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
 
             <Card className="bg-card border-border" aria-busy={loadingTop}>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Medal className="h-5 w-5 text-primary"/>Top 5 Pemain</CardTitle>
-                <CardDescription>Pemain dengan rata-rata skor tertinggi</CardDescription>
+                <CardTitle className="flex items-center gap-2"><Medal className="h-5 w-5 text-primary"/>Top 5 Pemain (Skor Rata-rata)</CardTitle>
+                <CardDescription>Pemain dengan rata-rata skor tertinggi di semua game</CardDescription>
               </CardHeader>
               <CardContent>
                 {loadingTop?(
@@ -149,7 +260,7 @@ const Games=()=>{
                 ):topUsers.length>0?(
                   <div className="space-y-3">
                     {topUsers.map(u=>(
-                      <Link key={u.userId} to={`/profile/${u.userId}`} className="flex items-center gap-4 p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors">
+                      <Link key={u.userId} to={`/profile/${u.userId}`} className="flex items-center gap-4 p-3 bg-muted/60 rounded-lg hover:bg-muted/80 transition-colors">
                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">
                           {rankIcon(u.rank-1)}
                         </div>

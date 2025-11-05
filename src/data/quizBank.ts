@@ -5,6 +5,7 @@ export interface QuizQuestion {
 }
 
 export const quizBank: QuizQuestion[] = [
+  // ————— Umum —————
   { question: "Provinsi termuda di Indonesia hasil pemekaran Papua tahun 2022 adalah?", options: ["Papua Barat Daya","Papua Tengah","Papua Pegunungan","Semua benar"], correctAnswer: 3 },
   { question: "Candi Borobudur terletak di provinsi?", options: ["Jawa Tengah","DI Yogyakarta","Jawa Timur","Banten"], correctAnswer: 0 },
   { question: "Sungai terpanjang di Pulau Jawa adalah?", options: ["Brantas","Citarum","Bengawan Solo","Progo"], correctAnswer: 2 },

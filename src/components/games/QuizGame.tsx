@@ -28,7 +28,7 @@ export default function QuizGame({ onScoreSubmit }: Props) {
     return()=>clearTimeout(t);
   },[state,time,show]);
 
-  const start=()=>{ setQuestions(pickRandomQuestions(5)); setState("playing"); setIdx(0); setScore(0); setSel(null); setShow(false); setTime(30); };
+  const start=()=>{ setQuestions(pickRandomQuestions(10)); setState("playing"); setIdx(0); setScore(0); setSel(null); setShow(false); setTime(30); };
 
   const answer=(i:number)=>{ if(show) return; setSel(i); setShow(true); if(i===questions[idx].correctAnswer) setScore(s=>s+10); };
 
@@ -38,9 +38,9 @@ export default function QuizGame({ onScoreSubmit }: Props) {
   };
 
   if(state==="idle") return (
-    <div className="py-8 text-center">
-      <p className="mb-4 text-muted-foreground">Jawab 5 pertanyaan dengan benar!</p>
-      <Button onClick={start} size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90"><Play className="mr-2 h-4 w-4"/>Mulai Quiz</Button>
+    <div className="grid place-items-center gap-4 py-10 text-center">
+      <p className="text-muted-foreground">Jawab 10 pertanyaan dengan benar!</p>
+      <Button onClick={start} size="lg" className="rounded-2xl bg-accent text-accent-foreground hover:bg-accent/90"><Play className="mr-2 h-4 w-4"/>Mulai Quiz</Button>
     </div>
   );
 
