@@ -55,13 +55,13 @@ const GroupDetail=()=> {
 
   const loadGroupData=async(userId:string)=> {
     try{
-      const { data:groupData,error:groupError }=await supabase.from("groups").select(`*,profiles!groups_created_by_fkey(full_name,avatar_url)`).eq("id",groupId).single();
+      const { data:groupData,error:groupError }=await supabase.from("groups").select(`*,profiles!groups_created_by_fkey(id, full_name,avatar_url)`).eq("id",groupId).single();
       if(groupError) throw groupError;
       setGroup(groupData); setEditDesc(groupData?.description||"");
       const { data:memberData }=await supabase.from("group_members").select("*").eq("group_id",groupId).eq("user_id",userId).single();
       setIsMember(!!memberData);
       if(!memberData&&groupData.is_private){ toast.error("Anda bukan anggota grup ini"); navigate("/groups"); return; }
-      const { data:membersData }=await supabase.from("group_members").select(`*,profiles(full_name,avatar_url,role)`).eq("group_id",groupId);
+      const { data:membersData }=await supabase.from("group_members").select(`*,profiles(id, full_name,avatar_url,role)`).eq("group_id",groupId);
       setMembers(membersData||[]);
       await loadPosts();
     }catch(e:any){ toast.error(e.message);}finally{ setLoading(false); }
@@ -223,6 +223,8 @@ const GroupDetail=()=> {
                     post={p}
                     currentUserId={currentUser?.id}
                     postType="group"
+                    topFollowers={topFollowers}
+                    topLiked={topLiked}
                   />
                 ))}
               </div>

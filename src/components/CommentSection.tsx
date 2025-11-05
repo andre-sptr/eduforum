@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { id } from "date-fns/locale";
 import { z } from "zod";
 import { MentionInput } from "./MentionInput";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { RankBadge } from "@/components/RankBadge";
 
 const commentSchema = z.object({ content: z.string().trim().min(1, "Comment cannot be empty").max(1000, "Comment is too long (max 1000 characters)") });
 
@@ -23,11 +24,31 @@ const CommentSection = ({ postId, currentUserId, postType = "global" }: Props) =
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null); const [editContent, setEditContent] = useState("");
   const [deleteCommentId, setDeleteCommentId] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState<number | null>(null);
-
-  // Tentukan nama tabel berdasarkan postType
+  const [topFollowers, setTopFollowers] = useState<any[]>([]);
+  const [topLiked, setTopLiked] = useState<any[]>([]);
   const commentTable = postType === "group" ? "group_post_comments" : "comments";
 
+  const followerRankMap = useMemo(() =>
+    new Map(topFollowers.slice(0, 3).map((u, i) => [u.id, i + 1]))
+  , [topFollowers]);
+
+  const likerRankMap = useMemo(() =>
+    new Map(topLiked.slice(0, 3).map((u, i) => [u.id, i + 1]))
+  , [topLiked]);
+
   useEffect(() => {
+    const loadLeaderboards = async () => {
+      if (topFollowers.length === 0 && topLiked.length === 0) {
+        const [tfRes, tlRes] = await Promise.all([
+          supabase.rpc("get_top_5_followers"),
+          supabase.rpc("get_top_5_liked_users")
+        ]);
+        if (tfRes.data) setTopFollowers(tfRes.data);
+        if (tlRes.data) setTopLiked(tlRes.data);
+      }
+    };
+    
+    loadLeaderboards();
     loadCount();
     const ch = supabase.channel(`comments-count-${postType}-${postId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: commentTable, filter: `post_id=eq.${postId}` }, () => loadCount())
@@ -102,8 +123,10 @@ const CommentSection = ({ postId, currentUserId, postType = "global" }: Props) =
           <div className="flex-1">
             <div className="rounded-xl border border-border bg-card/60 p-3">
               <div className="mb-1 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-semibold">{c.profiles.full_name}</span>
+                  <RankBadge rank={followerRankMap.get(c.user_id)} type="follower" />
+                  <RankBadge rank={likerRankMap.get(c.user_id)} type="like" />
                   <span className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(c.created_at), { addSuffix: true, locale: id })}</span>
                 </div>
                 {isOwner && !isEditing && (
