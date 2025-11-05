@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, X, Heart, MessageCircle, Repeat2, UserPlus, AtSign, Gamepad2, Info } from "lucide-react";
+import { Bell, X, Heart, MessageCircle, Repeat2, UserPlus, AtSign, Gamepad2, Info, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
@@ -18,6 +18,7 @@ const typeIcon = {
   follow: UserPlus,
   mention: AtSign,
   game: Gamepad2,
+  group_invite: Users,
   system: Info
 } as const;
 
@@ -28,6 +29,7 @@ const typeStyle = {
   follow: "bg-violet-500/10 text-violet-400 ring-1 ring-violet-500/20",
   mention: "bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20",
   game: "bg-indigo-500/10 text-indigo-400 ring-1 ring-indigo-500/20",
+  group_invite: "bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-500/20",
   system: "bg-zinc-500/10 text-zinc-400 ring-1 ring-zinc-500/20",
   default: "bg-muted text-muted-foreground ring-1 ring-border/60"
 };
