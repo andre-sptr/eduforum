@@ -12,6 +12,7 @@ import { z } from "zod";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MentionInput } from "@/components/MentionInput";
 import { RankBadge } from "@/components/RankBadge";
+import { ContentRenderer } from "@/components/ContentRenderer";
 
 const messageSchema = z.object({ content: z.string().trim().min(1,"Message cannot be empty").max(2000,"Message is too long (max 2000 characters)") });
 
@@ -217,7 +218,7 @@ const Chat = () => {
                         </div>
                       ):(
                         <div className={`group relative inline-flex rounded-2xl px-4 py-2 ${mine?"bg-primary text-primary-foreground":"bg-muted text-foreground"}`}>
-                          <p className="text-sm whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html:m.content.replace(/@\[([^\]]+)\]\([a-f0-9\-]+\)/g,'<span class="text-primary font-semibold">@$1</span>') }}/>
+                          <ContentRenderer content={m.content} className="text-sm whitespace-pre-wrap break-words" />
                           {m.edited_at&&<span className={`ml-2 self-end text-[10px] opacity-70 italic ${mine?"text-primary-foreground/70":"text-muted-foreground"}`}>diedit</span>}
                           {mine&&(
                             <DropdownMenu>

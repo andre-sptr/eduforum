@@ -11,6 +11,7 @@ import { z } from "zod";
 import { MentionInput } from "./MentionInput";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { RankBadge } from "@/components/RankBadge";
+import { ContentRenderer } from "@/components/ContentRenderer";
 
 const commentSchema = z.object({ content: z.string().trim().min(1, "Comment cannot be empty").max(1000, "Comment is too long (max 1000 characters)") });
 
@@ -145,7 +146,7 @@ const CommentSection = ({ postId, currentUserId, postType = "global" }: Props) =
                   </div>
                 </div>
               ) : (
-                <p className="text-sm" dangerouslySetInnerHTML={{ __html: c.content.replace(/@\[([^\]]+)\]\([a-f0-9\-]+\)/g, '<span class="text-primary font-semibold">@$1</span>') }} />
+                <ContentRenderer content={c.content} className="text-sm" />
               )}
             </div>
 

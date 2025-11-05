@@ -15,6 +15,7 @@ import { MentionInput } from "./MentionInput";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { RankBadge } from "@/components/RankBadge";
+import { ContentRenderer } from "@/components/ContentRenderer";
 
 interface PostCardProps {
   post: {
@@ -250,12 +251,7 @@ const PostCard = ({ post, postType = "global", currentUserId, onLike, onPostUpda
               </div>
             </div>
           ) : (
-            <p
-              className="mb-3 whitespace-pre-wrap text-foreground"
-              dangerouslySetInnerHTML={{
-                __html: post.content.replace(/@\[([^\]]+)\]\([a-f0-9\-]+\)/g, '<span class="text-primary font-semibold">@$1</span>'),
-              }}
-            />
+            <ContentRenderer content={post.content} className="mb-3 whitespace-pre-wrap text-foreground" />
           )}
 
           {post.quoted_post && (

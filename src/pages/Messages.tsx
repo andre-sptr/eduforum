@@ -13,6 +13,7 @@ import { z } from "zod";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MentionInput } from "@/components/MentionInput";
 import { RankBadge } from "@/components/RankBadge";
+import { ContentRenderer } from "@/components/ContentRenderer";
 
 const messageSchema=z.object({content:z.string().trim().min(1,"Message cannot be empty").max(2000,"Message is too long")});
 interface Message{ id:string; user_id:string; content:string; created_at:string; edited_at?:string|null; is_deleted?:boolean; profiles?:{ full_name:string; avatar_url:string|null; role:string; }; }
@@ -177,7 +178,7 @@ const Messages=()=> {
                       ):(
                         <div className="flex items-start gap-2">
                           <div className={`rounded-2xl px-4 py-2 shadow-sm ${own?"bg-accent text-accent-foreground":"bg-muted/70 text-foreground"}`}>
-                            <p className="text-sm whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{__html:m.content.replace(/@\[([^\]]+)\]\([a-f0-9\-]+\)/g,'<span class="text-primary font-semibold">@$1</span>')}}/>
+                            <ContentRenderer content={m.content} className="text-sm whitespace-pre-wrap break-words" />
                             {m.edited_at&&<span className="text-xs opacity-70 italic">diedit</span>}
                           </div>
                           {own&&(

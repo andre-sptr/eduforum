@@ -49,7 +49,6 @@ export const MentionInput=({
     onKeyDown?.(e);
   };
 
-  const renderValue=()=>value.replace(/@\[([^\]]+)\]\([a-f0-9\-]+\)/g,"@$1");
   const initials=(n:string)=>{const a=n.split(" ");return a.length>=2?(a[0][0]+a[1][0]).toUpperCase():n.slice(0,2).toUpperCase();}
   const Field=multiline?Textarea:Input;
   const fieldClass=[
@@ -64,7 +63,7 @@ export const MentionInput=({
       <Field
         ref={inputRef as any}
         type={multiline?undefined:"text"}
-        value={renderValue()}
+        value={value}
         onChange={handleChange}
         onKeyDown={handleKeys}
         placeholder={placeholder}
