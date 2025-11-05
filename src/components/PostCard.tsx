@@ -1,4 +1,3 @@
-// src/components/PostCard.tsx
 import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -22,9 +21,17 @@ interface PostCardProps {
     id: string; content: string; created_at: string;
     media_urls?: string[]; media_types?: string[];
     profiles: { id: string; full_name: string; avatar_url?: string; role: string };
-    likes: any[]; reposts: any[]; quote_reposts: any[]; reposted_by_user?: any; repost_of_id?: string | null; quoted_post?: any;
+    likes: any[]; reposts: any[]; quote_reposts: any[];
+    repost_of_id?: string | null; quoted_post?: any;
+    reposted_by_user?: any; group_id?: string | null;
   };
-  currentUserId?: string; onLike?: () => void; onPostUpdated?: () => void; onPostDeleted?: () => void; topFollowers?: any[]; topLiked?: any[];
+  postType: "global" | "group";
+  currentUserId?: string;
+  onLike?: () => void;
+  onPostUpdated?: () => void;
+  onPostDeleted?: () => void;
+  topFollowers?: any[];
+  topLiked?: any[];
 }
 
 interface QuotedPostProps {
@@ -52,7 +59,7 @@ const QuotedPostCard = ({ post }: QuotedPostProps) => {
       <div className="flex items-center gap-2 mb-2">
         <Avatar className="h-5 w-5">
           <AvatarImage src={post.profiles.avatar_url} />
-          <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(post.profiles.full_name)}</AvatarFallback>
+          <AvatarFallback className="text-xs">{getInitials(post.profiles.full_name)}</AvatarFallback>
         </Avatar>
         <span className="text-sm font-medium">{post.profiles.full_name}</span>
         <span className="text-xs text-muted-foreground">• {formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: id })}</span>
@@ -62,7 +69,7 @@ const QuotedPostCard = ({ post }: QuotedPostProps) => {
   );
 };
 
-const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted, topFollowers, topLiked }: PostCardProps) => {
+const PostCard = ({ post, postType = "global", currentUserId, onLike, onPostUpdated, onPostDeleted, topFollowers, topLiked }: PostCardProps) => {
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [isReposted, setIsReposted] = useState(false);
@@ -77,6 +84,12 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted, t
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [quoteContent, setQuoteContent] = useState("");
   const [isReposting, setIsReposting] = useState(false);
+
+  const postTable = postType === "group" ? "group_posts" : "posts";
+  const likeTable = postType === "group" ? "group_post_likes" : "likes";
+  const repostTable = "reposts";
+  const quotePostTable = "posts";
+
   const [followerRank, likerRank] = useMemo(() => {
     const authorId = post.profiles.id;
     const fRank = (topFollowers || []).slice(0, 3).findIndex(u => u.id === authorId);
@@ -94,16 +107,21 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted, t
   const total = urls.length;
 
   useEffect(() => {
-    if (currentUserId) { setIsLiked(post.likes.some((l) => l.user_id === currentUserId)); checkRepost(); }
+    if (currentUserId) {
+      setIsLiked(post.likes.some((l) => l.user_id === currentUserId));
+      checkRepost(); 
+    }
     setLikeCount(post.likes.length);
+    
     const simpleReposts = post.reposts?.[0]?.count ?? 0;
     const quoteReposts = post.quote_reposts?.[0]?.count ?? 0;
     setRepostCount(simpleReposts + quoteReposts);
+
   }, [post.likes, post.reposts, post.quote_reposts, currentUserId]);
 
   const checkRepost = async () => {
-    if (!currentUserId) return;
-    const { data } = await supabase.from("reposts").select("id").eq("user_id", currentUserId).eq("post_id", post.id).maybeSingle();
+    if (!currentUserId || postType === "group") return;
+    const { data } = await supabase.from(repostTable).select("id").eq("user_id", currentUserId).eq("post_id", post.id).maybeSingle();
     setIsReposted(!!data);
   };
 
@@ -111,10 +129,10 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted, t
     if (!currentUserId) return toast.error("Silakan login terlebih dahulu");
     try {
       if (isLiked) {
-        const { error } = await supabase.from("likes").delete().eq("user_id", currentUserId).eq("post_id", post.id);
+        const { error } = await supabase.from(likeTable).delete().eq("user_id", currentUserId).eq("post_id", post.id);
         if (error) throw error; setIsLiked(false); setLikeCount((v) => v - 1);
       } else {
-        const { error } = await supabase.from("likes").insert({ user_id: currentUserId, post_id: post.id });
+        const { error } = await supabase.from(likeTable).insert({ user_id: currentUserId, post_id: post.id });
         if (error) throw error; setIsLiked(true); setLikeCount((v) => v + 1);
       }
       onLike?.();
@@ -124,14 +142,18 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted, t
   const handleSimpleRepost = async () => {
     if (!currentUserId) return toast.error("Silakan login terlebih dahulu");
     if (isOwnPost) return toast.error("Tidak dapat me-repost postingan sendiri");
+    if (postType === "group") return toast.error("Tidak dapat me-repost postingan dari dalam grup");
+    
     setIsReposting(true);
     try {
       if (isReposted) {
-        const { error } = await supabase.from("reposts").delete().eq("user_id", currentUserId).eq("post_id", post.id);
-        if (error) throw error; setIsReposted(false); setRepostCount((v) => v - 1); toast.success("Repost dibatalkan");
+        const { error } = await supabase.from(repostTable).delete().eq("user_id", currentUserId).eq("post_id", post.id);
+        if (error) throw error; 
+        setIsReposted(false); setRepostCount((v) => v - 1); toast.success("Repost dibatalkan");
       } else {
-        const { error } = await supabase.from("reposts").insert({ user_id: currentUserId, post_id: post.id });
-        if (error) throw error; setIsReposted(true); setRepostCount((v) => v + 1); toast.success("Berhasil di-repost!");
+        const { error } = await supabase.from(repostTable).insert({ user_id: currentUserId, post_id: post.id });
+        if (error) throw error; 
+        setIsReposted(true); setRepostCount((v) => v + 1); toast.success("Berhasil di-repost!");
       }
     } catch (e: any) { toast.error(e.message); } finally { setIsReposting(false); }
   };
@@ -139,21 +161,30 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted, t
   const handleQuoteRepost = async () => {
     if (!currentUserId) return toast.error("Silakan login terlebih dahulu");
     if (isOwnPost) return toast.error("Tidak dapat me-repost postingan sendiri");
+    if (postType === "group") return toast.error("Tidak dapat me-repost postingan dari dalam grup");
     if (!quoteContent.trim()) return toast.error("Caption tidak boleh kosong");
+    
     setIsReposting(true);
     try {
-      const { error } = await supabase.from("posts").insert({ user_id: currentUserId, content: quoteContent.trim(), repost_of_id: post.id });
+      const { error } = await supabase.from(quotePostTable).insert({ user_id: currentUserId, content: quoteContent.trim(), repost_of_id: post.id });
       if (error) throw error;
-      setRepostCount((v) => v + 1); toast.success("Postingan berhasil di-quote!"); setShowQuoteModal(false); setQuoteContent(""); onPostUpdated?.();
+      setRepostCount((v) => v + 1); 
+      toast.success("Postingan berhasil di-quote!"); setShowQuoteModal(false); setQuoteContent(""); onPostUpdated?.();
     } catch (e: any) { toast.error(e.message); } finally { setIsReposting(false); }
   };
 
-  const handleShare = () => { navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`); toast.success("Link postingan disalin!"); };
+  const handleShare = () => {
+    const link = postType === "group" 
+      ? `${window.location.origin}/groups/${post.group_id}`
+      : `${window.location.origin}/post/${post.id}`;
+    navigator.clipboard.writeText(link); 
+    toast.success("Link postingan disalin!"); 
+  };
 
   const handleEditPost = async () => {
     if (!editContent.trim()) return toast.error("Konten postingan tidak boleh kosong");
     try {
-      const { error } = await supabase.from("posts").update({ content: editContent.trim() }).eq("id", post.id);
+      const { error } = await supabase.from(postTable).update({ content: editContent.trim() }).eq("id", post.id);
       if (error) throw error; setIsEditing(false); toast.success("Postingan berhasil diubah"); onPostUpdated?.();
     } catch (e: any) { toast.error("Gagal mengubah postingan: " + e.message); }
   };
@@ -161,7 +192,7 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted, t
   const handleDeletePost = async () => {
     setIsDeleting(true);
     try {
-      const { error } = await supabase.from("posts").delete().eq("id", post.id);
+      const { error } = await supabase.from(postTable).delete().eq("id", post.id);
       if (error) throw error; toast.success("Postingan berhasil dihapus"); onPostDeleted?.();
     } catch (e: any) { toast.error("Gagal menghapus postingan: " + e.message); } finally { setIsDeleting(false); setShowDeleteDialog(false); }
   };
@@ -189,7 +220,7 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted, t
         </Link>
 
         <div className="flex-1">
-          <div className="mb-2 flex items-center gap-2">
+          <div className="mb-2 flex items-center flex-wrap gap-2">
             <Link to={`/profile/${post.profiles.id}`} className="rounded-xl px-2 py-1 font-semibold hover:bg-accent/10 transition">{post.profiles.full_name}</Link>
             <RankBadge rank={followerRank} type="follower" />
             <RankBadge rank={likerRank} type="like" />
@@ -249,7 +280,6 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted, t
                     <DialogTitle>Media Viewer</DialogTitle>
                     <DialogDescription>Menampilkan media dalam ukuran penuh.</DialogDescription>
                   </DialogHeader>
-
                   <div className="relative flex items-center justify-center bg-black min-h-[400px]">
                     {types[idx]?.startsWith("video") ? (
                       <video src={urls[idx]} controls autoPlay className="max-h-[80vh] max-w-[95vw] rounded-lg" />
@@ -261,7 +291,6 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted, t
                     ) : (
                       <img src={urls[idx]} alt="" className="max-h-[80vh] max-w-[95vw] rounded-lg object-contain" />
                     )}
-
                     {total > 1 && (
                       <>
                         <Button variant="ghost" size="icon" onClick={prev} className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-white/10 text-white hover:bg-white/20">
@@ -272,7 +301,6 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted, t
                         </Button>
                       </>
                     )}
-
                     <div className="absolute left-3 bottom-3 rounded-full bg-white/10 px-2 py-1 text-xs text-white">{idx + 1} / {total}</div>
                   </div>
                 </DialogContent>
@@ -283,26 +311,29 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted, t
           <div className="mt-4 flex items-center gap-4">
             <Button variant="ghost" size="sm" className={`gap-2 ${isLiked ? "text-red-500" : "text-muted-foreground"} hover:text-red-500`} onClick={handleLike}>
               <Heart className={`h-5 w-5 ${isLiked ? "fill-current" : ""}`} />
-              <span>{likeCount}</span>
+              {likeCount > 0 && <span>{likeCount}</span>}
             </Button>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className={`gap-2 ${isReposted ? "text-green-500" : "text-muted-foreground"} ${!isOwnPost ? "hover:text-green-500" : ""}`} disabled={isOwnPost} title={isOwnPost ? "Tidak dapat me-repost postingan sendiri" : "Repost"}>
-                  <Repeat2 className="h-5 w-5" />
-                  {repostCount > 0 && <span>{repostCount}</span>}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem onClick={handleSimpleRepost}><Repeat2 className="mr-2 h-4 w-4" />{isReposted ? "Batal Repost" : "Repost"}</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowQuoteModal(true)}><Pencil className="mr-2 h-4 w-4" />Quote Repost</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Repost/Quote hanya untuk postingan global */}
+            {postType === "global" && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className={`gap-2 ${isReposted ? "text-green-500" : "text-muted-foreground"} ${!isOwnPost ? "hover:text-green-500" : ""}`} disabled={isOwnPost} title={isOwnPost ? "Tidak dapat me-repost postingan sendiri" : "Repost"}>
+                    <Repeat2 className="h-5 w-5" />
+                    {repostCount > 0 && <span>{repostCount}</span>}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={handleSimpleRepost}><Repeat2 className="mr-2 h-4 w-4" />{isReposted ? "Batal Repost" : "Repost"}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowQuoteModal(true)}><Pencil className="mr-2 h-4 w-4" />Quote Repost</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
             <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-accent" onClick={handleShare}><Share2 className="h-5 w-5" /></Button>
           </div>
 
-          <CommentSection postId={post.id} currentUserId={currentUserId} />
+          <CommentSection postId={post.id} currentUserId={currentUserId} postType={postType} />
         </div>
       </div>
 

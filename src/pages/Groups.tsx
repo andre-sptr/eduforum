@@ -1,5 +1,5 @@
 // src/pages/Groups.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { RankBadge } from "@/components/RankBadge";
 
 const Groups=()=> {
   const navigate=useNavigate();
@@ -27,16 +28,34 @@ const Groups=()=> {
   const [priv,setPriv]=useState(false); 
   const [creating,setCreating]=useState(false);
   const [confirmLeaveId,setConfirmLeaveId]=useState<string|null>(null);
+  const [topFollowers, setTopFollowers] = useState<any[]>([]);
+  const [topLiked, setTopLiked] = useState<any[]>([]);
+
+  const followerRankMap = useMemo(() =>
+    new Map(topFollowers.slice(0, 3).map((u, i) => [u.id, i + 1]))
+  , [topFollowers]);
+
+  const likerRankMap = useMemo(() =>
+    new Map(topLiked.slice(0, 3).map((u, i) => [u.id, i + 1]))
+  , [topLiked]);
 
   useEffect(()=>{(async()=>{
     const { data:{ user } }=await supabase.auth.getUser(); if(!user){ navigate("/auth"); return; }
-    setMe(user); await loadGroups(user.id);
-  })()},[]);
+    setMe(user); 
+    const [tfRes, tlRes] = await Promise.all([
+        supabase.rpc("get_top_5_followers"),
+        supabase.rpc("get_top_5_liked_users")
+      ]);
+      if (tfRes.data) setTopFollowers(tfRes.data);
+      if (tlRes.data) setTopLiked(tlRes.data);
+      await loadGroups(user.id);
+    })()
+  },[]);
 
   const loadGroups=async(uid:string)=>{
     try{
-      const { data:allGroups,error:gErr }=await supabase.from("groups").select(`*,group_members(count),profiles!groups_created_by_fkey(full_name,avatar_url)`).order("created_at",{ascending:false}); if(gErr) throw gErr;
-      const { data:uGroups,error:ugErr }=await supabase.from("group_members").select(`*,groups(*,group_members(count),profiles!groups_created_by_fkey(full_name,avatar_url))`).eq("user_id",uid); if(ugErr) throw ugErr;
+      const { data:allGroups,error:gErr }=await supabase.from("groups").select(`*,group_members(count),profiles!groups_created_by_fkey(id, full_name,avatar_url)`).order("created_at",{ascending:false}); if(gErr) throw gErr;
+      const { data:uGroups,error:ugErr }=await supabase.from("group_members").select(`*,groups(*,group_members(count),profiles!groups_created_by_fkey(id, full_name,avatar_url))`).eq("user_id",uid); if(ugErr) throw ugErr;
       setGroups(allGroups||[]); setMyGroups((uGroups||[]).map(g=>g.groups));
     }catch(e:any){ toast.error(e.message); }finally{ setLoading(false); }
   };
@@ -104,8 +123,12 @@ const Groups=()=> {
                         <CardTitle className="truncate text-lg">{g.name}</CardTitle>
                         <CardDescription className="mt-1 line-clamp-2">{g.description||"Tidak ada deskripsi"}</CardDescription>
                         <div className="mt-3 flex items-center gap-2 text-sm">
-                          <Avatar className="h-6 w-6"><AvatarImage src={g.profiles?.avatar_url||""}/><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{initials(g.profiles?.full_name||"")}</AvatarFallback></Avatar>
-                          <span className="truncate text-muted-foreground">Owner: {g.profiles?.full_name||"—"}</span>
+                          <Avatar className="h-6 w-6"><AvatarImage src={g.profiles?.avatar_url || ""} /><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{initials(g.profiles?.full_name || "")}</AvatarFallback></Avatar>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="truncate text-muted-foreground">Owner: {g.profiles?.full_name || "—"}</span>
+                            <RankBadge rank={followerRankMap.get(g.profiles?.id)} type="follower" />
+                            <RankBadge rank={likerRankMap.get(g.profiles?.id)} type="like" />
+                          </div>
                         </div>
                       </div>
                       {g.is_private?<Lock className="h-4 w-4 text-muted-foreground"/>:<Globe className="h-4 w-4 text-muted-foreground"/>}
@@ -132,8 +155,12 @@ const Groups=()=> {
                       <CardTitle className="truncate text-lg">{g.name}</CardTitle>
                       <CardDescription className="mt-1 line-clamp-2">{g.description||"Tidak ada deskripsi"}</CardDescription>
                       <div className="mt-3 flex items-center gap-2 text-sm">
-                        <Avatar className="h-6 w-6"><AvatarImage src={g.profiles?.avatar_url||""}/><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{initials(g.profiles?.full_name||"")}</AvatarFallback></Avatar>
-                        <span className="truncate text-muted-foreground">Owner: {g.profiles?.full_name||"—"}</span>
+                        <Avatar className="h-6 w-6"><AvatarImage src={g.profiles?.avatar_url || ""} /><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{initials(g.profiles?.full_name || "")}</AvatarFallback></Avatar>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="truncate text-muted-foreground">Owner: {g.profiles?.full_name || "—"}</span>
+                          <RankBadge rank={followerRankMap.get(g.profiles?.id)} type="follower" />
+                          <RankBadge rank={likerRankMap.get(g.profiles?.id)} type="like" />
+                        </div>
                       </div>
                     </div>
                     {g.is_private?<Lock className="h-4 w-4 text-muted-foreground"/>:<Globe className="h-4 w-4 text-muted-foreground"/>}

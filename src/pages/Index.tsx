@@ -205,6 +205,7 @@ const Index = () => {
                         onPostDeleted={refreshPosts}
                         topFollowers={topFollowers}
                         topLiked={topLiked}
+                        postType="global"
                       />
                     ))}
                     <div ref={observerTarget} className="h-8" />

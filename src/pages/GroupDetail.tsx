@@ -1,5 +1,5 @@
 // src/pages/GroupDetail.tsx
-import { useEffect,useState } from "react";
+import { useEffect, useState, useMemo } from "react"; 
 import { Link, useNavigate,useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import MediaUploader from "@/components/MediaUploader";
 import { MediaFile,compressImage } from "@/lib/mediaUtils";
 import { Dialog,DialogContent,DialogHeader,DialogTitle,DialogFooter,DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog,AlertDialogAction,AlertDialogCancel,AlertDialogContent,AlertDialogDescription,AlertDialogFooter,AlertDialogHeader,AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { RankBadge } from "@/components/RankBadge";
 
 const GroupDetail=()=> {
   const navigate=useNavigate();
@@ -30,9 +31,27 @@ const GroupDetail=()=> {
   const [editDesc,setEditDesc]=useState("");
   const [openDelete,setOpenDelete]=useState(false);
   const [chatOpening,setChatOpening]=useState(false);
+  const [topFollowers, setTopFollowers] = useState<any[]>([]);
+  const [topLiked, setTopLiked] = useState<any[]>([]);
   const isOwner=group?.created_by===currentUser?.id;
 
-  useEffect(()=>{(async()=>{const{data:{user}}=await supabase.auth.getUser();if(!user){navigate("/auth");return;}setCurrentUser(user);await loadGroupData(user.id);})()},[groupId]);
+  const followerRankMap = useMemo(() =>
+    new Map(topFollowers.slice(0, 3).map((u, i) => [u.id, i + 1]))
+  , [topFollowers]);
+
+  const likerRankMap = useMemo(() =>
+    new Map(topLiked.slice(0, 3).map((u, i) => [u.id, i + 1]))
+  , [topLiked]);
+
+  useEffect(()=>{(async()=>{const{data:{user}}=await supabase.auth.getUser();if(!user){navigate("/auth");return;}setCurrentUser(user);
+  const [tfRes, tlRes] = await Promise.all([
+      supabase.rpc("get_top_5_followers"),
+      supabase.rpc("get_top_5_liked_users")
+    ]);
+    if (tfRes.data) setTopFollowers(tfRes.data);
+    if (tlRes.data) setTopLiked(tlRes.data);
+    await loadGroupData(user.id);})()
+  },[groupId]);
 
   const loadGroupData=async(userId:string)=> {
     try{
@@ -48,10 +67,30 @@ const GroupDetail=()=> {
     }catch(e:any){ toast.error(e.message);}finally{ setLoading(false); }
   };
 
-  const loadPosts=async()=> {
-    const { data,error }=await supabase.from("group_posts").select(`*,profiles(id,full_name,avatar_url,role)`).eq("group_id",groupId).order("created_at",{ascending:false});
-    if(error){ toast.error(error.message); return; }
-    setPosts((data||[]).map(p=>({...p,likes:[]})));
+  const loadPosts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("group_posts")
+        .select(`
+          *,
+          profiles:profiles!user_id(id, full_name, avatar_url, role),
+          likes:group_post_likes(user_id, post_id)
+        `)
+        .eq("group_id", groupId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const postsWithData = (data || []).map(p => ({
+        ...p,
+        likes: p.likes || [],
+        reposts: [], 
+        quote_reposts: [], 
+      }));
+      setPosts(postsWithData);
+    } catch (e: any) {
+      toast.error(e.message);
+    }
   };
 
   const uploadMedia=async(file:File,userId:string,type:string)=> {
@@ -139,7 +178,13 @@ const GroupDetail=()=> {
                   <Link to={`/profile/${owner.user_id}`} className="mb-2 block rounded-lg border border-border bg-muted/40 p-2 hover:bg-muted/60 transition">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8 ring-1 ring-border"><AvatarImage src={owner.profiles?.avatar_url||""}/><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(owner.profiles?.full_name||"O")}</AvatarFallback></Avatar>
-                      <div className="min-w-0"><p className="truncate text-sm font-semibold">{owner.profiles?.full_name||"Owner"}</p></div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-semibold">{owner.profiles?.full_name || "Owner"}</p>
+                          <RankBadge rank={followerRankMap.get(owner.user_id)} type="follower" />
+                          <RankBadge rank={likerRankMap.get(owner.user_id)} type="like" />
+                        </div>
+                      </div>
                       <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-foreground/80"><Crown className="h-3 w-3"/>Owner</span>
                     </div>
                   </Link>
@@ -149,7 +194,14 @@ const GroupDetail=()=> {
                 ):otherMembers.map(m=>(
                   <Link to={`/profile/${m.user_id}`} key={m.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-muted/50 transition">
                     <Avatar className="h-8 w-8 ring-1 ring-border"><AvatarImage src={m.profiles?.avatar_url||""}/><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(m.profiles?.full_name||"U")}</AvatarFallback></Avatar>
-                    <div className="min-w-0"><p className="truncate text-sm font-medium">{m.profiles?.full_name||"Pengguna"}</p>{m.profiles?.role&&<p className="truncate text-xs text-muted-foreground">{m.profiles.role}</p>}</div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-medium">{m.profiles?.full_name || "Pengguna"}</p>
+                        <RankBadge rank={followerRankMap.get(m.user_id)} type="follower" />
+                        <RankBadge rank={likerRankMap.get(m.user_id)} type="like" />
+                      </div>
+                    {m.profiles?.role&&<p className="truncate text-xs text-muted-foreground">{m.profiles.role}</p>}
+                    </div>
                   </Link>
                 ))}
               </div>
@@ -159,7 +211,22 @@ const GroupDetail=()=> {
           <main className="space-y-6">
             {group.description&&(<Card className="border-border bg-card/60 p-5"><p className="text-sm leading-relaxed text-foreground/90">{group.description}</p></Card>)}
             {isMember&&(<Card className="border-border bg-card/60 p-5"><Textarea value={newPostContent} onChange={e=>setNewPostContent(e.target.value)} placeholder="Bagikan sesuatu dengan grup..." className="mb-3 min-h-[110px] resize-none rounded-xl bg-input/60"/><MediaUploader onMediaChange={setMediaFiles}/><div className="mt-4 flex justify-end"><Button onClick={handleCreatePost} disabled={posting||(!newPostContent.trim()&&mediaFiles.length===0)} className="rounded-xl bg-accent text-accent-foreground hover:bg-accent/90"><Send className="mr-2 h-4 w-4"/>{posting?"Memposting...":"Posting"}</Button></div></Card>)}
-            {posts.length===0?(<Card className="grid place-items-center border-border bg-card/60 p-10 text-sm text-muted-foreground">{isMember?"Belum ada postingan. Jadilah yang pertama!":"Bergabung untuk melihat postingan"}</Card>):(<div className="space-y-4">{posts.map(p=>(<PostCard key={p.id} post={p} currentUserId={currentUser?.id}/>))}</div>)}
+            {posts.length === 0 ? (
+              <Card className="grid place-items-center border-border bg-card/60 p-10 text-sm text-muted-foreground">
+                {isMember ? "Belum ada postingan. Jadilah yang pertama!" : "Bergabung untuk melihat postingan"}
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {posts.map(p => (
+                  <PostCard
+                    key={p.id}
+                    post={p}
+                    currentUserId={currentUser?.id}
+                    postType="group"
+                  />
+                ))}
+              </div>
+            )}
           </main>
         </div>
       </div>

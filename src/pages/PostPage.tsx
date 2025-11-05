@@ -52,7 +52,7 @@ const PostPage = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6 max-w-3xl">
-        <PostCard post={post} currentUserId={currentUser?.id} onLike={loadPost} onPostUpdated={loadPost} onPostDeleted={() => navigate("/")} />
+        <PostCard post={post} currentUserId={currentUser?.id} onLike={loadPost} onPostUpdated={loadPost} onPostDeleted={() => navigate("/")} postType="global" />
       </main>
     </div>
   );
