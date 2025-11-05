@@ -4,66 +4,151 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
 
 interface User { id:string; full_name:string; avatar_url:string|null; role:string }
 interface MentionInputProps {
   value:string; onChange:(v:string)=>void; placeholder?:string; className?:string; multiline?:boolean; disabled?:boolean; onKeyDown?:(e:React.KeyboardEvent)=>void; allowedUserIds?:string[]; currentUserId?:string;
 }
 
+const findQuery = (text: string, cursor: number) => {
+  const beforeCursor = text.substring(0, cursor);
+  let i = beforeCursor.length - 1;
+  while (i >= 0) {
+    const char = beforeCursor[i];
+    if (char === " " || char === "\n" || char === ")") break;
+    if (char === "@") {
+      if (i > 0 && beforeCursor[i - 1] === "[") {
+        i--;
+        continue;
+      }
+      const query = beforeCursor.substring(i + 1);
+      if (!query.includes(" ")) {
+        return { query, queryStartIndex: i };
+      } else {
+        break;
+      }
+    }
+    i--;
+  }
+  return { query: null, queryStartIndex: -1 };
+};
+
 export const MentionInput=({
   value,onChange,placeholder="Ketik pesan...",className="",multiline=false,disabled=false,onKeyDown,allowedUserIds,currentUserId
 }:MentionInputProps)=>{
-  const [show,setShow]=useState(false); const [items,setItems]=useState<User[]>([]); const [sel,setSel]=useState(0);
-  const [q,setQ]=useState(""); const [cursor,setCursor]=useState(0); const [pos,setPos]=useState<"top"|"bottom">("bottom");
-  const inputRef=useRef<HTMLInputElement|HTMLTextAreaElement>(null); const listRef=useRef<HTMLDivElement>(null);
+  const [show,setShow]=useState(false); 
+  const [items,setItems]=useState<User[]>([]); 
+  const [sel,setSel]=useState(0);
+  const [q,setQ]=useState(""); 
+  const [cursor,setCursor]=useState(0); 
+  const [pos,setPos]=useState<"top"|"bottom">("bottom");
+  const [queryStartIndex, setQueryStartIndex] = useState(-1);
+  const inputRef=useRef<HTMLInputElement|HTMLTextAreaElement>(null); 
 
-  useEffect(()=>{ if(!show||!inputRef.current) return; const r=inputRef.current.getBoundingClientRect(); const vh=window.innerHeight; setPos(vh-r.bottom>300||r.top<300?"bottom":"top"); },[show]);
+  useEffect(()=>{ 
+    if(!show||!inputRef.current) return; 
+    const r=inputRef.current.getBoundingClientRect(); 
+    const vh=window.innerHeight; 
+    setPos(vh - r.bottom > 220 || r.top < 220 ? "bottom" : "top");
+  },[show, items.length]);
 
-  useEffect(()=>{ const search=async()=>{ if(!q){ setItems([]); setShow(false); return; }
-    let query=supabase.from("profiles").select("id,full_name,avatar_url,role").ilike("full_name",`%${q}%`);
-    if(currentUserId) query=query.neq("id",currentUserId); if(allowedUserIds?.length) query=query.in("id",allowedUserIds);
-    const {data}=await query.limit(5); if(data?.length){ setItems(data); setShow(true); setSel(0);} else { setItems([]); setShow(false); }
-  }; search(); },[q,allowedUserIds,currentUserId]);
+  useEffect(() => {
+    const search = async () => {
+      if (!q) {
+        setShow(false);
+        setItems([]);
+        return;
+      }
+      let query = supabase.from("profiles")
+        .select("id,full_name,avatar_url,role")
+        .ilike("full_name", `%${q}%`);
+        
+      if (currentUserId) query = query.neq("id", currentUserId);
+      if (allowedUserIds?.length) query = query.in("id", allowedUserIds);
+
+      const { data } = await query.limit(5);
+      setItems(data || []);
+      setShow(!!data?.length);
+      if (data?.length) setSel(0);
+    };
+    
+    search();
+  }, [q, allowedUserIds, currentUserId]);
 
   const handleChange=(e:React.ChangeEvent<HTMLInputElement|HTMLTextAreaElement>)=>{
-    const nv=e.target.value, c=e.target.selectionStart||0; onChange(nv); setCursor(c);
-    const before=nv.substring(0,c); const i=before.lastIndexOf("@");
-    if(i!==-1){ const after=before.substring(i+1); if(!after.includes(" ")){ setQ(after); return; } }
-    setQ(""); setShow(false);
+    const nv = e.target.value;
+    const c = e.target.selectionStart || 0;
+    onChange(nv);
+    setCursor(c);
+
+    const { query, queryStartIndex } = findQuery(nv, c);
+    
+    setQ(query || "");
+    setQueryStartIndex(queryStartIndex);
+    
+    if (query === null) {
+      setShow(false);
+    }
   };
 
   const insert=(u:User)=>{
-    const beforeAll=value.substring(0,cursor), afterAll=value.substring(cursor), i=beforeAll.lastIndexOf("@");
-    const before=beforeAll.substring(0,i), mention=`@[${u.full_name}](${u.id})`, nv=before+mention+" "+afterAll;
-    onChange(nv); setShow(false); setQ("");
-    setTimeout(()=>{ if(inputRef.current){ const p=before.length+mention.length+1; inputRef.current.focus(); inputRef.current.setSelectionRange(p,p);} },0);
+    if (queryStartIndex === -1) return; 
+
+    const beforeQuery = value.substring(0, queryStartIndex);
+    const afterCursor = value.substring(cursor);
+    const mention = `@[${u.full_name}](${u.id})`;
+    const newValue = `${beforeQuery}${mention} ${afterCursor}`;
+    
+    onChange(newValue);
+    setShow(false);
+    setQ("");
+    setQueryStartIndex(-1);
+
+    setTimeout(()=>{ if(inputRef.current){ 
+      const newCursorPos = beforeQuery.length + mention.length + 1;
+      inputRef.current.focus(); 
+      inputRef.current.setSelectionRange(newCursorPos, newCursorPos);
+    }}, 0);
   };
 
   const handleKeys=(e:React.KeyboardEvent<HTMLInputElement|HTMLTextAreaElement>)=>{
     if(show&&items.length){
-      if(e.key==="ArrowDown"){ e.preventDefault(); setSel(v=>(v+1)%items.length); return; }
-      if(e.key==="ArrowUp"){ e.preventDefault(); setSel(v=>(v-1+items.length)%items.length); return; }
-      if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); insert(items[sel]); return; }
-      if(e.key==="Escape"){ setShow(false); setQ(""); return; }
+      const keyMap: Record<string, () => void> = {
+        ArrowDown: () => setSel(v => (v + 1) % items.length),
+        ArrowUp: () => setSel(v => (v - 1 + items.length) % items.length),
+        Enter: () => insert(items[sel]),
+        Escape: () => { setShow(false); setQ(""); },
+      };
+      
+      const handler = keyMap[e.key];
+      
+      if (handler && !(e.key === 'Enter' && e.shiftKey)) {
+        e.preventDefault();
+        handler();
+        return;
+      }
     }
     onKeyDown?.(e);
   };
 
-  const initials=(n:string)=>{const a=n.split(" ");return a.length>=2?(a[0][0]+a[1][0]).toUpperCase():n.slice(0,2).toUpperCase();}
+  const initials=(n:string)=>{const a=n.split(" ");return (a[0]?.[0]||"")+(a[1]?.[0]||"").toUpperCase()||"U";}
+  
   const Field=multiline?Textarea:Input;
-  const fieldClass=[
+  
+  const fieldClass = cn(
     "rounded-xl bg-input/60 border-border focus-visible:ring-2 focus-visible:ring-accent/70",
     "placeholder:text-muted-foreground/70",
-    multiline?"min-h-[100px]":"",
+    multiline && "min-h-[100px]",
     className
-  ].filter(Boolean).join(" ");
+  );
 
   return (
     <div className="relative w-full">
       <Field
         ref={inputRef as any}
         type={multiline?undefined:"text"}
-        value={value}
+        value={value} 
         onChange={handleChange}
         onKeyDown={handleKeys}
         placeholder={placeholder}
@@ -71,10 +156,20 @@ export const MentionInput=({
         className={fieldClass}
       />
       {show&&items.length>0&&(
-        <Card ref={listRef} className={`absolute ${pos==="top"?"bottom-full mb-2":"top-full mt-2"} left-0 z-50 w-full overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl backdrop-blur`}>
+        <Card className={cn(
+          "absolute left-0 z-50 w-full overflow-hidden rounded-xl border border-border bg-card/95 shadow-xl backdrop-blur",
+          pos === "top" ? "bottom-full mb-2" : "top-full mt-2"
+        )}>
           <div className="divide-y divide-border/60">
             {items.map((u,i)=>(
-              <button key={u.id} onClick={()=>insert(u)} className={`flex w-full items-center gap-3 px-3 py-2 text-left transition ${i===sel?"bg-accent/90 text-accent-foreground":"hover:bg-accent/40"}`}>
+              <button 
+                key={u.id} 
+                onClick={()=>insert(u)} 
+                className={cn(
+                  "flex w-full items-center gap-3 px-3 py-2 text-left transition", 
+                  i===sel?"bg-accent/90 text-accent-foreground":"hover:bg-accent/40"
+                )}
+              >
                 <Avatar className="h-8 w-8 ring-1 ring-border">
                   <AvatarImage src={u.avatar_url||undefined}/>
                   <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{initials(u.full_name)}</AvatarFallback>
@@ -87,7 +182,7 @@ export const MentionInput=({
               </button>
             ))}
           </div>
-        </Card>
+        </Card> 
       )}
     </div>
   );

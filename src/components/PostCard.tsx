@@ -65,7 +65,7 @@ const QuotedPostCard = ({ post }: QuotedPostProps) => {
         <span className="text-sm font-medium">{post.profiles.full_name}</span>
         <span className="text-xs text-muted-foreground">• {formatDistanceToNow(new Date(post.created_at), { addSuffix: true, locale: id })}</span>
       </div>
-      <p className="text-sm text-foreground/90 line-clamp-3 whitespace-pre-wrap">{post.content}</p>
+      <ContentRenderer content={post.content} className="text-sm text-foreground/90 line-clamp-3 whitespace-pre-wrap" />
     </Link>
   );
 };
