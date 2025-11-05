@@ -1,5 +1,5 @@
 // src/components/PostCard.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MentionInput } from "./MentionInput";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { RankBadge } from "@/components/RankBadge";
 
 interface PostCardProps {
   post: {
@@ -23,7 +24,7 @@ interface PostCardProps {
     profiles: { id: string; full_name: string; avatar_url?: string; role: string };
     likes: any[]; reposts: any[]; quote_reposts: any[]; reposted_by_user?: any; repost_of_id?: string | null; quoted_post?: any;
   };
-  currentUserId?: string; onLike?: () => void; onPostUpdated?: () => void; onPostDeleted?: () => void;
+  currentUserId?: string; onLike?: () => void; onPostUpdated?: () => void; onPostDeleted?: () => void; topFollowers?: any[]; topLiked?: any[];
 }
 
 interface QuotedPostProps {
@@ -61,7 +62,7 @@ const QuotedPostCard = ({ post }: QuotedPostProps) => {
   );
 };
 
-const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }: PostCardProps) => {
+const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted, topFollowers, topLiked }: PostCardProps) => {
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [isReposted, setIsReposted] = useState(false);
@@ -76,6 +77,15 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }:
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [quoteContent, setQuoteContent] = useState("");
   const [isReposting, setIsReposting] = useState(false);
+  const [followerRank, likerRank] = useMemo(() => {
+    const authorId = post.profiles.id;
+    const fRank = (topFollowers || []).slice(0, 3).findIndex(u => u.id === authorId);
+    const lRank = (topLiked || []).slice(0, 3).findIndex(u => u.id === authorId);
+    return [
+      fRank !== -1 ? fRank + 1 : null,
+      lRank !== -1 ? lRank + 1 : null
+    ];
+  }, [topFollowers, topLiked, post.profiles.id]);
 
   const navigate = useNavigate();
   const isOwnPost = currentUserId === post.profiles.id;
@@ -181,6 +191,8 @@ const PostCard = ({ post, currentUserId, onLike, onPostUpdated, onPostDeleted }:
         <div className="flex-1">
           <div className="mb-2 flex items-center gap-2">
             <Link to={`/profile/${post.profiles.id}`} className="rounded-xl px-2 py-1 font-semibold hover:bg-accent/10 transition">{post.profiles.full_name}</Link>
+            <RankBadge rank={followerRank} type="follower" />
+            <RankBadge rank={likerRank} type="like" />
             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${roleStyles[post.profiles.role] || "bg-muted text-muted-foreground"}`}>
               {roleIcons[post.profiles.role] || roleIcons.alumni}{post.profiles.role[0].toUpperCase() + post.profiles.role.slice(1)}
             </span>

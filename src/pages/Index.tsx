@@ -203,6 +203,8 @@ const Index = () => {
                         onLike={() => refreshOnePost(post.id)}
                         onPostUpdated={refreshPosts}
                         onPostDeleted={refreshPosts}
+                        topFollowers={topFollowers}
+                        topLiked={topLiked}
                       />
                     ))}
                     <div ref={observerTarget} className="h-8" />
