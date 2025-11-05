@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -80,7 +80,12 @@ const GroupDetail = () => {
         .order("created_at", { ascending: false });
       if (error) throw error;
       const postsWithData = (data || []).map(p => ({ ...p, likes: p.likes || [], reposts: [], quote_reposts: [] }));
-      setPosts(postsWithData);
+      
+      if (reset) {
+        setPosts(postsWithData);
+      } else {
+        setPosts(postsWithData);
+      }
     } catch (e: any) {
       toast.error(e.message);
     }
@@ -120,22 +125,24 @@ const GroupDetail = () => {
   useEffect(() => {
     if (!groupId) return;
     const handleRefresh = () => loadPosts(true);
+    
     const postsChannel = supabase
       .channel(`group-posts-${groupId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "group_posts", filter: `group_id=eq.${groupId}` }, handleRefresh)
       .subscribe();
+      
     const likesChannel = supabase
       .channel(`group-likes-${groupId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "group_post_likes" }, (payload: any) => {
-        const changedPostId = payload.new?.post_id || payload.old?.post_id;
-        if (changedPostId && posts.some(p => p.id === changedPostId)) handleRefresh();
+        handleRefresh();
       })
       .subscribe();
+      
     return () => {
       supabase.removeChannel(postsChannel);
       supabase.removeChannel(likesChannel);
     };
-  }, [groupId, supabase, posts]);
+  }, [groupId, supabase]);
 
   const searchUsers = async (query: string) => {
     if (!query.trim()) return;
@@ -164,12 +171,7 @@ const GroupDetail = () => {
     const adminName = adminProfile?.full_name || "Pemilik grup";
     
     try {
-      const { error } = await supabase.from("group_members").insert({
-        group_id: groupId,
-        user_id: profileToAdd.id,
-        role: "member"
-      });
-      
+      const { error } = await supabase.from("group_members").insert({ group_id: groupId, user_id: profileToAdd.id, role: "member" });
       if (error) throw error;
       const { error: notifError } = await supabase
         .from("notifications")
@@ -182,18 +184,10 @@ const GroupDetail = () => {
           reference_id: groupId,
           reference_type: 'group'
         });
-      if (notifError) {
-        console.error("Gagal mengirim notifikasi:", notifError.message);
-      }
+      if (notifError) console.error("Gagal mengirim notifikasi:", notifError.message);
 
       toast.success(`${profileToAdd.full_name} telah ditambahkan ke grup!`);
-      setMembers(prev => [...prev, {
-        user_id: profileToAdd.id,
-        profiles: profileToAdd,
-        role: 'member',
-        group_id: groupId,
-        id: Math.random().toString() 
-      }]);
+      setMembers(prev => [...prev, { user_id: profileToAdd.id, profiles: profileToAdd, role: 'member', group_id: groupId, id: Math.random().toString() }]);
       setSearchResults(prev => prev.filter(u => u.id !== profileToAdd.id)); 
     } catch (e: any) {
       toast.error(e.message);
@@ -216,7 +210,8 @@ const GroupDetail = () => {
       for (const m of mediaFiles) { const u = await uploadMedia(m.file, currentUser.id, m.type); urls.push(u); types.push(m.type); }
       const { error } = await supabase.from("group_posts").insert({ group_id: groupId, user_id: currentUser.id, content: newPostContent.trim(), media_urls: urls.length ? urls : null, media_types: types.length ? types : null });
       if (error) throw error;
-      toast.success("Postingan berhasil dibuat!"); setNewPostContent(""); setMediaFiles([]); await loadPosts(true);
+      toast.success("Postingan berhasil dibuat!"); setNewPostContent(""); setMediaFiles([]);
+      await loadPosts(true);
     } catch (e: any) { toast.error(e.message); } finally { setPosting(false); }
   };
 
@@ -341,8 +336,8 @@ const GroupDetail = () => {
                               <p className="text-sm font-medium truncate">{user.full_name}</p>
                               <p className="text-xs text-muted-foreground">{user.role}</p>
                             </div>
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               onClick={() => setUserToConfirmAdd(user)}
                               className="bg-accent text-accent-foreground hover:bg-accent/90"
                             >
