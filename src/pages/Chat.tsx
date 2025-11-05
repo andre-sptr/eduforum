@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { z } from "zod";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MentionInput } from "@/components/MentionInput";
+import { RankBadge } from "@/components/RankBadge";
 
 const messageSchema = z.object({ content: z.string().trim().min(1,"Message cannot be empty").max(2000,"Message is too long (max 2000 characters)") });
 
@@ -30,16 +31,24 @@ const Chat = () => {
   const [editingMessageId,setEditingMessageId]=useState<string|null>(null);
   const [editContent,setEditContent]=useState("");
   const [groupMembers,setGroupMembers]=useState<string[]>([]);
+  const [topFollowers, setTopFollowers] = useState<any[]>([]);
+  const [topLiked, setTopLiked] = useState<any[]>([]);
   const cardRef=useRef<HTMLDivElement|null>(null);
   const bottomRef=useRef<HTMLDivElement|null>(null);
   const unsubscribeRef=useRef<null|(()=>void)>(null);
   const atBottomRef=useRef(true);
   const pendingSmoothRef=useRef(false);
 
+  const followerRankMap = useMemo(() =>
+    new Map(topFollowers.slice(0, 3).map((u, i) => [u.id, i + 1]))
+  , [topFollowers]);
+
+  const likerRankMap = useMemo(() =>
+    new Map(topLiked.slice(0, 3).map((u, i) => [u.id, i + 1]))
+  , [topLiked]);
+
   useEffect(()=>{ checkUser(); return()=>{ unsubscribeRef.current?.(); }; },[conversationId]);
-
   useEffect(()=>{ attachScrollListener(); return detachScrollListener; },[cardRef.current]);
-
   useEffect(()=>{
     const scroll = () => bottomRef.current?.scrollIntoView({ behavior: pendingSmoothRef.current ? "smooth" : "auto", block:"end" });
     if (atBottomRef.current || pendingSmoothRef.current) requestAnimationFrame(scroll);
@@ -58,11 +67,28 @@ const Chat = () => {
   const checkUser=async()=> {
     const { data:{ user } }=await supabase.auth.getUser(); if(!user){ navigate("/auth"); return; }
     setCurrentUser(user);
-    const { data:conv }=await supabase.from("conversations").select("*").eq("id",conversationId).single();
-    if(!conv){ toast.error("Percakapan tidak ditemukan"); navigate("/messages"); return; }
+    const [
+      convRes,
+      tfRes,
+      tlRes
+    ] = await Promise.all([
+      supabase.from("conversations").select("*").eq("id", conversationId).single(),
+      supabase.rpc("get_top_5_followers"),
+      supabase.rpc("get_top_5_liked_users")
+    ]);
+    if (tfRes.data) setTopFollowers(tfRes.data);
+    if (tlRes.data) setTopLiked(tlRes.data);
+    const conv = convRes.data;
+    if (!conv) { toast.error("Percakapan tidak ditemukan"); navigate("/messages"); return; }
     setConversation(conv);
-    if(conv.type==="group"&&conv.group_id){ const { data:members }=await supabase.from("group_members").select("user_id").eq("group_id",conv.group_id); if(members) setGroupMembers(members.map(m=>m.user_id)); }
-    if(conv.type==="global"){ const { data:exist }=await supabase.from("conversation_participants").select("*").eq("conversation_id",conversationId).eq("user_id",user.id).single(); if(!exist) await supabase.from("conversation_participants").insert({conversation_id:conversationId,user_id:user.id}); }
+    if (conv.type === "group" && conv.group_id) {
+      const { data: members } = await supabase.from("group_members").select("user_id").eq("group_id", conv.group_id);
+      if (members) setGroupMembers(members.map(m => m.user_id));
+    }
+    if (conv.type === "global") {
+      const { data: exist } = await supabase.from("conversation_participants").select("*").eq("conversation_id", conversationId).eq("user_id", user.id).single();
+      if (!exist) await supabase.from("conversation_participants").insert({ conversation_id: conversationId, user_id: user.id });
+    }
     await loadMessages();
     unsubscribeRef.current = setupRealtimeSubscription();
     setLoading(false);
@@ -176,8 +202,10 @@ const Chat = () => {
 
                     <div className={`max-w-[72%] ${mine?"items-end text-right":"items-start"} flex flex-col`}>
                       {!grouped && (
-                        <div className={`mb-1 flex items-baseline gap-2 ${mine?"flex-row-reverse":""}`}>
+                        <div className={`mb-1 flex items-center flex-wrap gap-2 ${mine ? "flex-row-reverse" : ""}`}>
                           <Link to={`/profile/${m.user_id}`} className="text-sm font-medium hover:text-accent">{m.profiles?.full_name}</Link>
+                          <RankBadge rank={followerRankMap.get(m.user_id)} type="follower" />
+                          <RankBadge rank={likerRankMap.get(m.user_id)} type="like" />
                         </div>
                       )}
 

@@ -57,6 +57,8 @@ const Profile=()=> {
   const [viewerOpen,setViewerOpen]=useState(false);
   const [followerRank, setFollowerRank] = useState<number | null>(null);
   const [likerRank, setLikerRank] = useState<number | null>(null);
+  const [topFollowers, setTopFollowers] = useState<any[]>([]);
+  const [topLiked, setTopLiked] = useState<any[]>([]);
 
   const getInitials=(n:string)=>{ const a=n.split(" "); return a.length>=2?(a[0][0]+a[1][0]).toUpperCase():n.slice(0,2).toUpperCase(); };
   const getRoleBadgeColor=(r:string)=> r==="siswa"?"bg-blue-500/20 text-blue-400":r==="guru"?"bg-green-500/20 text-green-400":r==="alumni"?"bg-purple-500/20 text-purple-400":"bg-muted text-muted-foreground";
@@ -96,6 +98,7 @@ const Profile=()=> {
         supabase.rpc("get_top_5_followers"),supabase.rpc("get_top_5_liked_users")
       ]);
       if(pe) throw pe;
+      setTopFollowers(topFollowersData || []); setTopLiked(topLikedData || []);
       setProfile(profileData); setIsFollowing(!!followData);
       setFollowerCount(followersRes.count||0); setFollowingCount(followingRes.count||0);
       setFollowingIds(new Set((myFollowingList.data||[]).map((r:any)=>r.following_id)));
@@ -318,7 +321,7 @@ const Profile=()=> {
             <Card className="p-8 text-center"><p className="text-muted-foreground">Belum ada postingan</p></Card>
           ):(
             <>
-              {posts.map(p=>(<PostCard key={p.id} post={p} currentUserId={currentUser?.id} onLike={refreshPosts} onPostUpdated={refreshPosts} onPostDeleted={refreshPosts}/>))}
+              {posts.map(p=>(<PostCard key={p.id} post={p} currentUserId={currentUser?.id} onLike={refreshPosts} onPostUpdated={refreshPosts} onPostDeleted={refreshPosts} topFollowers={topFollowers} topLiked={topLiked} />))}
               {postsLoading&&(<div className="space-y-4"><PostSkeleton/></div>)}
               <div ref={loadMoreRef} className="h-6"/>
             </>

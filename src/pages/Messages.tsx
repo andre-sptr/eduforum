@@ -1,5 +1,5 @@
 // src/pages/Messages.tsx
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { z } from "zod";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MentionInput } from "@/components/MentionInput";
+import { RankBadge } from "@/components/RankBadge";
 
 const messageSchema=z.object({content:z.string().trim().min(1,"Message cannot be empty").max(2000,"Message is too long")});
 interface Message{ id:string; user_id:string; content:string; created_at:string; edited_at?:string|null; is_deleted?:boolean; profiles?:{ full_name:string; avatar_url:string|null; role:string; }; }
@@ -29,7 +30,17 @@ const Messages=()=> {
   const [editingMessageId,setEditingMessageId]=useState<string|null>(null);
   const [editContent,setEditContent]=useState("");
   const [followQuery,setFollowQuery]=useState("");
+  const [topFollowers, setTopFollowers] = useState<any[]>([]);
+  const [topLiked, setTopLiked] = useState<any[]>([]);
   const messagesViewportRef=useRef<HTMLDivElement>(null);
+
+  const followerRankMap = useMemo(() =>
+    new Map(topFollowers.slice(0, 3).map((u, i) => [u.id, i + 1]))
+  , [topFollowers]);
+
+  const likerRankMap = useMemo(() =>
+    new Map(topLiked.slice(0, 3).map((u, i) => [u.id, i + 1]))
+  , [topLiked]);
 
   useEffect(()=>{ checkUser(); },[]);
   useEffect(()=>{ const el=messagesViewportRef.current; if(el) el.scrollTop=el.scrollHeight; },[messages]);
@@ -38,7 +49,15 @@ const Messages=()=> {
     const { data:{ user } }=await supabase.auth.getUser();
     if(!user){ navigate("/auth"); return; }
     setCurrentUser(user);
-    await Promise.all([loadGlobalChat(user.id),loadFollowedUsers(user.id),loadUserGroups(user.id)]);
+    const [_, __, ___, tfData, tlData] = await Promise.all([
+      loadGlobalChat(user.id),
+      loadFollowedUsers(user.id),
+      loadUserGroups(user.id),
+      supabase.rpc("get_top_5_followers"),
+      supabase.rpc("get_top_5_liked_users") 
+    ]);
+    if (tfData.data) setTopFollowers(tfData.data);
+    if (tlData.data) setTopLiked(tlData.data);
     setLoading(false);
   };
 
@@ -143,8 +162,10 @@ const Messages=()=> {
                       <Avatar className="h-8 w-8"><AvatarImage src={m.profiles?.avatar_url||undefined}/><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(m.profiles?.full_name||"U")}</AvatarFallback></Avatar>
                     </Link>
                     <div className={`flex flex-col max-w-[70%] ${own?"items-end":"items-start"}`}>
-                      <div className="flex items-baseline gap-2 mb-1">
-                        <Link to={`/profile/${m.user_id}`} className="text-sm font-medium" onClick={(e)=>e.stopPropagation()}>{m.profiles?.full_name}</Link>
+                      <div className="flex items-center flex-wrap gap-2 mb-1">
+                        <Link to={`/profile/${m.user_id}`} className="text-sm font-medium" onClick={(e) => e.stopPropagation()}>{m.profiles?.full_name}</Link>
+                        <RankBadge rank={followerRankMap.get(m.user_id)} type="follower" />
+                        <RankBadge rank={likerRankMap.get(m.user_id)} type="like" />
                         <span className="text-xs text-muted-foreground">{m.profiles?.role}</span>
                       </div>
                       {editing?(
