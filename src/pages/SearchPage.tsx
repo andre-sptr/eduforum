@@ -1,5 +1,5 @@
 // src/pages/SearchPage.tsx
-import { useEffect,useState } from "react";
+import { useEffect,useState,useMemo } from "react";
 import { useNavigate,useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { ArrowLeft,Search,User,FileText } from "lucide-react";
 import PostCard from "@/components/PostCard";
 import PostSkeleton from "@/components/PostSkeleton";
 import { toast } from "sonner";
+import { RankBadge } from "@/components/RankBadge";
 
 const SearchPage=()=> {
   const navigate=useNavigate(); const [sp]=useSearchParams();
@@ -18,8 +19,18 @@ const SearchPage=()=> {
   const [users,setUsers]=useState<any[]>([]);
   const [loading,setLoading]=useState(false);
   const [currentUser,setCurrentUser]=useState<any>(null);
-  const getInitials=(n:string)=>{ const a=n.trim().split(" "); return (a[0][0]+(a[1]?.[0]||a[0][1]||"")).toUpperCase(); };
+  const [topFollowers, setTopFollowers] = useState<any[]>([]);
+  const [topLiked, setTopLiked] = useState<any[]>([]);
 
+  const followerRankMap = useMemo(() =>
+    new Map(topFollowers.slice(0, 3).map((u, i) => [u.id, i + 1]))
+  , [topFollowers]);
+
+  const likerRankMap = useMemo(() =>
+    new Map(topLiked.slice(0, 3).map((u, i) => [u.id, i + 1]))
+  , [topLiked]);
+
+  const getInitials=(n:string)=>{ const a=n.trim().split(" "); return (a[0][0]+(a[1]?.[0]||a[0][1]||"")).toUpperCase(); };
   const refreshPosts=async()=>{ if(q.trim()) await handleSearch(q); };
 
   useEffect(()=>{ checkUser(); },[]);
@@ -27,24 +38,39 @@ const SearchPage=()=> {
 
   const checkUser=async()=> {
     const { data:{ user } }=await supabase.auth.getUser(); if(!user){ navigate("/auth"); return; }
-    const { data:profile }=await supabase.from("profiles").select("*").eq("id",user.id).single(); setCurrentUser(profile);
+    const [profileRes, tfRes, tlRes] = await Promise.all([
+      supabase.from("profiles").select("*").eq("id", user.id).single(),
+      supabase.rpc("get_top_5_followers"),
+      supabase.rpc("get_top_5_liked_users")
+    ]);
+    
+    setCurrentUser(profileRes.data);
+    if (tfRes.data) setTopFollowers(tfRes.data);
+    if (tlRes.data) setTopLiked(tlRes.data);
   };
 
   const handleSearch=async(query:string)=> {
     if(!query.trim()){ setPosts([]); setUsers([]); return; }
     setLoading(true);
     try{
-      const { data:postsData,error:postsError }=await supabase.from("posts").select("*").ilike("content",`%${query}%`).order("created_at",{ ascending:false }).limit(20);
+      const { data: postsData, error: postsError } = await supabase
+        .from("posts")
+        .select(`
+          id, content, created_at, media_urls, media_types, user_id,
+          profiles:profiles!user_id ( id, full_name, avatar_url, role ),
+          likes ( user_id, post_id ),
+          reposts ( count ),
+          quote_reposts:posts!repost_of_id ( count ),
+          quoted_post:repost_of_id (
+            id, content, created_at, user_id,
+            profiles:profiles!user_id ( id, full_name, avatar_url, role )
+          )
+        `)
+        .ilike("content", `%${query}%`)
+        .order("created_at", { ascending: false })
+        .limit(20);
       if(postsError) throw postsError;
-      if(postsData?.length){
-        const userIds=[...new Set(postsData.map(p=>p.user_id))];
-        const { data:profilesData }=await supabase.from("profiles").select("id,full_name,avatar_url,role").in("id",userIds);
-        const postIds=postsData.map(p=>p.id);
-        const { data:likesData }=await supabase.from("likes").select("post_id,user_id").in("post_id",postIds);
-        const pMap=new Map((profilesData||[]).map(p=>[p.id,p]));
-        const lMap=new Map<string,any[]>(); (likesData||[]).forEach(l=>{ if(!lMap.has(l.post_id)) lMap.set(l.post_id,[]); lMap.get(l.post_id)!.push(l); });
-        setPosts(postsData.map(post=>({ ...post,profiles:pMap.get(post.user_id),likes:lMap.get(post.id)||[] })));
-      }else setPosts([]);
+      setPosts(postsData || []);
       const { data:usersData,error:usersError }=await supabase.from("profiles").select("*").ilike("full_name",`%${query}%`).limit(20);
       if(usersError) throw usersError; setUsers(usersData||[]);
     }catch(e:any){ toast.error(e.message); }finally{ setLoading(false); }
@@ -89,7 +115,11 @@ const SearchPage=()=> {
                         <AvatarImage src={u.avatar_url||undefined}/><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(u.full_name)}</AvatarFallback>
                       </Avatar>
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold truncate">{u.full_name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold truncate">{u.full_name}</p>
+                          <RankBadge rank={followerRankMap.get(u.id)} type="follower" />
+                          <RankBadge rank={likerRankMap.get(u.id)} type="like" />
+                        </div>
                         {u.bio&&<p className="text-sm text-muted-foreground truncate">{u.bio}</p>}
                       </div>
                       <Button variant="ghost" size="sm" className="rounded-xl">Lihat</Button>
@@ -113,7 +143,7 @@ const SearchPage=()=> {
           ):posts.length?(
             <div className="space-y-4">
               {posts.map(p=>(
-                <PostCard key={p.id} post={p} currentUserId={currentUser?.id} onLike={refreshPosts} onPostUpdated={refreshPosts} onPostDeleted={refreshPosts}/>
+                <PostCard key={p.id} post={p} currentUserId={currentUser?.id} onLike={refreshPosts} onPostUpdated={refreshPosts} onPostDeleted={refreshPosts} postType="global" topFollowers={topFollowers} topLiked={topLiked}/>
               ))}
             </div>
           ):(

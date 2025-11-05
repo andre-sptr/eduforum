@@ -1,11 +1,12 @@
 // src/pages/PostPage.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import PostCard from "@/components/PostCard";
+import { RankBadge } from "@/components/RankBadge";
 
 const PostPage = () => {
   const { postId } = useParams();
@@ -13,6 +14,8 @@ const PostPage = () => {
   const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [topFollowers, setTopFollowers] = useState<any[]>([]);
+  const [topLiked, setTopLiked] = useState<any[]>([]);
 
   useEffect(() => { loadPost(); }, [postId]);
 
@@ -20,12 +23,34 @@ const PostPage = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
-      const { data: postData, error: postError } = await supabase.from("posts").select("*").eq("id", postId).single();
-      if (postError) throw postError;
-      if (!postData) { toast.error("Postingan tidak ditemukan"); navigate("/"); return; }
-      const { data: profileData } = await supabase.from("profiles").select("*").eq("id", postData.user_id).single();
-      const { data: likesData } = await supabase.from("likes").select("*").eq("post_id", postId);
-      setPost({ ...postData, profiles: profileData, likes: likesData || [] });
+      const [postRes, tfRes, tlRes] = await Promise.all([
+        supabase
+          .from("posts")
+          .select(`
+            id, content, created_at, media_urls, media_types, user_id,
+            profiles:profiles!user_id ( id, full_name, avatar_url, role ),
+            likes ( user_id, post_id ),
+            reposts ( count ),
+            quote_reposts:posts!repost_of_id ( count ),
+            quoted_post:repost_of_id (
+              id, content, created_at, user_id,
+              profiles:profiles!user_id ( id, full_name, avatar_url, role )
+            )
+          `)
+          .eq("id", postId)
+          .single(),
+        supabase.rpc("get_top_5_followers"),
+        supabase.rpc("get_top_5_liked_users")
+      ]);
+      if (tfRes.data) setTopFollowers(tfRes.data);
+      if (tlRes.data) setTopLiked(tlRes.data);
+      if (postRes.error) throw postRes.error;
+      if (!postRes.data) {
+        toast.error("Postingan tidak ditemukan");
+        navigate("/");
+        return;
+      }
+      setPost(postRes.data);
     } catch (e: any) { toast.error(e.message); navigate("/"); } finally { setLoading(false); }
   };
 
@@ -52,7 +77,7 @@ const PostPage = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6 max-w-3xl">
-        <PostCard post={post} currentUserId={currentUser?.id} onLike={loadPost} onPostUpdated={loadPost} onPostDeleted={() => navigate("/")} postType="global" />
+        <PostCard post={post} currentUserId={currentUser?.id} onLike={loadPost} onPostUpdated={loadPost} onPostDeleted={() => navigate("/")} postType="global" topFollowers={topFollowers} topLiked={topLiked}/>
       </main>
     </div>
   );

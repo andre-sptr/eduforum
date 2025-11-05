@@ -321,7 +321,7 @@ const Profile=()=> {
             <Card className="p-8 text-center"><p className="text-muted-foreground">Belum ada postingan</p></Card>
           ):(
             <>
-              {posts.map(p=>(<PostCard key={p.id} post={p} currentUserId={currentUser?.id} onLike={refreshPosts} onPostUpdated={refreshPosts} onPostDeleted={refreshPosts} topFollowers={topFollowers} topLiked={topLiked} />))}
+              {posts.map(p=>(<PostCard key={p.id} post={p} currentUserId={currentUser?.id} onLike={refreshPosts} onPostUpdated={refreshPosts} onPostDeleted={refreshPosts} postType="global" topFollowers={topFollowers} topLiked={topLiked} />))}
               {postsLoading&&(<div className="space-y-4"><PostSkeleton/></div>)}
               <div ref={loadMoreRef} className="h-6"/>
             </>
