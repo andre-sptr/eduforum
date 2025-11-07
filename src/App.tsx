@@ -27,6 +27,7 @@ const SearchPage = lazy(() => import("./pages/SearchPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PostPage = lazy(() => import("./pages/PostPage"));
 const UpdatePassword = lazy(() => import("./pages/UpdatePassword"));
+const WebsitePage = lazy(() => import("./pages/WebsitePage"));
 
 const App = () => (
   <ThemeProvider defaultTheme="system" storageKey="eduforum-theme">
@@ -52,6 +53,7 @@ const App = () => (
               <Route path="/games" element={<Games />} />
               <Route path="/search" element={<SearchPage />} />
               <Route path="/post/:postId" element={<PostPage />} />
+              <Route path="/websitepage" element={<WebsitePage />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>

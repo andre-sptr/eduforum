@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { TrendingUp, Trophy, Medal, Award, FileText, Heart } from "lucide-react";
+import { TrendingUp, Trophy, Medal, Award, FileText, Heart, Globe } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { RankBadge } from "@/components/RankBadge"
+import { Button } from "@/components/ui/button";
 
 interface LeaderboardUser {
   id: string;
@@ -93,6 +94,26 @@ const Leaderboard = ({ users, likedUsers }: LeaderboardProps) => {
               ))}
             </div>
           </TooltipProvider>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm overflow-hidden">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Globe className="h-5 w-5 text-primary" />
+            Website Siswa
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4">
+          <p className="text-sm text-muted-foreground mb-3">
+            Lihat proyek dan situs web karya siswa.
+          </p>
+          <Button 
+            className="w-full rounded-xl"
+            onClick={() => navigate('/websitepage')}
+          >
+            Lihat
+          </Button>
         </CardContent>
       </Card>
       
