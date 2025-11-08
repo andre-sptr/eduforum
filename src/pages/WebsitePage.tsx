@@ -9,7 +9,9 @@ import { ArrowLeft, Search } from "lucide-react";
 const studentWebsites = [
   { id: 1, name: "Game Skill Analyzer", author: "Andhika Syahputra, Aulia Hadziq Afif, Bintang Rahman, Fatimah Azmi Nadira, dan Hilal Nov Putra Tri Ratya", url: "https://lembu.icsiak.site/", description: "Temukan Potensi Belajarmu dari Game!" },
   { id: 2, name: "Islamic Future", author: "Firdan Habsi Wijayanto, Rafa Syarahil, Rakha Saputra, dan Taat Nugroho", url: "https://jannahin.icsiak.site/", description: "Menggabungkan Nilai-Nilai Islami dengan Teknologi Masa Depan." },
-  { id: 2, name: "Seryn", author: "Azkia Calisa, Wardatul, Puan Faizah, Nailah Fauziah, dan Shafa Nabilah", url: "https://seryn.icsiak.site/", description: "Send Sweet Vibes to MAN IC Friends." },
+  { id: 3, name: "Seryn", author: "Azkia Calisa, Wardatul, Puan Faizah, Nailah Fauziah, dan Shafa Nabilah", url: "https://seryn.icsiak.site/", description: "Send Sweet Vibes to MAN IC Friends." },
+  { id: 4, name: "Smart Vibes", author: "Fadila Safitri, Hilya Atira Salsabila, Neni Sahira, dan Tasya Nur Elisa", url: "https://smartvibes.icsiak.site/", description: "Aku SmartVibes — temen ngobrol dan bantu belajarmu. Mau bahas apa hari ini?" },
+  { id: 5, name: "Study Share", author: "Oksya Donika Amalia, Azilla Lovenia Almisky, Alya Azizah Afdal, Aira Reyhana Sumardi, dan Nayla Azira", url: "https://studyshare.icsiak.site/", description: "Tempat anak Madrasah berbagi video belajar, berdiskusi, dan upload tugas bareng." },
 ];
 
 export default function WebsitePage() {
