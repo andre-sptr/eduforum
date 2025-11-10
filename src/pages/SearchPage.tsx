@@ -57,13 +57,13 @@ const SearchPage=()=> {
         .from("posts")
         .select(`
           id, content, created_at, media_urls, media_types, user_id,
+          spotify_track_id,
           profiles:profiles!user_id ( id, full_name, avatar_url, role ),
           likes ( user_id, post_id ),
           reposts ( count ),
           quote_reposts:posts!repost_of_id ( count ),
           quoted_post:repost_of_id (
             id, content, created_at, user_id,
-            spotify_track_id,
             profiles:profiles!user_id ( id, full_name, avatar_url, role )
           )
         `)

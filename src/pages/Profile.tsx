@@ -18,13 +18,13 @@ type PostFilter = "all" | "reposts" | "media" | "text";
 const POSTS_PROFILES_FK="posts_user_id_fkey";
 const POST_SELECT = `
   id, content, created_at, media_urls, media_types, user_id,
+  spotify_track_id,
   profiles:profiles!user_id ( id, full_name, avatar_url, role ),
   likes ( user_id, post_id ),
   reposts ( count ),
   quote_reposts:posts!repost_of_id ( count ),
   quoted_post:repost_of_id (
     id, content, created_at, user_id,
-    spotify_track_id,
     profiles:profiles!user_id ( id, full_name, avatar_url, role )
   )
 `;
