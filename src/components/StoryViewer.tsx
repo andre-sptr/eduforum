@@ -23,10 +23,9 @@ import {
 interface Story {
   id: string;
   media_url: string;
-  media_type: "image" | "video"; // Tipe "spotify" dihapus
+  media_type: "image" | "video";
   content: string | null;
   created_at: string;
-  // spotify_track_id dihapus
   viewed: boolean;
 }
 interface StoryGroup {
@@ -68,7 +67,6 @@ export const StoryViewer = ({
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  // iframeRef dihapus
 
   const activeGroup = useMemo(
     () => groups[currentUserIndex],
@@ -174,7 +172,6 @@ export const StoryViewer = ({
         videoRef.current.load();
       }
     }
-    // Blok 'else if (media_type === "spotify")' dihapus
   }, [activeStory, markStoryAsViewed, goToNextStory]);
 
   useEffect(() => {

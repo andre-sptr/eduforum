@@ -25,6 +25,7 @@ interface PostCardProps {
     likes: any[]; reposts: any[]; quote_reposts: any[];
     repost_of_id?: string | null; quoted_post?: any;
     reposted_by_user?: any; group_id?: string | null;
+    spotify_track_id?: string | null;
   };
   postType: "global" | "group";
   currentUserId?: string;
@@ -255,6 +256,21 @@ const PostCard = ({ post, postType = "global", currentUserId, onLike, onPostUpda
             <ContentRenderer content={post.content} className="mb-3 whitespace-pre-wrap text-foreground" />
           )}
 
+          {post.spotify_track_id && (
+            <div className="mt-3 overflow-hidden rounded-xl border border-border">
+              <iframe
+                src={`https://open.spotify.com/embed/track/${post.spotify_track_id}`}
+                width="100%"
+                height="152"
+                frameBorder="0"
+                allowTransparency={true}
+                allow="encrypted-media"
+                loading="lazy"
+                className="rounded-xl"
+              ></iframe>
+            </div>
+          )}
+
           {post.quoted_post && (
             <div className="mt-2 mb-3 border border-border rounded-xl overflow-hidden cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate(`/post/${post.quoted_post.id}`); }}>
               <QuotedPostCard post={post.quoted_post} />
@@ -311,7 +327,6 @@ const PostCard = ({ post, postType = "global", currentUserId, onLike, onPostUpda
               {likeCount > 0 && <span>{likeCount}</span>}
             </Button>
 
-            {/* Repost/Quote hanya untuk postingan global */}
             {postType === "global" && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

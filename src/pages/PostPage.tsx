@@ -34,6 +34,7 @@ const PostPage = () => {
             quote_reposts:posts!repost_of_id ( count ),
             quoted_post:repost_of_id (
               id, content, created_at, user_id,
+              spotify_track_id,
               profiles:profiles!user_id ( id, full_name, avatar_url, role )
             )
           `)
@@ -77,7 +78,9 @@ const PostPage = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6 max-w-3xl">
-        <PostCard post={post} currentUserId={currentUser?.id} onLike={loadPost} onPostUpdated={loadPost} onPostDeleted={() => navigate("/")} postType="global" topFollowers={topFollowers} topLiked={topLiked}/>
+        <PostCard post={post} currentUserId={currentUser?.id} 
+        // onLike={loadPost} 
+        onPostUpdated={loadPost} onPostDeleted={() => navigate("/")} postType="global" topFollowers={topFollowers} topLiked={topLiked}/>
       </main>
     </div>
   );

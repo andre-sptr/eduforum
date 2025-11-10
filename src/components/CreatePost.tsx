@@ -9,6 +9,10 @@ import MediaUploader from "./MediaUploader";
 import { MediaFile, compressImage } from "@/lib/mediaUtils";
 import { z } from "zod";
 import { MentionInput } from "./MentionInput";
+import { Music, X } from "lucide-react";
+import { SpotifySearchModal } from "./SpotifySearchModal";
+import { Card as UiCard } from "@/components/ui/card";
+import { Avatar as UiAvatar, AvatarFallback as UiAvatarFallback, AvatarImage as UiAvatarImage } from "@/components/ui/avatar";
 
 const postSchema = z.object({ content: z.string().trim().min(1, "Post cannot be empty").max(5000, "Post is too long (max 5000 characters)") });
 
@@ -17,6 +21,8 @@ interface CreatePostProps { currentUser:{ id:string; full_name:string; avatar_ur
 const CreatePost = ({ currentUser, onPostCreated }: CreatePostProps) => {
   const [content, setContent] = useState(""); const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [loading, setLoading] = useState(false); const [mediaKey, setMediaKey] = useState(0);
+  const [showSpotifySearch, setShowSpotifySearch] = useState(false);
+  const [spotifyTrack, setSpotifyTrack] = useState<any>(null);
 
   const getInitials = (n:string) => { const a=n.split(" "); return a.length>=2?`${a[0][0]}${a[1][0]}`.toUpperCase():n.slice(0,2).toUpperCase(); };
 
@@ -34,10 +40,26 @@ const CreatePost = ({ currentUser, onPostCreated }: CreatePostProps) => {
     try {
       const mediaUrls:string[]=[]; const mediaTypes:string[]=[];
       for (const m of mediaFiles) { const url=await uploadMedia(m.file,currentUser.id,m.type); mediaUrls.push(url); mediaTypes.push(m.type); }
-      const { error } = await supabase.from("posts").insert({ user_id: currentUser.id, content: content.trim()||"", media_urls: mediaUrls.length?mediaUrls:null, media_types: mediaTypes.length?mediaTypes:null });
+      const { error } = await supabase.from("posts").insert({
+        user_id: currentUser.id,
+        content: content.trim() || "",
+        media_urls: mediaUrls.length ? mediaUrls : null,
+        media_types: mediaTypes.length ? mediaTypes : null,
+        spotify_track_id: spotifyTrack?.trackId || null
+      });
+
       if (error) throw error;
-      toast.success("Postingan berhasil dibuat!"); setContent(""); setMediaFiles([]); setMediaKey(v=>v+1); onPostCreated();
-    } catch (e:any){ toast.error(e.message); } finally { setLoading(false); }
+      toast.success("Postingan berhasil dibuat!"); 
+      setContent(""); 
+      setMediaFiles([]); 
+      setSpotifyTrack(null);
+      setMediaKey(v => v + 1); 
+      onPostCreated();
+    } catch (e: any) { 
+      toast.error(e.message); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   return (
@@ -50,9 +72,50 @@ const CreatePost = ({ currentUser, onPostCreated }: CreatePostProps) => {
         <div className="flex-1 space-y-4">
           <MentionInput value={content} onChange={setContent} placeholder="Apa yang Anda pikirkan?" className="min-h-[110px] resize-none rounded-xl bg-input/60 border-border focus-visible:ring-2 focus-visible:ring-accent" multiline currentUserId={currentUser.id} />
           <MediaUploader key={mediaKey} onMediaChange={setMediaFiles} />
+          <Button 
+            type="button" 
+            variant="ghost" 
+            size="sm" 
+            className="rounded-xl ring-1 ring-border hover:ring-accent/60 gap-2" 
+            onClick={() => setShowSpotifySearch(true)}
+            disabled={!!spotifyTrack}
+          >
+            <Music className="h-4 w-4"/> Spotify
+          </Button>
+
+          {spotifyTrack && (
+            <UiCard className="p-2 flex items-center gap-3 relative">
+              <UiAvatar className="h-8 w-8 rounded-sm">
+                <UiAvatarImage src={spotifyTrack.albumArtUrl || ""} />
+                <UiAvatarFallback><Music className="h-4 w-4" /></UiAvatarFallback>
+              </UiAvatar>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">{spotifyTrack.trackName}</p>
+                <p className="text-xs text-muted-foreground truncate">{spotifyTrack.artistName}</p>
+              </div>
+              <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSpotifyTrack(null)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </UiCard>
+          )}
           <div className="flex items-center justify-end">
-            <Button onClick={handleSubmit} disabled={loading||(!content.trim()&&mediaFiles.length===0)} className="rounded-xl px-5 bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-60">{loading?"Memposting...":"Posting"}</Button>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={loading || (!content.trim() && mediaFiles.length === 0 && !spotifyTrack)} 
+              className="..."
+            >
+              {loading ? "Memposting..." : "Posting"}
+            </Button>
           </div>
+
+          <SpotifySearchModal
+            open={showSpotifySearch}
+            onOpenChange={setShowSpotifySearch}
+            onSelectTrack={(track) => {
+              setSpotifyTrack(track);
+              setShowSpotifySearch(false);
+            }}
+          />
         </div>
       </div>
     </Card>

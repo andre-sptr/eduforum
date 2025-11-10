@@ -24,6 +24,7 @@ const POST_SELECT = `
   quote_reposts:posts!repost_of_id ( count ),
   quoted_post:repost_of_id (
     id, content, created_at, user_id,
+    spotify_track_id,
     profiles:profiles!user_id ( id, full_name, avatar_url, role )
   )
 `;
@@ -321,7 +322,9 @@ const Profile=()=> {
             <Card className="p-8 text-center"><p className="text-muted-foreground">Belum ada postingan</p></Card>
           ):(
             <>
-              {posts.map(p=>(<PostCard key={p.id} post={p} currentUserId={currentUser?.id} onLike={refreshPosts} onPostUpdated={refreshPosts} onPostDeleted={refreshPosts} postType="global" topFollowers={topFollowers} topLiked={topLiked} />))}
+              {posts.map(p=>(<PostCard key={p.id} post={p} currentUserId={currentUser?.id} 
+              //onLike={refreshPosts} 
+              onPostUpdated={refreshPosts} onPostDeleted={refreshPosts} postType="global" topFollowers={topFollowers} topLiked={topLiked} />))}
               {postsLoading&&(<div className="space-y-4"><PostSkeleton/></div>)}
               <div ref={loadMoreRef} className="h-6"/>
             </>

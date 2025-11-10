@@ -63,6 +63,7 @@ const SearchPage=()=> {
           quote_reposts:posts!repost_of_id ( count ),
           quoted_post:repost_of_id (
             id, content, created_at, user_id,
+            spotify_track_id,
             profiles:profiles!user_id ( id, full_name, avatar_url, role )
           )
         `)
@@ -143,7 +144,9 @@ const SearchPage=()=> {
           ):posts.length?(
             <div className="space-y-4">
               {posts.map(p=>(
-                <PostCard key={p.id} post={p} currentUserId={currentUser?.id} onLike={refreshPosts} onPostUpdated={refreshPosts} onPostDeleted={refreshPosts} postType="global" topFollowers={topFollowers} topLiked={topLiked}/>
+                <PostCard key={p.id} post={p} currentUserId={currentUser?.id}
+                // onLike={refreshPosts}
+                onPostUpdated={refreshPosts} onPostDeleted={refreshPosts} postType="global" topFollowers={topFollowers} topLiked={topLiked}/>
               ))}
             </div>
           ):(

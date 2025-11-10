@@ -38,6 +38,8 @@ const GroupDetail = () => {
   const [editDesc, setEditDesc] = useState("");
   const [openDelete, setOpenDelete] = useState(false);
   const [chatOpening, setChatOpening] = useState(false);
+  const [spotifyTrack, setSpotifyTrack] = useState<any>(null);
+  const [showSpotifySearch, setShowSpotifySearch] = useState(false);
   const [topFollowers, setTopFollowers] = useState<any[]>([]);
   const [topLiked, setTopLiked] = useState<any[]>([]);
   const [userToConfirmAdd, setUserToConfirmAdd] = useState<any | null>(null);
@@ -50,7 +52,6 @@ const GroupDetail = () => {
   const followerRankMap = useMemo(() => new Map(topFollowers.slice(0, 3).map((u, i) => [u.id, i + 1])), [topFollowers]);
   const likerRankMap = useMemo(() => new Map(topLiked.slice(0, 3).map((u, i) => [u.id, i + 1])), [topLiked]);
   
-  // Buat daftar ID anggota untuk difilter di MentionInput
   const memberIds = useMemo(() => members.map(m => m.user_id), [members]);
 
   const loadGroupData = async (userId: string) => {
@@ -80,7 +81,7 @@ const GroupDetail = () => {
     try {
       const { data, error } = await supabase
         .from("group_posts")
-        .select(`*, profiles:profiles!user_id(id, full_name, avatar_url, role), likes:group_post_likes(user_id, post_id)`)
+        .select(`*, profiles:profiles!user_id(id, full_name, avatar_url, role), likes:group_post_likes(user_id, post_id), spotify_track_id`)
         .eq("group_id", groupId)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -213,9 +214,9 @@ const GroupDetail = () => {
     try {
       const urls: string[] = []; const types: string[] = [];
       for (const m of mediaFiles) { const u = await uploadMedia(m.file, currentUser.id, m.type); urls.push(u); types.push(m.type); }
-      const { error } = await supabase.from("group_posts").insert({ group_id: groupId, user_id: currentUser.id, content: newPostContent.trim(), media_urls: urls.length ? urls : null, media_types: types.length ? types : null });
+      const { error } = await supabase.from("group_posts").insert({ group_id: groupId, user_id: currentUser.id, content: newPostContent.trim(), media_urls: urls.length ? urls : null, media_types: types.length ? types : null, spotify_track_id: spotifyTrack?.trackId || null });
       if (error) throw error;
-      toast.success("Postingan berhasil dibuat!"); setNewPostContent(""); setMediaFiles([]);
+      toast.success("Postingan berhasil dibuat!"); setNewPostContent(""); setMediaFiles([]); setSpotifyTrack(null);
       await loadPosts(true);
     } catch (e: any) { toast.error(e.message); } finally { setPosting(false); }
   };
@@ -429,7 +430,7 @@ const GroupDetail = () => {
                     postType="group"
                     topFollowers={topFollowers}
                     topLiked={topLiked}
-                    onLike={() => loadPosts(true)}
+                    // onLike={() => loadPosts(true)}
                     onPostDeleted={() => setPosts(currentPosts => currentPosts.filter(post => post.id !== p.id))}
                     allowedUserIds={memberIds}
                   />

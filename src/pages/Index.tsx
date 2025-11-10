@@ -18,6 +18,7 @@ const postSelect =
   likes ( user_id, post_id ),
   quoted_post:repost_of_id (
     id, content, created_at,
+    spotify_track_id,
     profiles ( id, full_name, avatar_url, role )
   )
 `.trim();
@@ -77,6 +78,7 @@ const Index = () => {
       .from("posts")
       .select(`
         id, content, created_at, media_urls, media_types, user_id,
+        spotify_track_id,
         profiles:profiles!user_id ( id, full_name, avatar_url, role ),
         likes ( user_id, post_id ),
         reposts ( count ),
@@ -111,6 +113,7 @@ const Index = () => {
           quote_reposts:posts!repost_of_id ( count ),
           quoted_post:repost_of_id (
             id, content, created_at, user_id,
+            spotify_track_id,
             profiles:profiles!user_id ( id, full_name, avatar_url, role )
           )
         `)
@@ -203,7 +206,7 @@ const Index = () => {
                         key={`${post.id}-${post.created_at}`}
                         post={post}
                         currentUserId={user?.id}
-                        onLike={() => refreshOnePost(post.id)}
+                        // onLike={() => refreshOnePost(post.id)}
                         onPostUpdated={refreshPosts}
                         onPostDeleted={refreshPosts}
                         topFollowers={topFollowers}
