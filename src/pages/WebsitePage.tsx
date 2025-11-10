@@ -12,6 +12,9 @@ const studentWebsites = [
   { id: 3, name: "Seryn", author: "Azkia Calisa, Wardatul, Puan Faizah, Nailah Fauziah, dan Shafa Nabilah", url: "https://seryn.icsiak.site/", description: "Send Sweet Vibes to MAN IC Friends." },
   { id: 4, name: "Smart Vibes", author: "Fadila Safitri, Hilya Atira Salsabila, Neni Sahira, dan Tasya Nur Elisa", url: "https://smartvibes.icsiak.site/", description: "Aku SmartVibes — temen ngobrol dan bantu belajarmu. Mau bahas apa hari ini?" },
   { id: 5, name: "Study Share", author: "Oksya Donika Amalia, Azilla Lovenia Almisky, Alya Azizah Afdal, Aira Reyhana Sumardi, dan Nayla Azira", url: "https://studyshare.icsiak.site/", description: "Tempat anak Madrasah berbagi video belajar, berdiskusi, dan upload tugas bareng." },
+  { id: 6, name: "EduBattle", author: "Nafisa Aqilah, Filza Nabila, Zahra Iffatunnisa, Keyla Adhelia, dan Qanita Najiya", url: "https://nexbiee.icsiak.site/", description: "Platform edukasi interaktif dengan battle game yang seru! Kumpulkan XP, naik level, dan unlock materi baru." },
+  { id: 7, name: "Type Rush", author: "Muhammad Ragil Ariyoseto S., Radhitya Rafie, Dzakirul Hanif, Tanzilal Akbar Ramadhan H., dan Almer Najid Hakim", url: "https://typerush.icsiak.site/", description: "Race against time. Master your keyboard. Dominate the leaderboard." },
+  { id: 8, name: "Fact Hub", author: "Zahra Dzakiyah Gunawan, Mazaya Syifa Alifa, Insyanifa Syafwah, dan Wafiq Khairunnisa", url: "https://facthub.icsiak.site/", description: "Dosis harian fakta menakjubkan. Temukan, bagikan, dan jelajahi pengetahuan menarik dari seluruh alam semesta." },
 ];
 
 export default function WebsitePage() {
