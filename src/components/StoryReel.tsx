@@ -12,7 +12,7 @@ import { Card } from "./ui/card";
 interface Story {
   id: string;
   media_url: string;
-  media_type: 'image' | 'video' | 'spotify';
+  media_type: 'image' | 'video';
   content: string | null;
   created_at: string;
   viewed: boolean;
