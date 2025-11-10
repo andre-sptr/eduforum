@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -15,12 +15,14 @@ interface Story {
   media_type: 'image' | 'video' | 'spotify';
   content: string | null;
   created_at: string;
+  viewed: boolean;
 }
 interface StoryGroup {
   user_id: string;
   full_name: string;
   avatar_url: string | null;
   stories: Story[];
+  all_viewed: boolean;
 }
 
 interface StoryReelProps {
@@ -42,48 +44,18 @@ export const StoryReel = ({ currentUser }: StoryReelProps) => {
   const fetchStories = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc("get_recent_stories")
-        .select(`
-          id, user_id, media_url, media_type, content, created_at,
-          profiles ( id, full_name, avatar_url )
-        `);
+      const { data, error } = await supabase.rpc("get_recent_stories_grouped", {
+        p_user_id: currentUser.id,
+      });
       
       if (error) throw error;
 
-      const userStoryMap = new Map<string, StoryGroup>();
-      
-      for (const story of data as any[]) {
-        if (!story.profiles) continue; 
-        
-        const profile = story.profiles as { id: string; full_name: string; avatar_url: string | null };
-        const storyData: Story = {
-          id: story.id,
-          media_url: story.media_url,
-          media_type: story.media_type,
-          content: story.content,
-          created_at: story.created_at,
-        };
+      const allGroups = (data as unknown as StoryGroup[]).map(group => ({
+        ...group,
+        stories: group.stories || [],
+      }));
 
-        if (!userStoryMap.has(profile.id)) {
-          userStoryMap.set(profile.id, {
-            user_id: profile.id,
-            full_name: profile.full_name,
-            avatar_url: profile.avatar_url,
-            stories: [],
-          });
-        }
-        userStoryMap.get(profile.id)!.stories.push(storyData);
-      }
-
-      const allGroups = Array.from(userStoryMap.values());
-
-      const sortedGroups = allGroups.sort((a, b) => {
-        if (a.user_id === currentUser.id) return -1;
-        if (b.user_id === currentUser.id) return 1;
-        return 0; 
-      });
-
-      setStoryGroups(sortedGroups);
+      setStoryGroups(allGroups);
 
     } catch (e: any) {
       toast.error("Gagal memuat stories: " + e.message);
@@ -109,6 +81,30 @@ export const StoryReel = ({ currentUser }: StoryReelProps) => {
       toast.error("Gagal menemukan story untuk pengguna ini.");
     }
   };
+
+  const handleMarkStoriesAsViewed = (userId: string) => {
+    setStoryGroups(prevGroups => 
+      prevGroups.map(group => 
+        group.user_id === userId ? { ...group, all_viewed: true } : group
+      )
+    );
+  };
+
+  const handleStoryDeleted = useCallback((userId: string, storyId: string) => {
+    setStoryGroups(prevGroups => {
+      return prevGroups.map(group => {
+        if (group.user_id === userId) {
+          const updatedStories = group.stories.filter(story => story.id !== storyId);
+          return {
+            ...group,
+            stories: updatedStories,
+          };
+        }
+        return group;
+      })
+      .filter(group => group.stories.length > 0);
+    });
+  }, []);
 
   return (
     <Card className="rounded-none lg:rounded-2xl border-0 lg:border border-border/60 bg-transparent lg:bg-card/30 shadow-none lg:shadow-xl p-4 mb-6">
@@ -147,6 +143,10 @@ export const StoryReel = ({ currentUser }: StoryReelProps) => {
             storyGroups.map((group) => {
               const isMyStory = group.user_id === currentUser.id;
               
+              const ringStyle = group.all_viewed
+                ? "p-0.5 bg-muted-foreground/30"
+                : "p-0.5 bg-gradient-to-tr from-primary via-primary/70 to-accent";
+
               return (
                 <div
                   key={group.user_id}
@@ -154,7 +154,7 @@ export const StoryReel = ({ currentUser }: StoryReelProps) => {
                 >
                   <button
                     onClick={() => handleStoryClick(group.user_id)}
-                    className="h-16 w-16 rounded-full p-0.5 bg-gradient-to-tr from-primary via-primary/70 to-accent hover:opacity-90 transition-all transform active:scale-95"
+                    className={`h-16 w-16 rounded-full hover:opacity-90 transition-all transform active:scale-95 ${ringStyle}`}
                   >
                     <Avatar className="h-full w-full border-2 border-card">
                       <AvatarImage src={group.avatar_url} />
@@ -187,6 +187,9 @@ export const StoryReel = ({ currentUser }: StoryReelProps) => {
           groups={storyGroups}
           initialUserIndex={viewerStartIndex}
           onClose={() => setViewerOpen(false)}
+          currentUserId={currentUser.id}
+          onAllStoriesViewed={handleMarkStoriesAsViewed}
+          onStoryDeleted={handleStoryDeleted}
         />
       )}
     </Card>

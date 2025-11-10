@@ -225,4 +225,4 @@ export const CreateStoryModal = ({ open, onOpenChange, currentUser, onStoryCreat
       </div>
     </div>
   );
-};
+}; 

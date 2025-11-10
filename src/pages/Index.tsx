@@ -9,6 +9,7 @@ import PostCard from "@/components/PostCard";
 import PostSkeleton from "@/components/PostSkeleton";
 import Leaderboard from "@/components/Leaderboard";
 import { toast } from "sonner";
+import { StoryReel } from "@/components/StoryReel";
 
 const postSelect =
   `
@@ -184,6 +185,8 @@ const Index = () => {
           </aside>
 
           <main className="lg:col-span-6 space-y-6">
+            {profile && <StoryReel currentUser={profile} />}
+            
             {profile && <div className="rounded-2xl bg-card shadow-xl border border-border p-2"><CreatePost currentUser={profile} onPostCreated={refreshPosts} /></div>}
             <div className="rounded-2xl bg-card shadow-xl border border-border">
               <div className="p-4 space-y-4">
