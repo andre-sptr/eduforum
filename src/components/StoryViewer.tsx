@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { X, Loader2, Pause, Play, Trash2, Eye } from "lucide-react";
+import { X, Loader2, Pause, Play, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { id } from "date-fns/locale";
 import { Link } from "react-router-dom";
@@ -23,9 +23,10 @@ import {
 interface Story {
   id: string;
   media_url: string;
-  media_type: 'image' | 'video' | 'spotify';
+  media_type: "image" | "video"; // Tipe "spotify" dihapus
   content: string | null;
   created_at: string;
+  // spotify_track_id dihapus
   viewed: boolean;
 }
 interface StoryGroup {
@@ -67,20 +68,30 @@ export const StoryViewer = ({
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  // iframeRef dihapus
 
-  const activeGroup = useMemo(() => groups[currentUserIndex], [groups, currentUserIndex]);
-  const activeStory = useMemo(() => activeGroup?.stories[currentStoryIndex], [activeGroup, currentStoryIndex]);
+  const activeGroup = useMemo(
+    () => groups[currentUserIndex],
+    [groups, currentUserIndex],
+  );
+  const activeStory = useMemo(
+    () => activeGroup?.stories[currentStoryIndex],
+    [activeGroup, currentStoryIndex],
+  );
 
-  const markStoryAsViewed = useCallback(async (storyId: string) => {
-    if (!currentUserId || !storyId) return;
-    supabase
-      .from("story_views")
-      .upsert(
-        { story_id: storyId, user_id: currentUserId },
-        { onConflict: 'story_id, user_id', ignoreDuplicates: true }
-      )
-      .then();
-  }, [currentUserId]);
+  const markStoryAsViewed = useCallback(
+    async (storyId: string) => {
+      if (!currentUserId || !storyId) return;
+      supabase
+        .from("story_views")
+        .upsert(
+          { story_id: storyId, user_id: currentUserId },
+          { onConflict: "story_id, user_id", ignoreDuplicates: true },
+        )
+        .then();
+    },
+    [currentUserId],
+  );
 
   const goToNextStory = useCallback(() => {
     if (!activeGroup) {
@@ -88,56 +99,56 @@ export const StoryViewer = ({
       return;
     }
     if (currentStoryIndex < activeGroup.stories.length - 1) {
-      setCurrentStoryIndex(i => i + 1);
+      setCurrentStoryIndex((i) => i + 1);
     } else {
       onAllStoriesViewed(activeGroup.user_id);
       goToNextUser();
     }
   }, [activeGroup, currentStoryIndex, onAllStoriesViewed, onClose]);
 
-  const goToPrevStory = useCallback(() => {
-    if (currentStoryIndex > 0) {
-      setCurrentStoryIndex(i => i - 1);
-    } else {
-      goToPrevUser();
-    }
-  }, [currentStoryIndex]);
-
   const goToNextUser = useCallback(() => {
     if (currentUserIndex < groups.length - 1) {
-      setCurrentUserIndex(i => i + 1);
+      setCurrentUserIndex((i) => i + 1);
       setCurrentStoryIndex(0);
     } else {
       onClose();
     }
   }, [currentUserIndex, groups.length, onClose]);
 
+  const goToPrevStory = useCallback(() => {
+    if (currentStoryIndex > 0) {
+      setCurrentStoryIndex((i) => i - 1);
+    } else {
+      goToPrevUser();
+    }
+  }, [currentStoryIndex]);
+
   const goToPrevUser = useCallback(() => {
     if (currentUserIndex > 0) {
-      setCurrentUserIndex(i => i - 1);
+      setCurrentUserIndex((i) => i - 1);
       setCurrentStoryIndex(groups[currentUserIndex - 1].stories.length - 1);
     }
   }, [currentUserIndex, groups]);
 
-  const storyDuration = useMemo(() => {
-    if (activeStory?.media_type === 'video' && videoRef.current?.duration) {
-      return (videoRef.current.duration || STORY_DURATION_S) * 1000;
-    }
-    return STORY_DURATION_MS;
-  }, [activeStory, videoRef.current?.duration]);
-
-  const progress = useStoryTimer(activeStory?.id, storyDuration, isPaused || isLoading, goToNextStory);
+  const [mediaDuration, setMediaDuration] = useState(STORY_DURATION_MS);
+  const progress = useStoryTimer(
+    activeStory?.id,
+    mediaDuration,
+    isPaused || isLoading,
+    goToNextStory,
+  );
 
   useEffect(() => {
     if (!activeStory) {
       goToNextStory();
       return;
     }
-    
+
     setIsLoading(true);
     markStoryAsViewed(activeStory.id);
-    
-    if (activeStory.media_type === 'image') {
+
+    if (activeStory.media_type === "image") {
+      setMediaDuration(STORY_DURATION_MS);
       const img = new Image();
       img.src = activeStory.media_url;
       img.onload = () => setIsLoading(false);
@@ -145,27 +156,33 @@ export const StoryViewer = ({
         toast.error("Gagal memuat story");
         goToNextStory();
       };
-    } else if (activeStory.media_type === 'video') {
+    } else if (activeStory.media_type === "video") {
       if (videoRef.current) {
         videoRef.current.src = activeStory.media_url;
-        
+
+        videoRef.current.onloadeddata = () => {
+          const durationMs =
+            (videoRef.current?.duration || STORY_DURATION_S) * 1000;
+          setMediaDuration(durationMs);
+          setIsLoading(false);
+        };
+
         videoRef.current.onerror = () => {
           toast.error("Gagal memuat video story");
           goToNextStory();
         };
-
         videoRef.current.load();
       }
     }
-    
+    // Blok 'else if (media_type === "spotify")' dihapus
   }, [activeStory, markStoryAsViewed, goToNextStory]);
 
   useEffect(() => {
-    if (activeStory?.media_type === 'video' && videoRef.current) {
+    if (activeStory?.media_type === "video" && videoRef.current) {
       if (isPaused) {
         videoRef.current.pause();
       } else if (!isLoading) {
-        videoRef.current.play().catch(e => console.warn("Autoplay gagal:", e));
+        videoRef.current.play().catch((e) => console.warn("Autoplay gagal:", e));
       }
     }
   }, [isPaused, isLoading, activeStory]);
@@ -174,20 +191,20 @@ export const StoryViewer = ({
   const handleMouseUp = (e: React.MouseEvent) => setIsPaused(false);
   const handleTouchStart = (e: React.TouchEvent) => setIsPaused(true);
   const handleTouchEnd = (e: React.TouchEvent) => setIsPaused(false);
-  
+
   const handleNavClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (isPaused) return; 
+    if (isPaused) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
-    const clickZone = rect.width * 0.3; 
-    
+    const clickZone = rect.width * 0.3;
+
     if (clickX < clickZone) {
       goToPrevStory();
     } else {
       goToNextStory();
     }
   };
-  
+
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) onClose();
   };
@@ -198,10 +215,10 @@ export const StoryViewer = ({
 
     try {
       const { error } = await supabase
-        .from('stories')
+        .from("stories")
         .delete()
-        .eq('id', activeStory.id)
-        .eq('user_id', currentUserId);
+        .eq("id", activeStory.id)
+        .eq("user_id", currentUserId);
 
       if (error) throw error;
 
@@ -212,7 +229,6 @@ export const StoryViewer = ({
       if (activeGroup.stories.length === 1) {
         goToNextUser();
       }
-      
     } catch (e: any) {
       toast.error("Gagal menghapus story: " + e.message);
     }
@@ -227,42 +243,51 @@ export const StoryViewer = ({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm animate-fade-in"
       onClick={handleBackdropClick}
     >
-      <div 
+      <div
         className="relative h-full w-full max-w-md max-h-[95vh] aspect-[9/16] bg-black rounded-2xl overflow-hidden shadow-2xl transform scale-95 animate-zoom-in"
         onClick={(e) => e.stopPropagation()}
       >
-        
-        <div 
-          className="absolute inset-0 bg-cover bg-center filter blur-xl transform scale-105 opacity-30 transition-all duration-300" 
+        <div
+          className="absolute inset-0 bg-cover bg-center filter blur-xl transform scale-105 opacity-30 transition-all duration-300"
           style={{ backgroundImage: `url(${activeStory.media_url})` }}
         />
 
         <div className="absolute inset-0 flex items-center justify-center">
-          {isLoading && <Loader2 className="h-8 w-8 text-white animate-spin" />}
-          
-          {activeStory.media_type === 'image' && (
-            <img 
-              src={activeStory.media_url} 
-              className={cn("w-full h-full object-contain transition-opacity duration-300", isLoading ? "opacity-0" : "opacity-100")}
-              alt="Story" 
+          {isLoading && (
+            <div className="absolute z-10">
+              <Loader2 className="h-8 w-8 text-white animate-spin" />
+            </div>
+          )}
+
+          {activeStory.media_type === "image" && (
+            <img
+              src={activeStory.media_url}
+              className={cn(
+                "w-full h-full object-contain transition-opacity duration-300",
+                isLoading ? "opacity-0" : "opacity-100",
+              )}
+              alt="Story"
             />
           )}
-          
-          {activeStory.media_type === 'video' && (
+
+          {activeStory.media_type === "video" && (
             <video
               ref={videoRef}
-              src={activeStory.media_url}
-              className={cn("w-full h-full object-contain transition-opacity duration-300", isLoading ? "opacity-0" : "opacity-100")}
+              className={cn(
+                "w-full h-full object-contain transition-opacity duration-300",
+                isLoading ? "opacity-0" : "opacity-100",
+              )}
               playsInline
-              muted 
-              onLoadedData={() => setIsLoading(false)}
+              muted
               onEnded={goToNextStory}
-              onClick={(e) => e.stopPropagation()} 
+              onClick={(e) => e.stopPropagation()}
             />
           )}
+
+          {/* Blok render iframe Spotify dihapus dari sini */}
         </div>
-        
-        <div 
+
+        <div
           className="absolute inset-0 flex z-10 cursor-pointer"
           onClick={handleNavClick}
           onMouseDown={handleMouseDown}
@@ -274,17 +299,22 @@ export const StoryViewer = ({
           <div className="w-2/3 h-full" />
         </div>
 
-        <div 
-          className="absolute top-0 left-0 right-0 p-4 space-y-2 bg-gradient-to-b from-black/60 to-transparent z-20"
-        >
+        <div className="absolute top-0 left-0 right-0 p-4 space-y-2 bg-gradient-to-b from-black/60 to-transparent z-20">
           <div className="flex w-full gap-1 shadow-sm rounded-full overflow-hidden">
             {activeGroup.stories.map((story, index) => (
-              <div key={index} className="flex-1 h-1.5 bg-white/30 rounded-full overflow-hidden">
+              <div
+                key={index}
+                className="flex-1 h-1.5 bg-white/30 rounded-full overflow-hidden"
+              >
                 <div
                   className="h-full bg-white"
                   style={{
                     width: `${
-                      index < currentStoryIndex ? 100 : (index === currentStoryIndex ? progress : 0)
+                      index < currentStoryIndex
+                        ? 100
+                        : index === currentStoryIndex
+                          ? progress
+                          : 0
                     }%`,
                   }}
                 />
@@ -293,51 +323,78 @@ export const StoryViewer = ({
           </div>
 
           <div className="flex items-center gap-3 pt-1">
-            <Link to={`/profile/${activeGroup.user_id}`} onClick={(e) => e.stopPropagation()}>
+            <Link
+              to={`/profile/${activeGroup.user_id}`}
+              onClick={(e) => e.stopPropagation()}
+            >
               <Avatar className="h-10 w-10 border-2 border-white/80 transition-transform hover:scale-105">
                 <AvatarImage src={activeGroup.avatar_url} />
-                <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">{getInitials(activeGroup.full_name)}</AvatarFallback>
+                <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
+                  {getInitials(activeGroup.full_name)}
+                </AvatarFallback>
               </Avatar>
             </Link>
             <div className="flex-1">
-              <Link to={`/profile/${activeGroup.user_id}`} onClick={(e) => e.stopPropagation()}>
-                <p className="font-semibold text-white text-sm [text-shadow:0_1px_3px_rgb(0_0_0_/_0.4)] hover:underline">{activeGroup.full_name}</p>
+              <Link
+                to={`/profile/${activeGroup.user_id}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <p className="font-semibold text-white text-sm [text-shadow:0_1px_3px_rgb(0_0_0_/_0.4)] hover:underline">
+                  {activeGroup.full_name}
+                </p>
               </Link>
               <p className="text-xs text-white/80 [text-shadow:0_1px_3px_rgb(0_0_0_/_0.4)]">
-                {formatDistanceToNow(new Date(activeStory.created_at), { locale: id })} lalu
+                {formatDistanceToNow(new Date(activeStory.created_at), {
+                  locale: id,
+                })}{" "}
+                lalu
               </p>
             </div>
-            
+
             {isMyStory && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-white/80 hover:text-red-400 hover:bg-white/10 rounded-full transition-all" 
-                onClick={(e) => { e.stopPropagation(); setIsPaused(true); setIsDeleteConfirmOpen(true); }}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white/80 hover:text-red-400 hover:bg-white/10 rounded-full transition-all"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsPaused(true);
+                  setIsDeleteConfirmOpen(true);
+                }}
               >
                 <Trash2 className="h-5 w-5" />
               </Button>
             )}
 
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-all" 
-              onClick={(e) => { e.stopPropagation(); setIsPaused(p => !p); }}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-all"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsPaused((p) => !p);
+              }}
             >
-              {isPaused ? <Play className="h-5 w-5 fill-white" /> : <Pause className="h-5 w-5 fill-white" />}
+              {isPaused ? (
+                <Play className="h-5 w-5 fill-white" />
+              ) : (
+                <Pause className="h-5 w-5 fill-white" />
+              )}
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-all" 
-              onClick={(e) => { e.stopPropagation(); onClose(); }}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-all"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
             >
               <X className="h-6 w-6" />
             </Button>
           </div>
         </div>
-        
+
         {activeStory.content && (
           <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent z-20">
             <p className="text-white text-sm text-center [text-shadow:0_1px_3px_rgb(0_0_0_/_0.6)]">
@@ -347,8 +404,8 @@ export const StoryViewer = ({
         )}
       </div>
 
-      <AlertDialog 
-        open={isDeleteConfirmOpen} 
+      <AlertDialog
+        open={isDeleteConfirmOpen}
         onOpenChange={(open) => {
           setIsDeleteConfirmOpen(open);
           if (!open) setIsPaused(false);
@@ -356,15 +413,18 @@ export const StoryViewer = ({
       >
         <AlertDialogContent className="bg-card border-border">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-foreground">Konfirmasi Hapus Story</AlertDialogTitle>
+            <AlertDialogTitle className="text-foreground">
+              Konfirmasi Hapus Story
+            </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
-              Apakah Anda yakin ingin menghapus story ini? Tindakan ini tidak dapat dibatalkan.
+              Apakah Anda yakin ingin menghapus story ini? Tindakan ini tidak
+              dapat dibatalkan.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-lg">Batal</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDeleteStory} 
+            <AlertDialogAction
+              onClick={handleDeleteStory}
               className="bg-red-500 hover:bg-red-600 text-white rounded-lg"
             >
               Hapus

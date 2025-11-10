@@ -1,16 +1,32 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { MediaFile, compressImage, getMediaType, validateMediaFile, maxSizeLabel } from "@/lib/mediaUtils";
+import {
+  MediaFile,
+  compressImage,
+  getMediaType,
+  validateMediaFile,
+  maxSizeLabel,
+} from "@/lib/mediaUtils";
 import { toast } from "sonner";
 import { Loader2, Send, X, ArrowLeft, FileImage, Music } from "lucide-react";
 import { z } from "zod";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
-const storySchema = z.object({
-  media: z.object({}).nullable().refine(val => val !== null, "Media story tidak boleh kosong"),
-  content: z.string().max(1000, "Caption terlalu panjang (maks 1000 karakter)").optional(),
-});
+const storySchema = z
+  .object({
+    media: z.any().nullable(),
+    content: z
+      .string()
+      .max(1000, "Caption terlalu panjang (maks 1000 karakter)")
+      .optional(),
+  })
+  .refine((data) => data.media !== null, {
+    message: "Pilih file media",
+    path: ["media"],
+  });
 
 interface CreateStoryModalProps {
   open: boolean;
@@ -21,11 +37,16 @@ interface CreateStoryModalProps {
 
 const MAX_VIDEO_DURATION_SECONDS = 60;
 
-export const CreateStoryModal = ({ open, onOpenChange, currentUser, onStoryCreated }: CreateStoryModalProps) => {
+export const CreateStoryModal = ({
+  open,
+  onOpenChange,
+  currentUser,
+  onStoryCreated,
+}: CreateStoryModalProps) => {
   const [mediaFile, setMediaFile] = useState<MediaFile | null>(null);
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -45,12 +66,16 @@ export const CreateStoryModal = ({ open, onOpenChange, currentUser, onStoryCreat
 
     const type = getMediaType(file);
     if (!type) {
-      toast.error(`File ${file.name} bukan tipe media yang valid (gambar, video, audio).`);
+      toast.error(
+        `File ${file.name} bukan tipe media yang valid (gambar, video, audio).`,
+      );
       return;
     }
 
     if (!validateMediaFile(file, type)) {
-      toast.error(`File ${file.name} terlalu besar (Maks: ${maxSizeLabel(type)}).`);
+      toast.error(
+        `File ${file.name} terlalu besar (Maks: ${maxSizeLabel(type)}).`,
+      );
       return;
     }
 
@@ -58,18 +83,22 @@ export const CreateStoryModal = ({ open, onOpenChange, currentUser, onStoryCreat
 
     if (type === "video") {
       setLoading(true);
-      const video = document.createElement('video');
-      video.preload = 'metadata';
+      const video = document.createElement("video");
+      video.preload = "metadata";
 
       video.onloadedmetadata = () => {
         window.URL.revokeObjectURL(video.src);
         const duration = video.duration;
-        setLoading(false); 
+        setLoading(false);
 
         if (duration > MAX_VIDEO_DURATION_SECONDS) {
-          toast.error(`Video terlalu panjang (${duration.toFixed(1)}s). Harap pilih video di bawah ${MAX_VIDEO_DURATION_SECONDS} detik.`);
+          toast.error(
+            `Video terlalu panjang (${duration.toFixed(
+              1,
+            )}s). Harap pilih video di bawah ${MAX_VIDEO_DURATION_SECONDS} detik.`,
+          );
           URL.revokeObjectURL(objectURL);
-          if (fileInputRef.current) fileInputRef.current.value = ""; 
+          if (fileInputRef.current) fileInputRef.current.value = "";
         } else {
           setMediaFile({
             file: file,
@@ -96,42 +125,57 @@ export const CreateStoryModal = ({ open, onOpenChange, currentUser, onStoryCreat
     }
   };
 
-  const uploadMedia = async (file: File, userId: string, type: string): Promise<string> => {
+  const uploadMedia = async (
+    file: File,
+    userId: string,
+    type: string,
+  ): Promise<string> => {
     let f = file;
-    if (type === "image") f = await compressImage(file); 
+    if (type === "image") f = await compressImage(file);
 
     const ext = f.name.split(".").pop();
     const name = `${userId}/stories/${Date.now()}.${ext}`;
-    const { error: uploadError } = await supabase.storage.from("media").upload(name, f);
+    const { error: uploadError } = await supabase.storage
+      .from("media")
+      .upload(name, f);
     if (uploadError) throw uploadError;
-    const { data: { publicUrl } } = supabase.storage.from("media").getPublicUrl(name);
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("media").getPublicUrl(name);
     return publicUrl;
   };
 
   const handleSubmit = async () => {
     try {
-      storySchema.parse({ media: mediaFile, content });
+      storySchema.parse({
+        media: mediaFile,
+        content,
+      });
     } catch (e: any) {
-      if (e instanceof z.ZodError) toast.error(e.errors[0].message);
+      if (e instanceof z.ZodError) {
+        toast.error(e.errors[0].message);
+      }
       return;
     }
 
-    if (!mediaFile) return;
-
     setLoading(true);
     try {
-      const mediaUrl = await uploadMedia(mediaFile.file, currentUser.id, mediaFile.type);
-      
-      const { error } = await supabase.from("stories").insert({
-        user_id: currentUser.id,
-        media_url: mediaUrl,
-        media_type: mediaFile.type,
-        content: content.trim() || null,
-      });
+      if (mediaFile) {
+        const mediaUrl = await uploadMedia(
+          mediaFile.file,
+          currentUser.id,
+          mediaFile.type,
+        );
+        const { error } = await supabase.from("stories").insert({
+          user_id: currentUser.id,
+          media_url: mediaUrl,
+          media_type: mediaFile.type,
+          content: content.trim() || null,
+        });
+        if (error) throw error;
+        toast.success("Story berhasil diposting!");
+      }
 
-      if (error) throw error;
-
-      toast.success("Story berhasil diposting!");
       onOpenChange(false);
       onStoryCreated();
     } catch (e: any) {
@@ -145,8 +189,14 @@ export const CreateStoryModal = ({ open, onOpenChange, currentUser, onStoryCreat
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
-      <div className="relative h-full w-full max-w-md max-h-[95vh] aspect-[9/16] bg-black rounded-2xl overflow-hidden shadow-2xl flex flex-col">
-        
+      <div
+        className={cn(
+          "dark",
+          "relative h-full w-full max-w-md max-h-[95vh] aspect-[9/16]",
+          "bg-popover text-popover-foreground",
+          "rounded-2xl overflow-hidden shadow-2xl flex flex-col",
+        )}
+      >
         <Button
           variant="ghost"
           size="icon"
@@ -157,28 +207,48 @@ export const CreateStoryModal = ({ open, onOpenChange, currentUser, onStoryCreat
           <X className="h-6 w-6" />
         </Button>
 
+        {mediaFile && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 left-4 z-20 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white transition-all"
+            onClick={() => {
+              setMediaFile(null);
+              if (fileInputRef.current) fileInputRef.current.value = "";
+            }}
+            disabled={loading}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        )}
+
         {!mediaFile && (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 gap-6">
-            <h2 className="text-2xl font-semibold text-center text-white">Buat Story Baru</h2>
-            <div className="w-40 h-40 rounded-2xl border-4 border-dashed border-border flex items-center justify-center">
-              {/* --- DIPERBARUI: Tampilkan Loader saat cek durasi --- */}
-              {loading ? (
-                <Loader2 className="h-16 w-16 text-muted-foreground animate-spin" />
-              ) : (
-                <FileImage className="h-16 w-16 text-muted-foreground" />
-              )}
+          <div className="flex-1 flex flex-col p-8 gap-4">
+            <h2 className="text-2xl font-semibold text-center text-popover-foreground">
+              Buat Story Baru
+            </h2>
+
+            <div className="flex flex-col items-center justify-center gap-4 text-center mt-4">
+              <div className="w-32 h-32 rounded-2xl border-4 border-dashed border-border flex items-center justify-center">
+                {loading ? (
+                  <Loader2 className="h-12 w-12 text-muted-foreground animate-spin" />
+                ) : (
+                  <FileImage className="h-12 w-12 text-muted-foreground" />
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Pilih foto, video (maks 1 menit), atau audio.
+              </p>
+              <Button
+                size="lg"
+                className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loading}
+              >
+                {loading ? "Mengecek File..." : "Pilih File"}
+              </Button>
             </div>
-            <p className="text-sm text-muted-foreground text-center">
-              Pilih foto, video (maks 1 menit), atau audio.
-            </p>
-            <Button
-              size="lg"
-              className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={loading}
-            >
-              {loading ? "Mengecek File..." : "Pilih File"}
-            </Button>
+
             <input
               ref={fileInputRef}
               type="file"
@@ -192,58 +262,56 @@ export const CreateStoryModal = ({ open, onOpenChange, currentUser, onStoryCreat
 
         {mediaFile && (
           <>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-4 left-4 z-20 rounded-full bg-black/40 text-white hover:bg-black/60 hover:text-white transition-all"
-              onClick={() => {
-                setMediaFile(null);
-                if (fileInputRef.current) fileInputRef.current.value = "";
-              }}
-              disabled={loading}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            
-            {(mediaFile.type === 'image' || mediaFile.type === 'video') && (
+            {(mediaFile?.type === "image" || mediaFile?.type === "video") && (
               <div
                 className="absolute inset-0 bg-cover bg-center filter blur-xl scale-110 opacity-50"
                 style={{ backgroundImage: `url(${mediaFile.preview})` }}
               />
             )}
-            {mediaFile.type === 'video' && (
+            {mediaFile?.type === "video" && (
               <video
                 src={mediaFile.preview}
                 className="absolute inset-0 object-cover filter blur-xl scale-110 opacity-50"
-                playsInline muted loop autoPlay
+                playsInline
+                muted
+                loop
+                autoPlay
               />
             )}
 
-            <div
-              className="absolute inset-0 flex items-center justify-center overflow-hidden"
-            >
-              {mediaFile.type === 'image' && (
-                <img 
-                  src={mediaFile.preview} 
-                  className="w-full h-full object-contain" 
+            <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+              {mediaFile?.type === "image" && (
+                <img
+                  src={mediaFile.preview}
+                  className="w-full h-full object-contain"
                   alt="Story preview"
                 />
               )}
-              {mediaFile.type === 'video' && (
-                <video src={mediaFile.preview} className="w-full h-full object-contain" playsInline controls autoPlay loop />
+              {mediaFile?.type === "video" && (
+                <video
+                  src={mediaFile.preview}
+                  className="w-full h-full object-contain"
+                  playsInline
+                  controls
+                  autoPlay
+                  loop
+                />
               )}
-              {mediaFile.type === 'audio' && (
+              {mediaFile?.type === "audio" && (
                 <div className="flex flex-col items-center justify-center p-8 gap-4">
                   <div className="w-40 h-40 rounded-2xl bg-black/30 border border-white/20 flex items-center justify-center">
                     <Music className="h-16 w-16 text-white/80" />
                   </div>
-                  <audio src={mediaFile.preview} controls className="w-full" />
+                  <audio
+                    src={mediaFile.preview}
+                    controls
+                    className="w-full"
+                  />
                 </div>
               )}
             </div>
 
             <div className="absolute bottom-0 left-0 right-0 z-10 p-4 space-y-3 bg-gradient-to-t from-black/70 to-transparent">
-              
               <Textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
@@ -268,7 +336,6 @@ export const CreateStoryModal = ({ open, onOpenChange, currentUser, onStoryCreat
             </div>
           </>
         )}
-
       </div>
     </div>
   );
