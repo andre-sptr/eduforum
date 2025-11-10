@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { X, Loader2, Pause, Play, Trash2 } from "lucide-react";
+import { X, Loader2, Pause, Play, Trash2, Eye } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { id } from "date-fns/locale";
 import { Link } from "react-router-dom";
@@ -148,6 +148,12 @@ export const StoryViewer = ({
     } else if (activeStory.media_type === 'video') {
       if (videoRef.current) {
         videoRef.current.src = activeStory.media_url;
+        
+        videoRef.current.onerror = () => {
+          toast.error("Gagal memuat video story");
+          goToNextStory();
+        };
+
         videoRef.current.load();
       }
     }
