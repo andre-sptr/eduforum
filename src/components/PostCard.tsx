@@ -263,7 +263,7 @@ const PostCard = ({ post, postType = "global", currentUserId, onLike, onPostUpda
                 width="100%"
                 height="152"
                 frameBorder="0"
-                allowTransparency={true}
+                allowtransparency="true"
                 allow="encrypted-media"
                 loading="lazy"
                 className="rounded-xl"
