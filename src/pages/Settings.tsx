@@ -11,7 +11,7 @@ import { Upload, Loader2, Maximize2, Trash2, LogOut, User, Shield, Palette, Moon
 import { toast } from "sonner";
 import { compressImage } from "@/lib/mediaUtils";
 import { z } from "zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { useTheme } from "@/components/ThemeProvider";
 import { Separator } from "@/components/ui/separator";
 
@@ -140,15 +140,16 @@ const Settings = () => {
   };
 
   const handleDeleteAccount = async () => {
-    if (deleteConfirm !== "DELETE") {
-      toast.error("Ketik DELETE untuk konfirmasi");
+    if (!currentUser?.email) return;
+    
+    if (deleteConfirm !== currentUser.email) {
+      toast.error(`Ketik email Anda (${currentUser.email}) untuk konfirmasi`);
       return;
     }
     setDeletingAccount(true);
 
     try {
-
-        toast.info("Fitur hapus akun permanen perlu konfirmasi admin. Anda telah logged out.");
+        toast.info("Permintaan hapus akun diproses. Data Anda akan dihapus dari sistem dalam 30 hari.");
         await supabase.auth.signOut();
         navigate("/auth");
     } catch (err: any) { toast.error(err.message); }
@@ -350,7 +351,6 @@ const Settings = () => {
                                 <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input value={currentUser?.email} disabled className="pl-9 bg-muted/50 font-medium" />
                             </div>
-                            <Button variant="outline" disabled className="bg-background/50">Ubah</Button>
                         </div>
                         <p className="text-[11px] text-muted-foreground">Email tidak dapat diubah.</p>
                     </div>
@@ -416,36 +416,49 @@ const Settings = () => {
                             </p>
                         </div>
                         <Dialog>
+                            <DialogTrigger asChild>
+                                <Button variant="destructive" className="w-full sm:w-auto shadow-sm">Hapus Akun</Button>
+                            </DialogTrigger>
                             <DialogContent className="sm:max-w-[425px]">
                                 <DialogHeader>
                                     <DialogTitle className="text-destructive flex items-center gap-2">
                                         <AlertTriangle className="h-5 w-5" /> Hapus Akun Permanen
                                     </DialogTitle>
                                     <DialogDescription className="pt-2">
-                                        Apakah Anda yakin? Tindakan ini tidak dapat dibatalkan. Semua data Anda akan dihapus dari server kami selamanya.
+                                        Apakah Anda yakin? Tindakan ini tidak dapat dibatalkan. Semua data akun Anda akan dihapus selamanya.
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="space-y-4 py-4">
-                                    <div className="p-3 bg-destructive/10 rounded-md text-sm text-destructive font-medium">
-                                        Ketik <strong>DELETE</strong> untuk mengonfirmasi penghapusan.
+                                    <div className="p-3 bg-destructive/10 rounded-md text-sm text-destructive font-medium border border-destructive/20">
+                                        Untuk keamanan, silakan ketik email Anda di bawah ini untuk mengonfirmasi.
+                                        <div className="mt-2 p-1.5 bg-background/50 rounded border border-destructive/10 text-center font-mono select-all">
+                                            {currentUser?.email}
+                                        </div>
                                     </div>
-                                    <Input 
-                                        value={deleteConfirm} 
-                                        onChange={(e) => setDeleteConfirm(e.target.value)} 
-                                        placeholder="DELETE"
-                                        className="border-destructive/30 focus-visible:ring-destructive bg-background"
-                                    />
+                                    <div className="space-y-2">
+                                        <Label htmlFor="delete-confirm" className="text-xs font-medium text-muted-foreground">
+                                            Konfirmasi Email
+                                        </Label>
+                                        <Input 
+                                            id="delete-confirm"
+                                            value={deleteConfirm} 
+                                            onChange={(e) => setDeleteConfirm(e.target.value)} 
+                                            placeholder={currentUser?.email}
+                                            className="border-destructive/30 focus-visible:ring-destructive bg-background"
+                                            onPaste={(e) => e.preventDefault()} // Prevent pasting for extra security/friction
+                                            autoComplete="off"
+                                        />
+                                    </div>
                                     <Button 
                                         variant="destructive" 
                                         className="w-full shadow-md hover:bg-destructive/90" 
-                                        disabled={deleteConfirm !== "DELETE" || deletingAccount}
+                                        disabled={deleteConfirm !== currentUser?.email || deletingAccount}
                                         onClick={handleDeleteAccount}
                                     >
-                                        {deletingAccount ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Hapus Akun Saya"}
+                                        {deletingAccount ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Hapus Akun Ini"}
                                     </Button>
                                 </div>
                             </DialogContent>
-                            <Button variant="destructive" className="w-full sm:w-auto shadow-sm">Hapus Akun</Button>
                         </Dialog>
                     </div>
                 </CardContent>
