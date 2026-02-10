@@ -1,10 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { TrendingUp, Trophy, Medal, Award, FileText, Heart, Globe } from "lucide-react";
+import { TrendingUp, Trophy, Medal, Award, FileText, Heart, UserPlus, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { RankBadge } from "@/components/RankBadge"
-import { Button } from "@/components/ui/button";
 
 interface LeaderboardUser {
   id: string;
@@ -23,13 +22,13 @@ interface LeaderboardLikeUser {
 interface LeaderboardProps {
   users: LeaderboardUser[];
   likedUsers: LeaderboardLikeUser[];
+  suggestedUsers: LeaderboardUser[];
 }
 
 const freeTools = [
-  { name: "PDF Tools", websiteUrl: "https://pdf.flamyheart.site/" },
-  { name: "AI Agent", iconUrl: "/maskot.png", websiteUrl: "https://ai.flamyheart.site/" },
-  { name: "ChatBot", iconUrl: "/whatsapp.png", websiteUrl: "https://wa.me/6287790596246" },
-  { name: "AetherNet", iconUrl: "/logo.jpg", websiteUrl: "https://aethernet.flamyheart.site/" },
+  { name: "PDF Tools", websiteUrl: "https://pdf.andresptr.site/" },
+  { name: "Reka AI", iconUrl: "/reka.png", websiteUrl: "https://ai.andresptr.site/" },
+  { name: "AetherNet", iconUrl: "/logo.png", websiteUrl: "https://aethernet.andresptr.site/" },
 ];
 
 const getInitials = (name: string) => {
@@ -41,27 +40,30 @@ const getInitials = (name: string) => {
 };
 
 const rankIcons = [
-  <Trophy className="h-5 w-5 text-accent" key="rank-1" />,
+  <Trophy className="h-5 w-5 text-yellow-500" key="rank-1" />,
   <Medal className="h-5 w-5 text-gray-400" key="rank-2" />,
   <Award className="h-5 w-5 text-amber-600" key="rank-3" />,
 ];
 
 const getRankIcon = (index: number) => {
-  return rankIcons[index] ?? <span className="text-muted-foreground font-bold">#{index + 1}</span>;
+  return rankIcons[index] ?? <span className="text-muted-foreground font-bold w-5 text-center">#{index + 1}</span>;
 };
 
-const Leaderboard = ({ users, likedUsers }: LeaderboardProps) => { 
+const Leaderboard = ({ users, likedUsers, suggestedUsers }: LeaderboardProps) => { 
   const navigate = useNavigate();
 
   return (
-    <div className="space-y-4">
-      <Card className="shadow-sm overflow-hidden">
-        <CardHeader>
-          <CardTitle className="text-lg">Free Tools</CardTitle>
+    <div className="space-y-6">
+      <Card className="border-none shadow-sm bg-gradient-to-br from-card to-card/50 overflow-hidden hover:shadow-md transition-shadow duration-300">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+            Free Tools
+            <ExternalLink className="h-4 w-4 opacity-50" />
+          </CardTitle>
         </CardHeader>
-        <CardContent className="px-4 pb-3.5">
+        <CardContent className="px-4 pb-4">
           <TooltipProvider>
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-4 gap-3">
               {freeTools.map((tool) => (
                 <Tooltip key={tool.name} delayDuration={100}>
                   <TooltipTrigger asChild>
@@ -69,25 +71,25 @@ const Leaderboard = ({ users, likedUsers }: LeaderboardProps) => {
                       href={tool.websiteUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group block aspect-square"
+                      className="group relative block aspect-square"
                       aria-label={`Link ke ${tool.name}`}
                     >
-                      <div className="flex h-full w-full items-center justify-center rounded-lg bg-muted/50 border border-border/50 group-hover:bg-muted group-hover:scale-105 group-hover:shadow-md transition-all duration-200">
+                      <div className="flex h-full w-full items-center justify-center rounded-xl bg-muted/30 border border-border/40 group-hover:bg-primary/5 group-hover:border-primary/20 group-hover:scale-105 transition-all duration-300">
                         {tool.iconUrl ? (
                           <img
                             src={tool.iconUrl}
                             alt={tool.name}
-                            className="h-3/5 w-3/5 object-contain"
+                            className="h-3/5 w-3/5 object-contain filter group-hover:brightness-110 transition-all"
                             loading="lazy"
                             decoding="async"
                           />
                         ) : (
-                          <FileText className="h-1/2 w-1/2 text-blue-500 group-hover:text-primary transition-colors duration-200" />
+                          <FileText className="h-1/2 w-1/2 text-muted-foreground group-hover:text-primary transition-colors duration-300" />
                         )}
                       </div>
                     </a>
                   </TooltipTrigger>
-                  <TooltipContent>
+                  <TooltipContent side="bottom" className="text-xs font-medium">
                     <p>{tool.name}</p>
                   </TooltipContent>
                 </Tooltip>
@@ -96,62 +98,46 @@ const Leaderboard = ({ users, likedUsers }: LeaderboardProps) => {
           </TooltipProvider>
         </CardContent>
       </Card>
-
-      <Card className="shadow-sm overflow-hidden">
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Globe className="h-5 w-5 text-primary" />
-            Website Siswa
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pb-4">
-          <p className="text-sm text-muted-foreground mb-3">
-            Lihat proyek dan situs web karya siswa.
-          </p>
-          <Button 
-            className="w-full rounded-xl"
-            onClick={() => navigate('/websitepage')}
-          >
-            Lihat
-          </Button>
-        </CardContent>
-      </Card>
       
-      <Card className="bg-card border-border">
-        <CardHeader className="border-b border-border">
-          <CardTitle className="text-xl flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-accent" />
-            Leaderboard
+      <Card className="border-none shadow-sm bg-card/80 backdrop-blur-sm hover:shadow-md transition-shadow duration-300">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-yellow-500/10">
+              <TrendingUp className="h-4 w-4 text-blue-500" />
+            </div>
+            Top Creators
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 pt-4">
+        <CardContent className="space-y-1 p-2">
           {users.length === 0 ? (
-            <p className="text-muted-foreground text-sm text-center py-4">
-              Belum ada data
-            </p>
+            <div className="text-center py-8">
+              <p className="text-muted-foreground text-sm">Belum ada data</p>
+            </div>
           ) : (
             users.map((user, index) => (
               <div
                 key={user.id}
-                className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-[var(--transition-smooth)] cursor-pointer"
+                className="group flex items-center gap-3 p-2 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
                 onClick={() => navigate(`/profile/${user.id}`)}
               >
-                <div className="flex-shrink-0 w-6">{getRankIcon(index)}</div>
+                <div className="flex-shrink-0 w-8 flex justify-center">{getRankIcon(index)}</div>
                 
-                <Avatar className="h-10 w-10 border-2 border-accent/20">
+                <Avatar className="h-9 w-9 border border-border group-hover:border-primary/50 transition-colors">
                   <AvatarImage src={user.avatar_url} />
-                  <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
                     {getInitials(user.full_name)}
                   </AvatarFallback>
                 </Avatar>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-foreground truncate">{user.full_name}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-medium text-sm text-foreground truncate group-hover:text-primary transition-colors">
+                      {user.full_name}
+                    </p>
                     <RankBadge rank={index + 1} type="follower" />
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {user.follower_count} followers
+                  <p className="text-xs text-muted-foreground font-medium">
+                    {user.follower_count.toLocaleString()} followers
                   </p>
                 </div>
               </div>
@@ -160,41 +146,45 @@ const Leaderboard = ({ users, likedUsers }: LeaderboardProps) => {
         </CardContent>
       </Card>
 
-      <Card className="bg-card border-border">
-        <CardHeader className="border-b border-border">
-          <CardTitle className="text-xl flex items-center gap-2">
-            <Heart className="h-5 w-5 text-red-500" />
-            Top Likes
+      <Card className="border-none shadow-sm bg-card/80 backdrop-blur-sm hover:shadow-md transition-shadow duration-300">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-red-500/10">
+              <Heart className="h-4 w-4 text-red-500" />
+            </div>
+            Most Liked
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 pt-4">
+        <CardContent className="space-y-1 p-2">
           {likedUsers.length === 0 ? (
-            <p className="text-muted-foreground text-sm text-center py-4">
-              Belum ada data
-            </p>
+            <div className="text-center py-8">
+              <p className="text-muted-foreground text-sm">Belum ada data</p>
+            </div>
           ) : (
             likedUsers.map((user, index) => (
               <div
                 key={user.id}
-                className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-[var(--transition-smooth)] cursor-pointer"
+                className="group flex items-center gap-3 p-2 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
                 onClick={() => navigate(`/profile/${user.id}`)}
               >
-                <div className="flex-shrink-0 w-6">{getRankIcon(index)}</div>
+                <div className="flex-shrink-0 w-8 flex justify-center">{getRankIcon(index)}</div>
                 
-                <Avatar className="h-10 w-10 border-2 border-accent/20">
+                <Avatar className="h-9 w-9 border border-border group-hover:border-red-500/50 transition-colors">
                   <AvatarImage src={user.avatar_url} />
-                  <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
+                  <AvatarFallback className="bg-red-500/10 text-red-500 text-xs font-bold">
                     {getInitials(user.full_name)}
                   </AvatarFallback>
                 </Avatar>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-foreground truncate">{user.full_name}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-medium text-sm text-foreground truncate group-hover:text-red-500 transition-colors">
+                      {user.full_name}
+                    </p>
                     <RankBadge rank={index + 1} type="like" />
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {user.total_likes} likes
+                  <p className="text-xs text-muted-foreground font-medium">
+                    {user.total_likes.toLocaleString()} likes
                   </p>
                 </div>
               </div>
@@ -203,23 +193,47 @@ const Leaderboard = ({ users, likedUsers }: LeaderboardProps) => {
         </CardContent>
       </Card>
       
-      <Card className="shadow-sm">
-        <CardHeader className="border-b border-border">
-          <CardTitle className="text-xl flex items-center gap-2">Tentang EduForum</CardTitle>
+      <Card className="border-none shadow-sm bg-card/80 backdrop-blur-sm hover:shadow-md transition-shadow duration-300">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-green-500/10">
+              <UserPlus className="h-4 w-4 text-green-500" />
+            </div>
+            Suggested Users
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground text-justify mt-4">
-            <strong>EduForum</strong> adalah platform komunitas digital eksklusif yang dirancang khusus untuk siswa, guru, 
-            dan alumni <strong>MAN Insan Cendekia Siak</strong>. Di sini, setiap anggota dapat terhubung, berbagi pengalaman, 
-            serta berdiskusi seputar akademik, pengembangan diri, dan kehidupan sekolah dalam suasana yang positif dan inspiratif. 🎓
-            <br /><br />
-            EduForum hadir untuk menciptakan ekosistem pembelajaran yang kolaboratif, di mana ide dan pengetahuan dapat 
-            tumbuh bersama. Melalui fitur diskusi, berbagi materi, dan publikasi kegiatan, platform ini mendorong setiap 
-            individu untuk aktif berkontribusi dan memperluas jaringan dalam lingkungan yang aman, suportif, dan bernilai edukatif. 🌱
-            <br /><br />
-            Dengan semangat "Belajar, Berkarya, dan Terhubung", EduForum menjadi wadah bagi komunitas MAN IC Siak untuk 
-            terus berkembang, menginspirasi, dan memperkuat hubungan antargenerasi demi terciptanya budaya digital yang produktif dan bermakna.
-          </p>
+        <CardContent className="space-y-1 p-2">
+          {suggestedUsers.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground text-sm">Belum ada saran</p>
+            </div>
+          ) : (
+            suggestedUsers.map((user) => (
+              <div
+                key={user.id}
+                className="group flex items-center gap-3 p-2 rounded-lg hover:bg-accent/50 transition-colors cursor-pointer"
+                onClick={() => navigate(`/profile/${user.id}`)}
+              >
+                <Avatar className="h-9 w-9 border border-border group-hover:border-green-500/50 transition-colors">
+                  <AvatarImage src={user.avatar_url} />
+                  <AvatarFallback className="bg-green-500/10 text-green-500 text-xs font-bold">
+                    {getInitials(user.full_name)}
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-medium text-sm text-foreground truncate group-hover:text-green-500 transition-colors">
+                      {user.full_name}
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground font-medium">
+                    {user.follower_count.toLocaleString()} followers
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
     </div>

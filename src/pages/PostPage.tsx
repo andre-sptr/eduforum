@@ -1,12 +1,13 @@
-// src/pages/PostPage.tsx
-import { useEffect, useState, useMemo } from "react";
+
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import PostCard from "@/components/PostCard";
-import { RankBadge } from "@/components/RankBadge";
+
+import { useLeaderboardData } from "@/hooks/useLeaderboardData";
 
 const PostPage = () => {
   const { postId } = useParams();
@@ -14,8 +15,7 @@ const PostPage = () => {
   const [post, setPost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [topFollowers, setTopFollowers] = useState<any[]>([]);
-  const [topLiked, setTopLiked] = useState<any[]>([]);
+  const { topFollowers, topLiked } = useLeaderboardData();
 
   useEffect(() => { loadPost(); }, [postId]);
 
@@ -23,8 +23,7 @@ const PostPage = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
-      const [postRes, tfRes, tlRes] = await Promise.all([
-        supabase
+      const { data: postData, error: postError } = await supabase
           .from("posts")
           .select(`
             id, content, created_at, media_urls, media_types, user_id,
@@ -39,19 +38,15 @@ const PostPage = () => {
             )
           `)
           .eq("id", postId)
-          .single(),
-        supabase.rpc("get_top_5_followers"),
-        supabase.rpc("get_top_5_liked_users")
-      ]);
-      if (tfRes.data) setTopFollowers(tfRes.data);
-      if (tlRes.data) setTopLiked(tlRes.data);
-      if (postRes.error) throw postRes.error;
-      if (!postRes.data) {
+          .single();
+
+      if (postError) throw postError;
+      if (!postData) {
         toast.error("Postingan tidak ditemukan");
         navigate("/");
         return;
       }
-      setPost(postRes.data);
+      setPost(postData);
     } catch (e: any) { toast.error(e.message); navigate("/"); } finally { setLoading(false); }
   };
 
@@ -67,21 +62,15 @@ const PostPage = () => {
   if (!post) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/40">
-      <header className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
-        <div className="container mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="rounded-xl hover:bg-accent/10">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="rounded-xl"><ArrowLeft className="h-5 w-5" /></Button>
           <h1 className="text-xl font-semibold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Postingan</h1>
-        </div>
-      </header>
+      </div>
 
-      <main className="container mx-auto px-4 py-6 max-w-3xl">
-        <PostCard post={post} currentUserId={currentUser?.id} 
-        // onLike={loadPost} 
+      <PostCard post={post} currentUserId={currentUser?.id} 
+        
         onPostUpdated={loadPost} onPostDeleted={() => navigate("/")} postType="global" topFollowers={topFollowers} topLiked={topLiked}/>
-      </main>
     </div>
   );
 };

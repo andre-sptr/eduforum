@@ -1,4 +1,4 @@
-// ReactionGame.tsx
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, RotateCcw, Target } from "lucide-react";

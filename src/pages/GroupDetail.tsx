@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
 import { ArrowLeft, Users, Send, MessageCircle, Pencil, Trash, Crown, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import PostCard from "@/components/PostCard";
@@ -12,9 +13,8 @@ import MediaUploader from "@/components/MediaUploader";
 import { MediaFile, compressImage } from "@/lib/mediaUtils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { RankBadge } from "@/components/RankBadge";
-import { Input } from "@/components/ui/input";
-// Impor MentionInput
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLeaderboardData } from "@/hooks/useLeaderboardData";
 import { MentionInput } from "@/components/MentionInput";
 
 const getInitials = (n: string) => {
@@ -39,18 +39,13 @@ const GroupDetail = () => {
   const [openDelete, setOpenDelete] = useState(false);
   const [chatOpening, setChatOpening] = useState(false);
   const [spotifyTrack, setSpotifyTrack] = useState<any>(null);
-  const [showSpotifySearch, setShowSpotifySearch] = useState(false);
-  const [topFollowers, setTopFollowers] = useState<any[]>([]);
-  const [topLiked, setTopLiked] = useState<any[]>([]);
   const [userToConfirmAdd, setUserToConfirmAdd] = useState<any | null>(null);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const isOwner = group?.created_by === currentUser?.id;
-
-  const followerRankMap = useMemo(() => new Map(topFollowers.slice(0, 3).map((u, i) => [u.id, i + 1])), [topFollowers]);
-  const likerRankMap = useMemo(() => new Map(topLiked.slice(0, 3).map((u, i) => [u.id, i + 1])), [topLiked]);
+  const { topFollowers, topLiked } = useLeaderboardData();
   
   const memberIds = useMemo(() => members.map(m => m.user_id), [members]);
 
@@ -102,12 +97,6 @@ const GroupDetail = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { navigate("/auth"); return; }
       setCurrentUser(user);
-      const [tfRes, tlRes] = await Promise.all([
-        supabase.rpc("get_top_5_followers"),
-        supabase.rpc("get_top_5_liked_users")
-      ]);
-      if (tfRes.data) setTopFollowers(tfRes.data);
-      if (tlRes.data) setTopLiked(tlRes.data);
       await loadGroupData(user.id);
     })()
   }, [groupId]);
@@ -247,71 +236,99 @@ const GroupDetail = () => {
   const ownerId = group?.created_by; const owner = members.find(m => m.user_id === ownerId); const otherMembers = members.filter(m => m.user_id !== ownerId);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur">
-        <div className="container mx-auto flex items-center gap-3 px-4 py-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/groups")} className="rounded-xl"><ArrowLeft className="h-5 w-5" /></Button>
-          <div className="flex-1 min-w-0"><h1 className="truncate text-lg font-semibold">{group.name}</h1><p className="flex items-center gap-1 text-xs text-muted-foreground"><Users className="h-4 w-4" />{members.length} anggota</p></div>
-          <div className="flex items-center gap-2">
-            {isMember && <Button variant="outline" className="rounded-xl" onClick={openGroupChat} disabled={chatOpening}><MessageCircle className="mr-2 h-4 w-4" />{chatOpening ? "Membuka..." : "Chat Grup"}</Button>}
-            <Dialog open={openEdit} onOpenChange={v => isOwner && setOpenEdit(v)}>
-              <DialogTrigger asChild><Button variant="outline" className="rounded-xl" disabled={!isOwner}><Pencil className="mr-2 h-4 w-4" />Edit Deskripsi</Button></DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader><DialogTitle>Edit Deskripsi Grup</DialogTitle></DialogHeader>
-                <Textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} className="min-h-[140px]" placeholder="Tulis deskripsi grup..." />
-                <DialogFooter><Button variant="ghost" onClick={() => setOpenEdit(false)}>Batal</Button><Button onClick={saveDescription} disabled={!isOwner || editDesc === group.description}>Simpan</Button></DialogFooter>
-              </DialogContent>
-            </Dialog>
-            <AlertDialog open={openDelete} onOpenChange={v => isOwner && setOpenDelete(v)}>
-              <Button variant="destructive" className="rounded-xl disabled:opacity-60" disabled={!isOwner} onClick={() => isOwner && setOpenDelete(true)}><Trash className="mr-2 h-4 w-4" />Hapus Grup</Button>
-              <AlertDialogContent>
-                <AlertDialogHeader><AlertDialogTitle>Hapus Grup?</AlertDialogTitle><AlertDialogDescription>Tindakan ini menghapus semua data grup dan tidak dapat dibatalkan.</AlertDialogDescription></AlertDialogHeader>
-                <AlertDialogFooter><AlertDialogCancel>Batal</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={deleteGroup}>Hapus</AlertDialogAction></AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-            <AlertDialog open={!!userToConfirmAdd} onOpenChange={() => setUserToConfirmAdd(null)}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Konfirmasi Tambah Anggota</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Apakah Anda yakin ingin menambahkan{" "}
-                    <span className="font-bold">{userToConfirmAdd?.full_name}</span>{" "}
-                    sebagai anggota grup "{group.name}"?
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setUserToConfirmAdd(null)}>Batal</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-accent text-accent-foreground hover:bg-accent/90"
-                    onClick={() => {
-                      if (userToConfirmAdd) {
-                        handleAddMember(userToConfirmAdd);
-                      }
-                      setUserToConfirmAdd(null);
-                      setShowInviteDialog(false);
-                    }}
-                  >
-                    Ya, Tambahkan
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+    <div className="space-y-6">
+      <Card className="border-border bg-card/80 backdrop-blur p-6">
+        <div className="flex flex-col md:flex-row gap-6">
+          <div className="flex-1">
+             <div className="flex items-center gap-4 mb-4">
+                <Button variant="ghost" size="icon" onClick={() => navigate("/groups")} className="rounded-xl"><ArrowLeft className="h-5 w-5" /></Button>
+                <div>
+                   <h1 className="text-2xl font-bold">{group.name}</h1>
+                   <p className="flex items-center gap-1 text-sm text-muted-foreground"><Users className="h-4 w-4" />{members.length} anggota</p>
+                </div>
+             </div>
+             {group.description && <p className="text-muted-foreground mb-4">{group.description}</p>}
+             
+             <div className="flex items-center gap-2 flex-wrap">
+               {isMember && <Button variant="outline" className="rounded-xl" onClick={openGroupChat} disabled={chatOpening}><MessageCircle className="mr-2 h-4 w-4" />{chatOpening ? "Membuka..." : "Chat Grup"}</Button>}
+               {isOwner && (
+                 <>
+                   <Dialog open={openEdit} onOpenChange={v => isOwner && setOpenEdit(v)}>
+                    <DialogTrigger asChild><Button variant="outline" className="rounded-xl"><Pencil className="mr-2 h-4 w-4" />Edit Info</Button></DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader><DialogTitle>Edit Deskripsi Grup</DialogTitle></DialogHeader>
+                      <Textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} className="min-h-[140px]" placeholder="Tulis deskripsi grup..." />
+                      <DialogFooter><Button variant="ghost" onClick={() => setOpenEdit(false)}>Batal</Button><Button onClick={saveDescription} disabled={!isOwner || editDesc === group.description}>Simpan</Button></DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                   <Button variant="destructive" className="rounded-xl" onClick={() => setOpenDelete(true)}><Trash className="mr-2 h-4 w-4" />Hapus Grup</Button>
+                 </>
+               )}
+             </div>
           </div>
-          {group.profiles?.avatar_url && (<Avatar className="ml-2 h-8 w-8 ring-1 ring-border"><AvatarImage src={group.profiles.avatar_url} /><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(group.profiles?.full_name || "G")}</AvatarFallback></Avatar>)}
+          {group.profiles?.avatar_url && (<Avatar className="h-24 w-24 ring-4 ring-card"><AvatarImage src={group.profiles.avatar_url} /><AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">{getInitials(group.profiles?.full_name || "G")}</AvatarFallback></Avatar>)}
         </div>
-      </header>
+      </Card>
 
-      <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-[280px_1fr]">
-          <aside className="space-y-4">
-            <Card className="border-border bg-card/60">
-              <div className="p-4 border-b border-border flex items-center justify-between">
-                <p className="text-sm font-medium">Anggota ({members.length})</p>
+      <Tabs defaultValue="feed" className="w-full">
+        <TabsList className="w-full justify-start rounded-xl bg-muted/50 p-1 mb-6">
+          <TabsTrigger value="feed" className="rounded-lg px-6">Diskusi</TabsTrigger>
+          <TabsTrigger value="members" className="rounded-lg px-6">Anggota ({members.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="feed" className="space-y-6">
+           { }
+            {isMember && (
+              <Card className="border-border bg-card/60 p-5">
+                <MentionInput 
+                  value={newPostContent} 
+                  onChange={setNewPostContent} 
+                  placeholder="Bagikan sesuatu dengan grup..." 
+                  className="mb-3 min-h-[110px] resize-none rounded-xl bg-input/60"
+                  multiline
+                  currentUserId={currentUser?.id}
+                  allowedUserIds={memberIds}
+                />
+                <MediaUploader onMediaChange={setMediaFiles} />
+                <div className="mt-4 flex justify-end">
+                  <Button onClick={handleCreatePost} disabled={posting || (!newPostContent.trim() && mediaFiles.length === 0)} className="rounded-xl bg-accent text-accent-foreground hover:bg-accent/90">
+                    <Send className="mr-2 h-4 w-4" />{posting ? "Memposting..." : "Posting"}
+                  </Button>
+                </div>
+              </Card>
+            )}
+            
+            {posts.length === 0 ? (
+              <Card className="grid place-items-center border-border bg-card/60 p-10 text-sm text-muted-foreground">
+                {isMember ? "Belum ada postingan. Jadilah yang pertama!" : "Bergabung untuk melihat postingan"}
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {posts.map(p => (
+                  <PostCard
+                    key={p.id}
+                    post={p}
+                    currentUserId={currentUser?.id}
+                    postType="group"
+                    topFollowers={topFollowers}
+                    topLiked={topLiked}
+                    onPostDeleted={() => setPosts(currentPosts => currentPosts.filter(post => post.id !== p.id))}
+                    allowedUserIds={memberIds}
+                  />
+                ))}
+              </div>
+            )}
+        </TabsContent>
+
+        <TabsContent value="members">
+          <Card className="border-border bg-card/60">
+             <div className="p-4 border-b border-border flex items-center justify-between">
+                <h3 className="font-semibold">Daftar Anggota</h3>
                 {isOwner && (
                   <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
                     <DialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" title="Undang Anggota">
-                        <UserPlus className="h-4 w-4" />
+                      <Button variant="outline" size="sm" className="rounded-lg gap-2">
+                        <UserPlus className="h-4 w-4" /> Undang
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-md">
@@ -356,90 +373,52 @@ const GroupDetail = () => {
                     </DialogContent>
                   </Dialog>
                 )}
-              </div>
-              <div className="max-h-[70vh] overflow-y-auto p-2">
+             </div>
+             <div className="p-4 grid gap-4 sm:grid-cols-2">
                 {owner && (
-                  <Link to={`/profile/${owner.user_id}`} className="mb-2 block rounded-lg border border-border bg-muted/40 p-2 hover:bg-muted/60 transition">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8 ring-1 ring-border"><AvatarImage src={owner.profiles?.avatar_url || ""} /><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(owner.profiles?.full_name || "O")}</AvatarFallback></Avatar>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="truncate text-sm font-semibold">{owner.profiles?.full_name || "Owner"}</p>
-                          <RankBadge rank={followerRankMap.get(owner.user_id)} type="follower" />
-                          <RankBadge rank={likerRankMap.get(owner.user_id)} type="like" />
-                        </div>
-                      </div>
-                      <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-foreground/80"><Crown className="h-3 w-3" />Owner</span>
+                  <Link to={`/profile/${owner.user_id}`} className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-3 hover:bg-muted/60 transition">
+                    <Avatar className="h-10 w-10 ring-1 ring-border"><AvatarImage src={owner.profiles?.avatar_url || ""} /><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(owner.profiles?.full_name || "O")}</AvatarFallback></Avatar>
+                    <div className="min-w-0">
+                       <p className="truncate text-sm font-semibold">{owner.profiles?.full_name || "Owner"}</p>
+                       <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary font-medium"><Crown className="h-3 w-3" />Owner</span>
                     </div>
                   </Link>
                 )}
-                {otherMembers.length === 0 ? (
-                  <div className="p-4 text-sm text-muted-foreground">{owner ? "Belum ada anggota lain" : "Belum ada anggota"}</div>
-                ) : otherMembers.map(m => (
-                  <Link to={`/profile/${m.user_id}`} key={m.id} className="flex items-center gap-3 rounded-lg p-2 hover:bg-muted/50 transition">
-                    <Avatar className="h-8 w-8 ring-1 ring-border"><AvatarImage src={m.profiles?.avatar_url || ""} /><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(m.profiles?.full_name || "U")}</AvatarFallback></Avatar>
+                {otherMembers.map(m => (
+                  <Link to={`/profile/${m.user_id}`} key={m.id} className="flex items-center gap-3 rounded-xl border border-border/50 p-3 hover:bg-muted/50 transition">
+                    <Avatar className="h-10 w-10 ring-1 ring-border"><AvatarImage src={m.profiles?.avatar_url || ""} /><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(m.profiles?.full_name || "U")}</AvatarFallback></Avatar>
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate text-sm font-medium">{m.profiles?.full_name || "Pengguna"}</p>
-                        <RankBadge rank={followerRankMap.get(m.user_id)} type="follower" />
-                        <RankBadge rank={likerRankMap.get(m.user_id)} type="like" />
-                      </div>
-                      {m.profiles?.role && <p className="truncate text-xs text-muted-foreground">{m.profiles.role}</p>}
+                      <p className="truncate text-sm font-medium">{m.profiles?.full_name || "Pengguna"}</p>
+                      <p className="truncate text-xs text-muted-foreground">{m.profiles?.role}</p>
                     </div>
                   </Link>
                 ))}
-              </div>
-            </Card>
-          </aside>
+             </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
+            
+      <AlertDialog open={openDelete} onOpenChange={v => isOwner && setOpenDelete(v)}>
+          <AlertDialogContent>
+            <AlertDialogHeader><AlertDialogTitle>Hapus Grup?</AlertDialogTitle><AlertDialogDescription>Tindakan ini menghapus semua data grup dan tidak dapat dibatalkan.</AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogFooter><AlertDialogCancel>Batal</AlertDialogCancel><AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={deleteGroup}>Hapus</AlertDialogAction></AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
 
-          <main className="space-y-6">
-            {group.description && (<Card className="border-border bg-card/60 p-5"><p className="text-sm leading-relaxed text-foreground/90">{group.description}</p></Card>)}
-            
-            {/* GANTI DARI TEXTAREA KE MENTIONINPUT */}
-            {isMember && (
-              <Card className="border-border bg-card/60 p-5">
-                <MentionInput 
-                  value={newPostContent} 
-                  onChange={setNewPostContent} 
-                  placeholder="Bagikan sesuatu dengan grup..." 
-                  className="mb-3 min-h-[110px] resize-none rounded-xl bg-input/60"
-                  multiline
-                  currentUserId={currentUser?.id}
-                  allowedUserIds={memberIds}
-                />
-                <MediaUploader onMediaChange={setMediaFiles} />
-                <div className="mt-4 flex justify-end">
-                  <Button onClick={handleCreatePost} disabled={posting || (!newPostContent.trim() && mediaFiles.length === 0)} className="rounded-xl bg-accent text-accent-foreground hover:bg-accent/90">
-                    <Send className="mr-2 h-4 w-4" />{posting ? "Memposting..." : "Posting"}
-                  </Button>
-                </div>
-              </Card>
-            )}
-            
-            {posts.length === 0 ? (
-              <Card className="grid place-items-center border-border bg-card/60 p-10 text-sm text-muted-foreground">
-                {isMember ? "Belum ada postingan. Jadilah yang pertama!" : "Bergabung untuk melihat postingan"}
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {posts.map(p => (
-                  <PostCard
-                    key={p.id}
-                    post={p}
-                    currentUserId={currentUser?.id}
-                    postType="group"
-                    topFollowers={topFollowers}
-                    topLiked={topLiked}
-                    // onLike={() => loadPosts(true)}
-                    onPostDeleted={() => setPosts(currentPosts => currentPosts.filter(post => post.id !== p.id))}
-                    allowedUserIds={memberIds}
-                  />
-                ))}
-              </div>
-            )}
-          </main>
-        </div>
-      </div>
+      <AlertDialog open={!!userToConfirmAdd} onOpenChange={() => setUserToConfirmAdd(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Konfirmasi Tambah Anggota</AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menambahkan <span className="font-bold">{userToConfirmAdd?.full_name}</span> sebagai anggota grup "{group.name}"?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setUserToConfirmAdd(null)}>Batal</AlertDialogCancel>
+            <AlertDialogAction className="bg-accent text-accent-foreground hover:bg-accent/90" onClick={() => { if (userToConfirmAdd) { handleAddMember(userToConfirmAdd); } setUserToConfirmAdd(null); setShowInviteDialog(false); }}>Ya, Tambahkan</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

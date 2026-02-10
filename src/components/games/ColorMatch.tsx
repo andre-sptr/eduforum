@@ -1,4 +1,4 @@
-// ColorMatch.tsx
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Play, RotateCcw } from "lucide-react";

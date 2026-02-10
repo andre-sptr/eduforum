@@ -1,4 +1,4 @@
-// src/components/Auth.tsx
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,27 +57,34 @@ const Auth = () => {
     } finally { setLoading(false); }
   };
 
-  const inputCls = "bg-input/60 border-border focus-visible:ring-2 focus-visible:ring-accent";
-  const btnCls = "w-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg";
+  const inputCls = "bg-input/60 border-border focus-visible:ring-2 focus-visible:ring-primary/50 rounded-xl";
+  const btnCls = "w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg rounded-xl font-semibold";
 
   return (
-    <div className="min-h-screen grid place-items-center bg-gradient-to-b from-background to-muted/40 p-4">
+    <div className="min-h-screen grid place-items-center bg-background p-4">
       <div className="w-full max-w-md">
-        <Card className="rounded-3xl shadow-2xl border border-border/60 backdrop-blur-sm">
-          <CardHeader className="text-center space-y-2">
-            <div className="flex justify-center"><img src="/favicon.ico" alt="Logo EduForum" className="w-14 h-14 rounded-xl shadow" /></div>
-            <CardTitle className="text-2xl">EduForum MAN IC Siak</CardTitle>
-            <CardDescription>Platform Edukasi Interaktif Eksklusif MAN IC Siak</CardDescription>
+        <Card className="rounded-3xl shadow-2xl border border-border/60 backdrop-blur-sm bg-card/50">
+          <CardHeader className="text-center space-y-4">
+            <div className="flex justify-center">
+               <div className="p-3 bg-primary/10 rounded-2xl">
+                 <img src="/favicon.ico" alt="Logo EduForum" className="w-12 h-12 rounded-xl shadow-sm" />
+               </div>
+            </div>
+            <div className="space-y-1">
+               <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">EduForum</CardTitle>
+               <CardDescription className="text-base">Komunitas Digital MAN IC Siak</CardDescription>
+            </div>
           </CardHeader>
           <CardContent>
             <Tabs value={tab} onValueChange={setTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 rounded-xl shadow">
-                <TabsTrigger value="login" className="data-[state=active]:shadow">Login</TabsTrigger>
-                <TabsTrigger value="register" className="data-[state=active]:shadow">Register</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 rounded-xl p-1 bg-muted/50">
+                <TabsTrigger value="login" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">Masuk</TabsTrigger>
+                <TabsTrigger value="register" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">Daftar</TabsTrigger>
               </TabsList>
-
-              <TabsContent value="login">
-                <form onSubmit={handleLogin} className="space-y-4 mt-4">
+              
+              <div className="mt-6">
+                <TabsContent value="login" className="mt-0">
+                  <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="login-email">Email</Label>
                     <Input id="login-email" type="email" placeholder="nama@gmail.com" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputCls} />
@@ -125,6 +132,7 @@ const Auth = () => {
                   </Button>
                 </form>
               </TabsContent>
+              </div>
             </Tabs>
           </CardContent>
         </Card>

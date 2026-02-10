@@ -1,4 +1,4 @@
-// src/pages/Messages.tsx
+
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Send, MessageCircle, Users, MoreVertical, Pencil, Trash2, Search } from "lucide-react";
+import { Send, MessageCircle, Users, MoreVertical, Pencil, Trash2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { z } from "zod";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MentionInput } from "@/components/MentionInput";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLeaderboardData } from "@/hooks/useLeaderboardData";
 import { RankBadge } from "@/components/RankBadge";
 import { ContentRenderer } from "@/components/ContentRenderer";
 
@@ -31,8 +33,7 @@ const Messages=()=> {
   const [editingMessageId,setEditingMessageId]=useState<string|null>(null);
   const [editContent,setEditContent]=useState("");
   const [followQuery,setFollowQuery]=useState("");
-  const [topFollowers, setTopFollowers] = useState<any[]>([]);
-  const [topLiked, setTopLiked] = useState<any[]>([]);
+  const { topFollowers, topLiked } = useLeaderboardData();
   const messagesViewportRef=useRef<HTMLDivElement>(null);
 
   const followerRankMap = useMemo(() =>
@@ -50,15 +51,11 @@ const Messages=()=> {
     const { data:{ user } }=await supabase.auth.getUser();
     if(!user){ navigate("/auth"); return; }
     setCurrentUser(user);
-    const [_, __, ___, tfData, tlData] = await Promise.all([
+    const [_, __, ___] = await Promise.all([
       loadGlobalChat(user.id),
       loadFollowedUsers(user.id),
-      loadUserGroups(user.id),
-      supabase.rpc("get_top_5_followers"),
-      supabase.rpc("get_top_5_liked_users") 
+      loadUserGroups(user.id)
     ]);
-    if (tfData.data) setTopFollowers(tfData.data);
-    if (tlData.data) setTopLiked(tlData.data);
     setLoading(false);
   };
 
@@ -143,16 +140,16 @@ const Messages=()=> {
   );
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-50 border-b border-border bg-card/70 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-        <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={()=>navigate("/")} className="rounded-xl"><ArrowLeft className="h-5 w-5"/></Button>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">Global Chat</h1>
-        </div>
-      </header>
+    <div className="space-y-6">
+      <Tabs defaultValue="global" className="w-full">
+        <TabsList className="w-full justify-start rounded-xl bg-muted/50 p-1 mb-6">
+          <TabsTrigger value="global" className="rounded-lg px-6">Global Chat</TabsTrigger>
+          <TabsTrigger value="direct" className="rounded-lg px-6">Direct Messages</TabsTrigger>
+          <TabsTrigger value="groups" className="rounded-lg px-6">Grup Chat</TabsTrigger>
+        </TabsList>
 
-      <div className="flex-1 container mx-auto px-4 py-6 flex gap-6 max-w-7xl">
-        <Card className="flex-1 border-border bg-card/60 backdrop-blur rounded-2xl flex flex-col h-[calc(100vh-125px)]">
+        <TabsContent value="global" className="h-[calc(100vh-200px)]">
+           <Card className="flex-1 border-border bg-card/60 backdrop-blur rounded-2xl flex flex-col h-full">
           <div ref={messagesViewportRef} className="flex-1 overflow-y-auto p-4">
             <div className="space-y-4">
               {messages.length===0?(<div className="text-center py-10 text-muted-foreground">Belum ada pesan. Mulai percakapan!</div>):messages.map(m=>{
@@ -207,8 +204,9 @@ const Messages=()=> {
             </div>
           </form>
         </Card>
+        </TabsContent>
 
-        <div className="w-80 space-y-4 hidden lg:block">
+        <TabsContent value="direct">
           <Card className="p-4 border-border bg-card/60 backdrop-blur rounded-2xl">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-semibold flex items-center gap-2"><MessageCircle className="h-4 w-4"/>User yang Diikuti</h3>
@@ -217,7 +215,7 @@ const Messages=()=> {
               <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
               <Input value={followQuery} onChange={e=>setFollowQuery(e.target.value)} placeholder="Cari pengguna..." className="pl-9 h-9 bg-input/60 border-border rounded-xl"/>
             </div>
-            <ScrollArea className="h-72">
+            <ScrollArea className="h-[60vh]">
               <div className="space-y-2 pr-2">
                 {filteredFollowed.length===0?(<p className="text-sm text-muted-foreground text-center py-4">Tidak ada hasil</p>):filteredFollowed.map(u=>(
                   <div key={u.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/10 cursor-pointer transition-colors" onClick={()=>createDirectChat(u.id)}>
@@ -228,10 +226,12 @@ const Messages=()=> {
               </div>
             </ScrollArea>
           </Card>
+        </TabsContent>
 
+        <TabsContent value="groups">
           <Card className="p-4 border-border bg-card/60 backdrop-blur rounded-2xl">
             <h3 className="font-semibold mb-4 flex items-center gap-2"><Users className="h-4 w-4"/>Grup Chat</h3>
-            <ScrollArea className="h-72">
+            <ScrollArea className="h-[60vh]">
               <div className="space-y-2 pr-2">
                 {userGroups.length===0?(<p className="text-sm text-muted-foreground text-center py-4">Belum bergabung grup</p>):userGroups.map(g=>(
                   <div key={g.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/10 cursor-pointer transition-colors" onClick={()=>createGroupChat(g.id)}>
@@ -242,8 +242,8 @@ const Messages=()=> {
               </div>
             </ScrollArea>
           </Card>
-        </div>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

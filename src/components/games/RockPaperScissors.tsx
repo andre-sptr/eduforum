@@ -1,9 +1,9 @@
-// RockPaperScissors.tsx
+
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Loader2, Users, Trophy, Hand, Scissors as ScissorsIcon, FileText, Play, RotateCcw } from "lucide-react";
+import { Loader2, Users, Trophy, Hand, Scissors as ScissorsIcon, FileText } from "lucide-react";
 import { useOpponent } from "@/hooks/useOpponent";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 

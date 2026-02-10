@@ -1,4 +1,4 @@
-// supabase/functions/spotify-search/index.ts
+
 
 import { serve } from "std/http";
 import { corsHeaders } from "../_shared/cors.ts";

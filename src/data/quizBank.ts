@@ -5,7 +5,7 @@ export interface QuizQuestion {
 }
 
 export const quizBank: QuizQuestion[] = [
-  // ————— Umum —————
+  
   { question: "Provinsi termuda di Indonesia hasil pemekaran Papua tahun 2022 adalah?", options: ["Papua Barat Daya","Papua Tengah","Papua Pegunungan","Semua benar"], correctAnswer: 3 },
   { question: "Candi Borobudur terletak di provinsi?", options: ["Jawa Tengah","DI Yogyakarta","Jawa Timur","Banten"], correctAnswer: 0 },
   { question: "Sungai terpanjang di Pulau Jawa adalah?", options: ["Brantas","Citarum","Bengawan Solo","Progo"], correctAnswer: 2 },
@@ -27,7 +27,6 @@ export const quizBank: QuizQuestion[] = [
   { question: "Provinsi dengan jumlah penduduk terbanyak di Indonesia?", options: ["Jawa Barat","Jawa Timur","Jawa Tengah","Banten"], correctAnswer: 0 },
   { question: "Bahasa daerah 'Ngapak' identik dengan wilayah?", options: ["Tegal–Banyumas","Madura","Minang","Bugis"], correctAnswer: 0 },
 
-  // ————— GEOGRAFI DUNIA —————
   { question: "Ibu kota Australia adalah?", options: ["Sydney","Melbourne","Canberra","Perth"], correctAnswer: 2 },
   { question: "Benua terbesar di dunia adalah?", options: ["Afrika","Eropa","Asia","Amerika Utara"], correctAnswer: 2 },
   { question: "Gunung tertinggi di dunia di atas permukaan laut adalah?", options: ["K2","Kilimanjaro","Denali","Everest"], correctAnswer: 3 },
@@ -49,7 +48,6 @@ export const quizBank: QuizQuestion[] = [
   { question: "Ibu kota Mesir adalah?", options: ["Alexandria","Giza","Luxor","Kairo"], correctAnswer: 3 },
   { question: "Selandia Baru terdiri dari Pulau Utara dan?", options: ["Pulau Timur","Pulau Selatan","Pulau Barat","Pulau Tengah"], correctAnswer: 1 },
 
-  // ————— SEJARAH & KEWARGANEGARAAN —————
   { question: "Sumpah Pemuda diikrarkan pada tahun?", options: ["1908","1928","1945","1965"], correctAnswer: 1 },
   { question: "BPUPKI dibentuk pada masa pendudukan?", options: ["Belanda","Jepang","Inggris","Portugis"], correctAnswer: 1 },
   { question: "Pembukaan UUD 1945 alinea ke-4 memuat?", options: ["Tujuan negara","Hak asasi","Kedaulatan rakyat","Bentuk pemerintahan"], correctAnswer: 0 },
@@ -71,7 +69,6 @@ export const quizBank: QuizQuestion[] = [
   { question: "G30S terjadi pada tahun?", options: ["1959","1965","1971","1975"], correctAnswer: 1 },
   { question: "Sistem pemerintahan Indonesia menurut UUD 1945 adalah?", options: ["Monarki konstitusional","Republik presidensial","Republik parlementer","Federasi"], correctAnswer: 1 },
 
-  // ————— SAINS (FISIKA, KIMIA, BIOLOGI) —————
   { question: "Satuan SI untuk gaya adalah?", options: ["Joule","Newton","Pascal","Watt"], correctAnswer: 1 },
   { question: "Percepatan gravitasi di bumi ~?", options: ["8,9 m/s²","9,8 m/s²","10,8 m/s²","12,0 m/s²"], correctAnswer: 1 },
   { question: "Hukum Ohm menyatakan V = ?", options: ["I/R","IR","P/t","W/Q"], correctAnswer: 1 },
@@ -130,7 +127,6 @@ export const quizBank: QuizQuestion[] = [
   { question: "Bentuk energi yang tersimpan pada pegas adalah?", options: ["Kinetik","Potensial elastik","Termal","Kimia"], correctAnswer: 1 },
   { question: "Zat aditif yang membuat roti mengembang adalah?", options: ["Garam","Ragi","Cuka","Air"], correctAnswer: 1 },
 
-  // ————— MATEMATIKA RINGAN & LOGIKA —————
   { question: "Jika f(x)=2x+3, maka f(5) =", options: ["10","11","12","13"], correctAnswer: 3 },
   { question: "Hasil dari 7! / 5! adalah?", options: ["6","7","42","35"], correctAnswer: 2 },
   { question: "Akar persamaan x²=144 adalah?", options: ["±10","±12","±14","±16"], correctAnswer: 1 },
@@ -162,7 +158,6 @@ export const quizBank: QuizQuestion[] = [
   { question: "Konversi 1 km ke meter adalah?", options: ["10 m","100 m","1000 m","10000 m"], correctAnswer: 2 },
   { question: "Jika peluang hujan 0,3 maka peluang tidak hujan =", options: ["0,3","0,5","0,7","0,8"], correctAnswer: 2 },
 
-  // ————— BAHASA & SASTRA —————
   { question: "Antonim 'objektif' adalah?", options: ["Subjektif","Aktif","Pasif","Efisien"], correctAnswer: 0 },
   { question: "Kata 'di mana' sebagai kata tanya ditulis?", options: ["Dimana","di mana","Di mana","diMana"], correctAnswer: 1 },
   { question: "Kalimat efektif adalah kalimat yang?", options: ["Panjang","Berima","Mudah dipahami","Bersajak"], correctAnswer: 2 },
@@ -184,7 +179,6 @@ export const quizBank: QuizQuestion[] = [
   { question: "Bahasa ibu artinya?", options: ["Bahasa sehari-hari di rumah","Bahasa asing","Bahasa resmi","Bahasa daerah tetangga"], correctAnswer: 0 },
   { question: "Antonim 'eksplisit' adalah?", options: ["Impresif","Implisit","Eksklusif","Imparsial"], correctAnswer: 1 },
 
-  // ————— EKONOMI, BISNIS, SOSIOLOGI —————
   { question: "Ilmu yang mempelajari cara masyarakat memenuhi kebutuhan disebut?", options: ["Sosiologi","Ekonomi","Antropologi","Geografi"], correctAnswer: 1 },
   { question: "Hukum permintaan: harga naik, jumlah diminta?", options: ["Naik","Turun","Tetap","Tak tentu"], correctAnswer: 1 },
   { question: "Kegiatan menabung di bank disebut?", options: ["Kredit","Debet","Simpanan","Investasi langsung"], correctAnswer: 2 },
@@ -206,7 +200,6 @@ export const quizBank: QuizQuestion[] = [
   { question: "Harga yang ditetapkan di bawah harga keseimbangan disebut?", options: ["Harga dasar","Harga maksimum","Harga patokan","Harga bebas"], correctAnswer: 1 },
   { question: "Pengangguran karena pergantian pekerjaan disebut?", options: ["Struktural","Frictional","Musiman","Siklikal"], correctAnswer: 1 },
 
-  // ————— TEKNOLOGI & INFORMATIKA —————
   { question: "Perangkat keras yang memproses data adalah?", options: ["CPU","RAM","SSD","GPU"], correctAnswer: 0 },
   { question: "Sistem bilangan komputer berbasis?", options: ["Desimal","Biner","Oktal","Heksadesimal"], correctAnswer: 1 },
   { question: "Perangkat penyimpanan non-volatile adalah?", options: ["RAM","Cache","Register","SSD"], correctAnswer: 3 },
@@ -223,7 +216,6 @@ export const quizBank: QuizQuestion[] = [
   { question: "Perangkat untuk menghubungkan jaringan berbeda adalah?", options: ["Switch","Router","Hub","Bridge"], correctAnswer: 1 },
   { question: "Ekstensi file kompresi umum adalah?", options: [".pdf",".zip",".docx",".png"], correctAnswer: 1 },
 
-  // ————— KEBUDAYAAN, SENI, OLAHRAGA, POP —————
   { question: "Alat musik yang ditiup dan memiliki lidah getar tunggal adalah?", options: ["Klarinet","Biola","Gitar","Piano"], correctAnswer: 0 },
   { question: "Ragam hias batik 'Parang' berasal dari?", options: ["Cirebon","Pekalongan","Yogyakarta","Madura"], correctAnswer: 2 },
   { question: "Cabang atletik lari terpendek adalah?", options: ["100 m","200 m","400 m","800 m"], correctAnswer: 0 },
@@ -235,7 +227,6 @@ export const quizBank: QuizQuestion[] = [
   { question: "Permainan tradisional 'engklek' menggunakan?", options: ["Batu loncat","Karet gelang","Gasing","Layang-layang"], correctAnswer: 0 },
   { question: "Tari Saman berasal dari?", options: ["Sumatra Utara","Aceh","Sumatra Barat","Riau"], correctAnswer: 1 },
 
-  // ————— KESEHATAN & LINGKUNGAN —————
   { question: "Zat gizi utama penghasil energi adalah?", options: ["Protein","Lemak","Karbohidrat","Vitamin"], correctAnswer: 2 },
   { question: "Jumlah detak jantung normal remaja saat istirahat sekitar?", options: ["20–40 bpm","40–60 bpm","60–100 bpm","100–140 bpm"], correctAnswer: 2 },
   { question: "3R dalam pengelolaan sampah adalah?", options: ["Reduce, Reuse, Recycle","Return, Refill, Reduce","Reuse, Refill, Repair","Recycle, Replace, Reduce"], correctAnswer: 0 },
@@ -247,14 +238,12 @@ export const quizBank: QuizQuestion[] = [
   { question: "Masker N95 dirancang untuk menyaring partikel hingga ~?", options: ["50%","70%","95%","100%"], correctAnswer: 2 },
   { question: "Konservasi mangrove penting untuk?", options: ["Badai salju","Erosi pantai","Gempa bumi","Letusan gunung"], correctAnswer: 1 },
 
-  // ————— LOGIKA SERU & PENALARAN —————
   { question: "Semua A adalah B. X adalah A. Maka X adalah?", options: ["B","A","C","Tak dapat disimpulkan"], correctAnswer: 0 },
   { question: "Pernyataan kontraposisi dari 'Jika hujan maka jalan basah' adalah?", options: ["Jika tidak hujan maka jalan tidak basah","Jika jalan tidak basah maka tidak hujan","Jika jalan basah maka hujan","Jika hujan maka tidak basah"], correctAnswer: 1 },
   { question: "Dalam himpunan, n(A∪B)=?", options: ["n(A)+n(B)","n(A)+n(B)−n(A∩B)","n(A)×n(B)","n(A)−n(B)"], correctAnswer: 1 },
   { question: "Paradoks: 'Kalimat ini salah' adalah contoh?", options: ["Paradoks kebohongan","Paradoks Zeno","Paradoks Simpson","Paradoks Monty Hall"], correctAnswer: 0 },
   { question: "Masalah 'tiga pintu' populer disebut?", options: ["Prisoner's Dilemma","Monty Hall","St. Petersburg","Birthday problem"], correctAnswer: 1 },
 
-  // (Untuk memastikan mencapai 300, berikut batch multi-topik tambahan)
   { question: "Hukum Pascal berlaku pada?", options: ["Zat padat","Zat cair","Gas mulia","Vakum"], correctAnswer: 1 },
   { question: "Satuan usaha listrik (energi listrik) pada tagihan rumah?", options: ["Watt","Volt","kWh","Ampere"], correctAnswer: 2 },
   { question: "Lambang kimia natrium adalah?", options: ["Na","N","Ni","Ne"], correctAnswer: 0 },

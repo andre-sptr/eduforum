@@ -1,35 +1,33 @@
-// src/pages/Groups.tsx
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Plus, Users, Lock, Globe, Search } from "lucide-react";
+import { ArrowLeft, Plus, Search, Loader2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { RankBadge } from "@/components/RankBadge";
+import { useLeaderboardData } from "@/hooks/useLeaderboardData";
+import { GroupCard } from "@/components/GroupCard";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const Groups=()=> {
-  const navigate=useNavigate();
-  const [groups,setGroups]=useState<any[]>([]);
-  const [myGroups,setMyGroups]=useState<any[]>([]);
-  const [q,setQ]=useState("");
-  const [loading,setLoading]=useState(true);
-  const [me,setMe]=useState<any>(null);
-  const [showCreate,setShowCreate]=useState(false);
-  const [newName,setNewName]=useState(""); 
-  const [newDesc,setNewDesc]=useState(""); 
-  const [priv,setPriv]=useState(false); 
-  const [creating,setCreating]=useState(false);
-  const [confirmLeaveId,setConfirmLeaveId]=useState<string|null>(null);
-  const [topFollowers, setTopFollowers] = useState<any[]>([]);
-  const [topLiked, setTopLiked] = useState<any[]>([]);
+const Groups = () => {
+  const navigate = useNavigate();
+  const [groups, setGroups] = useState<any[]>([]);
+  const [myGroups, setMyGroups] = useState<any[]>([]);
+  const [q, setQ] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [me, setMe] = useState<any>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState(""); 
+  const [newDesc, setNewDesc] = useState(""); 
+  const [priv, setPriv] = useState(false); 
+  const [creating, setCreating] = useState(false);
+  const [confirmLeaveId, setConfirmLeaveId] = useState<string | null>(null);
+  const { topFollowers, topLiked } = useLeaderboardData();
 
   const followerRankMap = useMemo(() =>
     new Map(topFollowers.slice(0, 3).map((u, i) => [u.id, i + 1]))
@@ -39,153 +37,238 @@ const Groups=()=> {
     new Map(topLiked.slice(0, 3).map((u, i) => [u.id, i + 1]))
   , [topLiked]);
 
-  useEffect(()=>{(async()=>{
-    const { data:{ user } }=await supabase.auth.getUser(); if(!user){ navigate("/auth"); return; }
-    setMe(user); 
-    const [tfRes, tlRes] = await Promise.all([
-        supabase.rpc("get_top_5_followers"),
-        supabase.rpc("get_top_5_liked_users")
-      ]);
-      if (tfRes.data) setTopFollowers(tfRes.data);
-      if (tlRes.data) setTopLiked(tlRes.data);
-      await loadGroups(user.id);
-    })()
-  },[]);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { navigate("/auth"); return; }
+        setMe(user); 
+        await loadGroups(user.id);
+      } catch (e) {
+         
+      } finally {
+         if (alive) setLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
-  const loadGroups=async(uid:string)=>{
-    try{
-      const { data:allGroups,error:gErr }=await supabase.from("groups").select(`*,group_members(count),profiles!groups_created_by_fkey(id, full_name,avatar_url)`).order("created_at",{ascending:false}); if(gErr) throw gErr;
-      const { data:uGroups,error:ugErr }=await supabase.from("group_members").select(`*,groups(*,group_members(count),profiles!groups_created_by_fkey(id, full_name,avatar_url))`).eq("user_id",uid); if(ugErr) throw ugErr;
-      setGroups(allGroups||[]); setMyGroups((uGroups||[]).map(g=>g.groups));
-    }catch(e:any){ toast.error(e.message); }finally{ setLoading(false); }
+  const loadGroups = async (uid: string) => {
+    try {
+      const { data: allGroups, error: gErr } = await supabase.from("groups")
+        .select(`*,group_members(count),profiles!groups_created_by_fkey(id, full_name, avatar_url)`)
+        .order("created_at", { ascending: false });
+      if (gErr) throw gErr;
+      
+      const { data: uGroups, error: ugErr } = await supabase.from("group_members")
+        .select(`*,groups(*,group_members(count),profiles!groups_created_by_fkey(id, full_name, avatar_url))`)
+        .eq("user_id", uid);
+      if (ugErr) throw ugErr;
+      
+      setGroups(allGroups || []);
+      setMyGroups((uGroups || []).map(g => g.groups));
+    } catch (e: any) {
+      toast.error(e.message);
+    }
   };
 
-  const handleCreate=async()=>{
-    if(!newName.trim()){ toast.error("Nama grup tidak boleh kosong"); return; }
+  const handleCreate = async () => {
+    if (!newName.trim()) { toast.error("Nama grup tidak boleh kosong"); return; }
     setCreating(true);
-    try{
-      const { error }=await supabase.from("groups").insert({ name:newName.trim(), description:newDesc.trim(), is_private:priv, created_by:me.id }); if(error) throw error;
-      toast.success("Grup berhasil dibuat!"); setShowCreate(false); setNewName(""); setNewDesc(""); setPriv(false); await loadGroups(me.id);
-    }catch(e:any){ toast.error(e.message); }finally{ setCreating(false); }
+    try {
+      const { error } = await supabase.from("groups").insert({ 
+        name: newName.trim(), 
+        description: newDesc.trim(), 
+        is_private: priv, 
+        created_by: me.id 
+      });
+      if (error) throw error;
+      toast.success("Grup berhasil dibuat!"); 
+      setShowCreate(false); 
+      setNewName(""); setNewDesc(""); setPriv(false); 
+      await loadGroups(me.id);
+    } catch (e: any) { 
+      toast.error(e.message); 
+    } finally { 
+      setCreating(false); 
+    }
   };
 
-  const join=async(id:string)=>{ try{ const { error }=await supabase.from("group_members").insert({ group_id:id, user_id:me.id, role:"member" }); if(error) throw error; toast.success("Berhasil bergabung"); await loadGroups(me.id);}catch(e:any){ toast.error(e.message);} };
-  const leave=async(id:string)=>{ try{ const { error }=await supabase.from("group_members").delete().eq("group_id",id).eq("user_id",me.id); if(error) throw error; toast.success("Berhasil keluar"); await loadGroups(me.id);}catch(e:any){ toast.error(e.message);}finally{ setConfirmLeaveId(null);} };
+  const join = async (id: string) => { 
+    try { 
+      const { error } = await supabase.from("group_members").insert({ group_id: id, user_id: me.id, role: "member" }); 
+      if (error) throw error; 
+      toast.success("Berhasil bergabung"); 
+      await loadGroups(me.id);
+    } catch (e: any) { 
+      toast.error(e.message);
+    } 
+  };
 
-  const filtered=groups.filter(g=>g.name.toLowerCase().includes(q.toLowerCase()));
-  const inGroup=(id:string)=>myGroups.some(g=>g.id===id);
-  const initials=(s:string)=>s?.split(" ").map(x=>x[0]).slice(0,2).join("").toUpperCase()||"U";
+  const leave = async (id: string) => { 
+    try { 
+      const { error } = await supabase.from("group_members").delete().eq("group_id", id).eq("user_id", me.id); 
+      if (error) throw error; 
+      toast.success("Berhasil keluar"); 
+      await loadGroups(me.id);
+    } catch (e: any) { 
+      toast.error(e.message);
+    } finally { 
+      setConfirmLeaveId(null);
+    } 
+  };
 
-  if(loading) return (
-    <div className="min-h-screen grid place-items-center bg-gradient-to-b from-background to-background/60">
-      <div className="text-center"><div className="h-12 w-12 mx-auto animate-spin rounded-full border-2 border-border border-t-accent"/><p className="mt-4 text-muted-foreground">Memuat...</p></div>
+  const isMember = (id: string) => myGroups.some(g => g.id === id);
+
+  const filteredAll = groups.filter(g => g.name.toLowerCase().includes(q.toLowerCase()) || g.description?.toLowerCase().includes(q.toLowerCase()));
+  const filteredMy = myGroups.filter(g => g.name.toLowerCase().includes(q.toLowerCase()) || g.description?.toLowerCase().includes(q.toLowerCase()));
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+        <p className="mt-4 text-muted-foreground">Memuat grup...</p>
+      </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-border bg-card/70 backdrop-blur supports-[backdrop-filter]:bg-card/60">
-        <div className="container mx-auto px-4 py-4 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={()=>navigate("/")} className="rounded-xl"><ArrowLeft className="h-5 w-5"/></Button>
-          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">Grup Diskusi</h1>
-          <div className="ml-auto">
-            <Dialog open={showCreate} onOpenChange={setShowCreate}>
-              <DialogTrigger asChild><Button className="rounded-xl bg-accent text-accent-foreground hover:bg-accent/90"><Plus className="h-4 w-4 mr-2"/>Buat Grup</Button></DialogTrigger>
-              <DialogContent className="bg-card border-border sm:max-w-md">
-                <DialogHeader><DialogTitle>Buat Grup Baru</DialogTitle><DialogDescription>Buat ruang diskusi komunitas Anda</DialogDescription></DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2"><Label htmlFor="gn">Nama Grup</Label><Input id="gn" placeholder="Matematika Kelas 12" value={newName} onChange={e=>setNewName(e.target.value)} className="bg-input/60 border-border"/></div>
-                  <div className="space-y-2"><Label htmlFor="gd">Deskripsi</Label><Textarea id="gd" placeholder="Jelaskan tentang grup ini..." value={newDesc} onChange={e=>setNewDesc(e.target.value)} className="bg-input/60 border-border resize-none"/></div>
-                  <div className="flex items-center justify-between"><div className="space-y-0.5"><Label htmlFor="priv">Grup Privat</Label><p className="text-xs text-muted-foreground">Hanya anggota yang bisa melihat postingan</p></div><Switch id="priv" checked={priv} onCheckedChange={setPriv}/></div>
-                  <Button onClick={handleCreate} disabled={creating} className="w-full rounded-xl bg-accent text-accent-foreground hover:bg-accent/90">{creating?"Membuat...":"Buat Grup"}</Button>
+    <div className="space-y-6 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="rounded-xl"><ArrowLeft className="h-5 w-5" /></Button>
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
+                    <Users className="w-6 h-6 text-primary-foreground" />
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-      </header>
-
-      <div className="container mx-auto px-4 py-6 space-y-8">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground"/>
-          <Input placeholder="Cari grup..." value={q} onChange={e=>setQ(e.target.value)} className="pl-10 rounded-xl bg-input/60 border-border focus-visible:ring-2 focus-visible:ring-accent"/>
-        </div>
-
-        {myGroups.length>0&&(
-          <section>
-            <h2 className="mb-4 text-xl font-semibold">Grup Saya</h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {myGroups.map(g=>(
-                <Card key={g.id} onClick={()=>navigate(`/groups/${g.id}`)} className="group cursor-pointer rounded-2xl border-border bg-card/60 backdrop-blur transition hover:shadow-md hover:-translate-y-0.5">
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <CardTitle className="truncate text-lg">{g.name}</CardTitle>
-                        <CardDescription className="mt-1 line-clamp-2">{g.description||"Tidak ada deskripsi"}</CardDescription>
-                        <div className="mt-3 flex items-center gap-2 text-sm">
-                          <Avatar className="h-6 w-6"><AvatarImage src={g.profiles?.avatar_url || ""} /><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{initials(g.profiles?.full_name || "")}</AvatarFallback></Avatar>
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="truncate text-muted-foreground">Owner: {g.profiles?.full_name || "—"}</span>
-                            <RankBadge rank={followerRankMap.get(g.profiles?.id)} type="follower" />
-                            <RankBadge rank={likerRankMap.get(g.profiles?.id)} type="like" />
-                          </div>
-                        </div>
-                      </div>
-                      {g.is_private?<Lock className="h-4 w-4 text-muted-foreground"/>:<Globe className="h-4 w-4 text-muted-foreground"/>}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground"><Users className="h-4 w-4"/><span>{g.group_members?.[0]?.count||0} anggota</span></div>
-                    <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={e=>{e.stopPropagation();setConfirmLeaveId(g.id);}}>Keluar</Button>
-                  </CardContent>
-                </Card>
-              ))}
+                <div>
+                    <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Grup Diskusi</h1>
+                    <p className="text-xs text-muted-foreground">Temukan komunitas belajar Anda</p>
+                </div>
             </div>
-          </section>
-        )}
-
-        <section>
-          <h2 className="mb-4 text-xl font-semibold">Semua Grup</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map(g=>(
-              <Card key={g.id} className="rounded-2xl border-border bg-card/60 backdrop-blur transition hover:shadow-md hover:-translate-y-0.5">
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <CardTitle className="truncate text-lg">{g.name}</CardTitle>
-                      <CardDescription className="mt-1 line-clamp-2">{g.description||"Tidak ada deskripsi"}</CardDescription>
-                      <div className="mt-3 flex items-center gap-2 text-sm">
-                        <Avatar className="h-6 w-6"><AvatarImage src={g.profiles?.avatar_url || ""} /><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{initials(g.profiles?.full_name || "")}</AvatarFallback></Avatar>
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="truncate text-muted-foreground">Owner: {g.profiles?.full_name || "—"}</span>
-                          <RankBadge rank={followerRankMap.get(g.profiles?.id)} type="follower" />
-                          <RankBadge rank={likerRankMap.get(g.profiles?.id)} type="like" />
-                        </div>
-                      </div>
-                    </div>
-                    {g.is_private?<Lock className="h-4 w-4 text-muted-foreground"/>:<Globe className="h-4 w-4 text-muted-foreground"/>}
-                  </div>
-                </CardHeader>
-                <CardContent className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground"><Users className="h-4 w-4"/><span>{g.group_members?.[0]?.count||0} anggota</span></div>
-                  {myGroups.some(x=>x.id===g.id)?(
-                    <Button size="sm" variant="outline" onClick={()=>navigate(`/groups/${g.id}`)} className="rounded-xl border-accent text-accent hover:bg-accent/10">Lihat Grup</Button>
-                  ):(
-                    <Button size="sm" onClick={()=>join(g.id)} className="rounded-xl bg-accent text-accent-foreground hover:bg-accent/90">Gabung</Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
           </div>
-        </section>
+          
+          <Dialog open={showCreate} onOpenChange={setShowCreate}>
+            <DialogTrigger asChild>
+                <Button className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-md">
+                    <Plus className="h-4 w-4 mr-2"/> Buat Grup
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border sm:max-w-md">
+              <DialogHeader>
+                  <DialogTitle>Buat Grup Baru</DialogTitle>
+                  <DialogDescription>Buat ruang diskusi untuk topik spesifik atau kelas Anda.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                    <Label htmlFor="gn">Nama Grup</Label>
+                    <Input id="gn" placeholder="Contoh: Matematika Kelas 12" value={newName} onChange={e => setNewName(e.target.value)} className="bg-muted/50 border-border"/>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="gd">Deskripsi</Label>
+                    <Textarea id="gd" placeholder="Jelaskan tujuan grup ini..." value={newDesc} onChange={e => setNewDesc(e.target.value)} className="bg-muted/50 border-border resize-none min-h-[100px]"/>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+                    <div className="space-y-0.5">
+                        <Label htmlFor="priv" className="text-base">Grup Privat</Label>
+                        <p className="text-xs text-muted-foreground">Hanya anggota yang disetujui yang bisa bergabung dan melihat konten.</p>
+                    </div>
+                    <Switch id="priv" checked={priv} onCheckedChange={setPriv}/>
+                </div>
+                <Button onClick={handleCreate} disabled={creating} className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90">
+                    {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {creating ? "Membuat..." : "Buat Grup"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
       </div>
 
-      <AlertDialog open={!!confirmLeaveId} onOpenChange={v=>!v&&setConfirmLeaveId(null)}>
+      <div className="space-y-6">
+        <Tabs defaultValue="all" className="w-full">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+                <TabsList className="grid grid-cols-2 w-full sm:w-[300px] h-auto p-1 bg-muted/60 rounded-xl">
+                    <TabsTrigger value="all" className="gap-2 rounded-lg py-2">Discover</TabsTrigger>
+                    <TabsTrigger value="my" className="gap-2 rounded-lg py-2">My Groups</TabsTrigger>
+                </TabsList>
+                
+                <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                        placeholder="Cari grup..." 
+                        value={q} 
+                        onChange={e => setQ(e.target.value)} 
+                        className="pl-9 rounded-xl bg-card/50 border-border focus:ring-primary/20"
+                    />
+                </div>
+            </div>
+
+            <TabsContent value="all" className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2 duration-500">
+                {filteredAll.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredAll.map(g => (
+                            <GroupCard 
+                                key={g.id} 
+                                group={g} 
+                                isMember={isMember(g.id)}
+                                onJoin={join}
+                                onLeave={(id) => setConfirmLeaveId(id)}
+                                followerRankMap={followerRankMap}
+                                likerRankMap={likerRankMap}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-16 bg-card/30 rounded-3xl border border-dashed border-border">
+                        <Users className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+                        <p className="text-muted-foreground font-medium">Tidak ada grup yang ditemukan</p>
+                        <p className="text-xs text-muted-foreground/70 mt-1">Coba kata kunci lain atau buat grup baru.</p>
+                    </div>
+                )}
+            </TabsContent>
+
+            <TabsContent value="my" className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2 duration-500">
+                {filteredMy.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredMy.map(g => (
+                            <GroupCard 
+                                key={g.id} 
+                                group={g} 
+                                isMember={true}
+                                onJoin={join}
+                                onLeave={(id) => setConfirmLeaveId(id)}
+                                followerRankMap={followerRankMap}
+                                likerRankMap={likerRankMap}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-16 bg-card/30 rounded-3xl border border-dashed border-border">
+                         <Users className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
+                        <p className="text-muted-foreground font-medium">Anda belum bergabung dengan grup apapun</p>
+                        <Button variant="link" onClick={() => document.querySelector('[data-state="inactive"][value="all"]')?.dispatchEvent(new MouseEvent('click', {bubbles: true}))} className="text-primary mt-2">
+                            Jelajahi Grup
+                        </Button>
+                    </div>
+                )}
+            </TabsContent>
+        </Tabs>
+      </div>
+
+      <AlertDialog open={!!confirmLeaveId} onOpenChange={v => !v && setConfirmLeaveId(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Keluar dari grup?</AlertDialogTitle><AlertDialogDescription>Anda akan menghapus keanggotaan dari grup ini.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Keluar dari grup?</AlertDialogTitle>
+            <AlertDialogDescription>
+                Anda akan menghapus keanggotaan dari grup ini. Anda mungkin perlu meminta izin untuk bergabung kembali jika grup ini bersifat privat.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={()=>confirmLeaveId&&leave(confirmLeaveId)}>Keluar</AlertDialogAction>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => confirmLeaveId && leave(confirmLeaveId)}>
+                Keluar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -1,4 +1,4 @@
-// src/pages/Profile.tsx
+
 import { useEffect,useMemo,useRef,useState } from "react";
 import { useNavigate,useParams,Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,16 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar,AvatarFallback,AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
-import { ArrowLeft, Settings, UserPlus, UserMinus, MessageCircle, Maximize2, Heart, Trophy } from "lucide-react";
+import { Settings, UserPlus, UserMinus, MessageCircle, Maximize2, Heart, Trophy, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import PostCard from "@/components/PostCard";
 import PostSkeleton from "@/components/PostSkeleton";
 import { Dialog,DialogContent,DialogDescription,DialogHeader,DialogTitle } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { RankBadge } from "@/components/RankBadge";
+import { useLeaderboardData } from "@/hooks/useLeaderboardData";
 
 type PostFilter = "all" | "reposts" | "media" | "text";
-const POSTS_PROFILES_FK="posts_user_id_fkey";
 const POST_SELECT = `
   id, content, created_at, media_urls, media_types, user_id,
   spotify_track_id,
@@ -58,8 +56,7 @@ const Profile=()=> {
   const [viewerOpen,setViewerOpen]=useState(false);
   const [followerRank, setFollowerRank] = useState<number | null>(null);
   const [likerRank, setLikerRank] = useState<number | null>(null);
-  const [topFollowers, setTopFollowers] = useState<any[]>([]);
-  const [topLiked, setTopLiked] = useState<any[]>([]);
+  const { topFollowers, topLiked } = useLeaderboardData();
 
   const getInitials=(n:string)=>{ const a=n.split(" "); return a.length>=2?(a[0][0]+a[1][0]).toUpperCase():n.slice(0,2).toUpperCase(); };
   const getRoleBadgeColor=(r:string)=> r==="siswa"?"bg-blue-500/20 text-blue-400":r==="guru"?"bg-green-500/20 text-green-400":r==="alumni"?"bg-purple-500/20 text-purple-400":"bg-muted text-muted-foreground";
@@ -90,25 +87,24 @@ const Profile=()=> {
     try{
       const { data:{ user } }=await supabase.auth.getUser(); if(!user){ navigate("/auth"); return; }
       setCurrentUser(user); const pid=userId||user.id;
-      const [{ data:profileData,error:pe },{ data:followData },followersRes,followingRes,myFollowingList,{ data: topFollowersData, error: tfError },{ data: topLikedData, error: tlError }]=await Promise.all([
+      const [{ data:profileData,error:pe },{ data:followData },followersRes,followingRes,myFollowingList]=await Promise.all([
         supabase.from("profiles").select("*").eq("id",pid).single(),
         pid!==user.id?supabase.from("follows").select("*").eq("follower_id",user.id).eq("following_id",pid).maybeSingle():Promise.resolve({ data:null }),
         supabase.from("follows").select("*",{ count:"exact",head:true }).eq("following_id",pid),
         supabase.from("follows").select("*",{ count:"exact",head:true }).eq("follower_id",pid),
         supabase.from("follows").select("following_id").eq("follower_id",user.id),
-        supabase.rpc("get_top_5_followers"),supabase.rpc("get_top_5_liked_users")
       ]);
       if(pe) throw pe;
-      setTopFollowers(topFollowersData || []); setTopLiked(topLikedData || []);
+      
       setProfile(profileData); setIsFollowing(!!followData);
       setFollowerCount(followersRes.count||0); setFollowingCount(followingRes.count||0);
       setFollowingIds(new Set((myFollowingList.data||[]).map((r:any)=>r.following_id)));
-      if (!tfError && topFollowersData) {
-        const rankIndex = topFollowersData.slice(0, 3).findIndex((u: any) => u.id === pid);
+      if (topFollowers.length > 0) {
+        const rankIndex = topFollowers.slice(0, 3).findIndex((u: any) => u.id === pid);
         setFollowerRank(rankIndex !== -1 ? rankIndex + 1 : null);
       }
-      if (!tlError && topLikedData) {
-        const rankIndex = topLikedData.slice(0, 3).findIndex((u: any) => u.id === pid);
+      if (topLiked.length > 0) {
+        const rankIndex = topLiked.slice(0, 3).findIndex((u: any) => u.id === pid);
         setLikerRank(rankIndex !== -1 ? rankIndex + 1 : null);
       }
       await loadPostCounts(pid);
@@ -249,59 +245,91 @@ const Profile=()=> {
   const isOwnProfile=currentUser?.id===profile.id;
   const canMaximize = !!profile?.avatar_url;
 
-  return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-card border-b border-border">
-        <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={()=>navigate("/")}><ArrowLeft className="h-5 w-5"/></Button>
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Profil</h1>
-        </div>
-      </header>
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/auth");
+  };
 
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
-        <Card className="bg-card border-border p-8 mb-6">
-          <div className="flex items-start gap-6">
+  return (
+    <div className="space-y-6">
+      <Card className="bg-card border-border p-8 mb-6 relative">
+          {isOwnProfile && (
+            <div className="absolute top-4 right-4 flex gap-2">
+              <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} className="rounded-xl"><Settings className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" onClick={handleLogout} className="rounded-xl text-destructive hover:bg-destructive/10"><LogOut className="h-5 w-5" /></Button>
+            </div>
+          )}
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
             <button
               type="button"
               onClick={() => { if (canMaximize) setViewerOpen(true); }}
               title={canMaximize ? "Lihat foto ukuran penuh" : "Belum ada foto profil"}
-              className={`relative rounded-full focus:outline-none ${canMaximize ? "focus:ring-2 focus:ring-accent/40 cursor-pointer" : "cursor-default"}`}
+              className={`relative group rounded-full focus:outline-none ${canMaximize ? "focus:ring-2 focus:ring-accent/40 cursor-zoom-in" : "cursor-default"}`}
             >
-              <Avatar className="h-24 w-24 border-4 border-accent/20">
-                <AvatarImage src={profile.avatar_url || undefined} />
-                <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
+              <Avatar className="h-32 w-32 border-4 border-card shadow-xl">
+                <AvatarImage src={profile.avatar_url || undefined} className="object-cover" />
+                <AvatarFallback className="text-4xl bg-primary text-primary-foreground font-bold">
                   {getInitials(profile.full_name)}
                 </AvatarFallback>
               </Avatar>
-
               {canMaximize && (
-                <span className="absolute -bottom-1.5 -right-1.5 grid place-items-center h-7 w-7 rounded-full bg-card/90 border shadow">
-                  <Maximize2 className="h-3.5 w-3.5" />
-                </span>
+                <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Maximize2 className="h-8 w-8 text-white" />
+                </div>
               )}
             </button>
 
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <h2 className="text-2xl font-bold">{profile.full_name}</h2>
-                <RankBadge rank={followerRank} type="follower" />
-                <RankBadge rank={likerRank} type="like" />
-                <span className={`text-sm px-3 py-1 rounded-full ${getRoleBadgeColor(profile.role)}`}>{profile.role?.[0]?.toUpperCase()+profile.role?.slice(1)}</span>
+            <div className="flex-1 text-center md:text-left space-y-4">
+              <div>
+                <h1 className="text-3xl font-bold">{profile.full_name}</h1>
+                <p className="text-muted-foreground flex items-center justify-center md:justify-start gap-2 mt-1">
+                  <span className={`capitalize px-2 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(profile.role)}`}>{profile.role?.[0]?.toUpperCase()+profile.role?.slice(1)}</span>
+                </p>
               </div>
-              {profile.bio&&<p className="text-muted-foreground mb-4">{profile.bio}</p>}
-              <div className="flex gap-6 mb-4">
-                <button onClick={openFollowers} className="text-left"><span className="font-bold">{followerCount}</span><span className="text-muted-foreground ml-1">Pengikut</span></button>
-                <button onClick={openFollowing} className="text-left"><span className="font-bold">{followingCount}</span><span className="text-muted-foreground ml-1">Mengikuti</span></button>
+
+              {profile.bio && <p className="text-sm max-w-lg mx-auto md:mx-0 leading-relaxed">{profile.bio}</p>}
+
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
+                 <div className="flex items-center gap-1 bg-muted/50 px-3 py-1.5 rounded-lg border border-border/50">
+                    <Trophy className="h-4 w-4 text-accent" />
+                    <span className="text-sm font-medium">{followerRank ? `#${followerRank} Follower` : "-"}</span>
+                 </div>
+                 <div className="flex items-center gap-1 bg-muted/50 px-3 py-1.5 rounded-lg border border-border/50">
+                    <Heart className="h-4 w-4 text-red-500" />
+                    <span className="text-sm font-medium">{likerRank ? `#${likerRank} Liked` : "-"}</span>
+                 </div>
               </div>
-              <div className="flex gap-2">
-                {isOwnProfile?(
-                  <Button onClick={()=>navigate("/settings")} className="bg-accent text-accent-foreground hover:bg-accent/90"><Settings className="h-4 w-4 mr-2"/>Edit Profil</Button>
-                ):(
+
+              <div className="flex items-center justify-center md:justify-start gap-6 text-sm">
+                <button onClick={openFollowers} className="hover:underline decoration-accent underline-offset-4">
+                  <span className="font-bold text-lg">{followerCount}</span> <span className="text-muted-foreground">Pengikut</span>
+                </button>
+                <button onClick={openFollowing} className="hover:underline decoration-accent underline-offset-4">
+                  <span className="font-bold text-lg">{followingCount}</span> <span className="text-muted-foreground">Mengikuti</span>
+                </button>
+                <div>
+                  <span className="font-bold text-lg">{postCount.all}</span> <span className="text-muted-foreground">Postingan</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center md:justify-start gap-3 pt-2">
+                {isOwnProfile ? (
+                   <Button onClick={()=>navigate("/settings")} className="bg-accent text-accent-foreground hover:bg-accent/90"><Settings className="h-4 w-4 mr-2"/>Edit Profil</Button>
+                ) : (
                   <>
-                    <Button onClick={handleFollow} className={isFollowing?"bg-muted text-foreground hover:bg-muted/80":"bg-accent text-accent-foreground hover:bg-accent/90"}>
-                      {isFollowing?(<><UserMinus className="h-4 w-4 mr-2"/>Berhenti Mengikuti</>):(<><UserPlus className="h-4 w-4 mr-2"/>Ikuti</>)}
+                    <Button 
+                      onClick={handleFollow} 
+                      className={isFollowing 
+                        ? "rounded-xl bg-muted text-foreground hover:bg-destructive hover:text-destructive-foreground border border-border" 
+                        : "rounded-xl bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg shadow-accent/20"
+                      }
+                    >
+                      {isFollowing ? <UserMinus className="mr-2 h-4 w-4" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                      {isFollowing ? "Berhenti Mengikuti" : "Ikuti"}
                     </Button>
-                    <Button onClick={handleStartChat} variant="outline" className="border-accent text-accent hover:bg-accent hover:text-accent-foreground"><MessageCircle className="h-4 w-4 mr-2"/>Chat</Button>
+                    <Button variant="outline" className="rounded-xl border-accent/50 text-accent hover:bg-accent/10" onClick={handleStartChat}>
+                      <MessageCircle className="mr-2 h-4 w-4" /> Pesan
+                    </Button>
                   </>
                 )}
               </div>
@@ -323,14 +351,13 @@ const Profile=()=> {
           ):(
             <>
               {posts.map(p=>(<PostCard key={p.id} post={p} currentUserId={currentUser?.id} 
-              //onLike={refreshPosts} 
+              
               onPostUpdated={refreshPosts} onPostDeleted={refreshPosts} postType="global" topFollowers={topFollowers} topLiked={topLiked} />))}
               {postsLoading&&(<div className="space-y-4"><PostSkeleton/></div>)}
               <div ref={loadMoreRef} className="h-6"/>
             </>
           )}
         </div>
-      </div>
 
       <Dialog open={!!openList} onOpenChange={v=>!v&&setOpenList(null)}>
         <DialogContent className="sm:max-w-[500px] max-h-[85vh]">
@@ -379,7 +406,10 @@ const Profile=()=> {
 
       <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-6"><DialogTitle>Foto Profil</DialogTitle></DialogHeader>
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle>Foto Profil</DialogTitle>
+            <DialogDescription className="sr-only">Foto profil ukuran penuh</DialogDescription>
+          </DialogHeader>
           <div className="p-6 pt-0">
             <div className="rounded-xl overflow-hidden border bg-black/5">
               <img src={profile.avatar_url||""} alt="Avatar" className="w-full h-full object-contain max-h-[70vh]" />

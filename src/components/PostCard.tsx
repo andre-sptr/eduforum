@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Heart, Repeat2, Share2, MoreVertical, Pencil, Trash2, ChevronLeft, ChevronRight, GraduationCap, Shield, BookOpen, Music, Loader2 } from "lucide-react";
+import { Repeat2, Share2, MoreVertical, Pencil, Trash2, ChevronLeft, ChevronRight, GraduationCap, Shield, BookOpen, Music, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { id } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,6 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { RankBadge } from "@/components/RankBadge";
 import { ContentRenderer } from "@/components/ContentRenderer";
+import { LikeButton } from "@/components/ui/LikeButton";
 
 interface PostCardProps {
   post: {
@@ -130,16 +131,28 @@ const PostCard = ({ post, postType = "global", currentUserId, onLike, onPostUpda
 
   const handleLike = async () => {
     if (!currentUserId) return toast.error("Silakan login terlebih dahulu");
+
+    const previousIsLiked = isLiked;
+    const previousLikeCount = likeCount;
+    
+    setIsLiked(!isLiked);
+    setLikeCount((prev) => (isLiked ? prev - 1 : prev + 1));
+
     try {
       if (isLiked) {
         const { error } = await supabase.from(likeTable).delete().eq("user_id", currentUserId).eq("post_id", post.id);
-        if (error) throw error; setIsLiked(false); setLikeCount((v) => v - 1);
+        if (error) throw error;
       } else {
         const { error } = await supabase.from(likeTable).insert({ user_id: currentUserId, post_id: post.id });
-        if (error) throw error; setIsLiked(true); setLikeCount((v) => v + 1);
+        if (error) throw error;
       }
       onLike?.();
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) { 
+      
+      setIsLiked(previousIsLiked);
+      setLikeCount(previousLikeCount);
+      toast.error(e.message); 
+    }
   };
 
   const handleSimpleRepost = async () => {
@@ -204,7 +217,7 @@ const PostCard = ({ post, postType = "global", currentUserId, onLike, onPostUpda
   const prev = () => setIdx((i) => (i - 1 + total) % total);
 
   return (
-    <Card className="rounded-2xl border border-border bg-card/80 p-5 shadow hover:shadow-lg transition">
+    <Card className="rounded-2xl border border-border bg-card/80 p-4 shadow hover:shadow-lg transition">
       {post.reposted_by_user && (
         <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
           <Repeat2 className="h-4 w-4" />
@@ -322,10 +335,7 @@ const PostCard = ({ post, postType = "global", currentUserId, onLike, onPostUpda
           )}
 
           <div className="mt-4 flex items-center gap-4">
-            <Button variant="ghost" size="sm" className={`gap-2 ${isLiked ? "text-red-500" : "text-muted-foreground"} hover:text-red-500`} onClick={handleLike}>
-              <Heart className={`h-5 w-5 ${isLiked ? "fill-current" : ""}`} />
-              {likeCount > 0 && <span>{likeCount}</span>}
-            </Button>
+            <LikeButton isLiked={isLiked} likeCount={likeCount} onClick={handleLike} />
 
             {postType === "global" && (
               <DropdownMenu>

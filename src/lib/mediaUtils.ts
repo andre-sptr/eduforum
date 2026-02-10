@@ -1,4 +1,4 @@
-// /src/lib/mediaUtils.ts
+
 import imageCompression from "browser-image-compression";
 
 export interface MediaFile {

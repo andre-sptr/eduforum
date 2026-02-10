@@ -14,6 +14,8 @@ import { MentionInput } from "@/components/MentionInput";
 import { RankBadge } from "@/components/RankBadge";
 import { ContentRenderer } from "@/components/ContentRenderer";
 
+import { useLeaderboardData } from "@/hooks/useLeaderboardData";
+
 const messageSchema = z.object({ content: z.string().trim().min(1,"Message cannot be empty").max(2000,"Message is too long (max 2000 characters)") });
 
 interface Message { id:string; user_id:string; content:string; created_at:string; edited_at?:string|null; is_deleted?:boolean; profiles?:{ full_name:string; avatar_url:string|null; role:string } }
@@ -32,8 +34,7 @@ const Chat = () => {
   const [editingMessageId,setEditingMessageId]=useState<string|null>(null);
   const [editContent,setEditContent]=useState("");
   const [groupMembers,setGroupMembers]=useState<string[]>([]);
-  const [topFollowers, setTopFollowers] = useState<any[]>([]);
-  const [topLiked, setTopLiked] = useState<any[]>([]);
+  const { topFollowers, topLiked } = useLeaderboardData();
   const cardRef=useRef<HTMLDivElement|null>(null);
   const bottomRef=useRef<HTMLDivElement|null>(null);
   const unsubscribeRef=useRef<null|(()=>void)>(null);
@@ -68,18 +69,7 @@ const Chat = () => {
   const checkUser=async()=> {
     const { data:{ user } }=await supabase.auth.getUser(); if(!user){ navigate("/auth"); return; }
     setCurrentUser(user);
-    const [
-      convRes,
-      tfRes,
-      tlRes
-    ] = await Promise.all([
-      supabase.from("conversations").select("*").eq("id", conversationId).single(),
-      supabase.rpc("get_top_5_followers"),
-      supabase.rpc("get_top_5_liked_users")
-    ]);
-    if (tfRes.data) setTopFollowers(tfRes.data);
-    if (tlRes.data) setTopLiked(tlRes.data);
-    const conv = convRes.data;
+    const { data: conv } = await supabase.from("conversations").select("*").eq("id", conversationId).single();
     if (!conv) { toast.error("Percakapan tidak ditemukan"); navigate("/messages"); return; }
     setConversation(conv);
     if (conv.type === "group" && conv.group_id) {
@@ -162,9 +152,9 @@ const Chat = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-50 bg-card/90 backdrop-blur border-b border-border">
-        <div className="container mx-auto px-4 py-3 flex items-center gap-3">
+    <div className="space-y-6 h-[calc(100vh-100px)]">
+      <header className="border-b border-border bg-card/80 backdrop-blur rounded-t-xl">
+        <div className="flex items-center gap-3 px-4 py-3">
           <Button variant="ghost" size="icon" onClick={()=>navigate("/messages")} className="rounded-xl"><ArrowLeft className="h-5 w-5"/></Button>
           <div className="flex-1">
             <h1 className="text-lg font-semibold">{conversation?.name||"Chat"}</h1>
@@ -177,8 +167,7 @@ const Chat = () => {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6 max-w-4xl flex-1 flex">
-        <Card ref={cardRef} className="flex-1 border-border bg-card shadow-sm overflow-hidden flex flex-col">
+      <Card ref={cardRef} className="flex-1 border-border bg-card shadow-sm overflow-hidden flex flex-col h-full rounded-b-xl rounded-t-none mt-0">
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-2">
               {messages.length===0?(
@@ -254,8 +243,7 @@ const Chat = () => {
               <Button type="submit" size="icon" disabled={sending||!newMessage.trim()} className="rounded-xl bg-accent text-accent-foreground hover:bg-accent/90"><Send className="h-5 w-5"/></Button>
             </div>
           </form>
-        </Card>
-      </div>
+      </Card>
     </div>
   );
 };

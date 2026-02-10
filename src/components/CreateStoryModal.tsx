@@ -12,7 +12,6 @@ import {
 import { toast } from "sonner";
 import { Loader2, Send, X, ArrowLeft, FileImage, Music } from "lucide-react";
 import { z } from "zod";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 const storySchema = z

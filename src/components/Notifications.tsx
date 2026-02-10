@@ -80,7 +80,12 @@ export function Notifications({ userId }: { userId: string }) {
 
       <DropdownMenuContent align="end" className="w-80 overflow-hidden rounded-2xl p-0">
         <div className="flex items-center justify-between border-b border-border bg-card/80 px-4 py-2">
-          <h3 className="text-sm font-semibold">Notifikasi</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold">Notifikasi</h3>
+            <Button variant="link" size="sm" className="h-auto p-0 text-xs text-muted-foreground" onClick={() => navigate("/notifications")}>
+                Lihat Semua
+            </Button>
+          </div>
           {unreadCount>0&&(
             <Button variant="ghost" size="sm" onClick={markAll} disabled={markingAll} className="h-7 rounded-full px-2 text-xs text-accent hover:text-accent/80">
               {markingAll?"Memproses...":"Tandai semua dibaca"}

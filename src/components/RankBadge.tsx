@@ -1,4 +1,4 @@
-// src/components/RankBadge.tsx
+
 
 import { Heart, Trophy, Medal, Award } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";

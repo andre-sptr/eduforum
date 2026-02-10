@@ -1,13 +1,12 @@
-// src/pages/Games.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, Brain, Zap, Target, ArrowLeft, Medal, Award, Hash, CaseUpper, Scissors, Keyboard, MousePointerClick, Sparkles } from "lucide-react";
+import { Trophy, Brain, Zap, Target, ArrowLeft, Medal, Award, Hash, CaseUpper, Scissors, Keyboard, MousePointerClick, Sparkles, Loader2, Gamepad2, Search } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import QuizGame from "@/components/games/QuizGame";
 import MemoryGame from "@/components/games/MemoryGame";
@@ -19,6 +18,8 @@ import RockPaperScissors from "@/components/games/RockPaperScissors";
 import ReactionGame from "@/components/games/ReactionGame";
 import PatternGame from "@/components/games/PatternGame";
 import TypingTest from "@/components/games/TypingTest";
+import { useGames, Game } from "@/hooks/useGames";
+import { GameCard } from "@/components/GameCard";
 
 type Profile = { id: string; full_name: string; avatar_url?: string | null };
 type ScoreRow = { user_id: string; score: number };
@@ -28,13 +29,59 @@ type TopUser = { userId: string; average: number; totalGames: number; rank: numb
 const Games = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingUser, setLoadingUser] = useState(true);
   const [userStats, setUserStats] = useState<UserStats>({ totalGames: 0, highestScore: 0, averageScore: 0, ranking: 0 });
   const [topUsers, setTopUsers] = useState<TopUser[]>([]);
   const [loadingTop, setLoadingTop] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const initials = (n: string) => { const a = n.split(" "); return a.length >= 2 ? (a[0][0] + a[1][0]).toUpperCase() : n.slice(0, 2).toUpperCase(); };
   const rankIcon = (i: number) => i === 0 ? <Trophy className="h-5 w-5 text-accent" /> : i === 1 ? <Medal className="h-5 w-5 text-gray-400" /> : i === 2 ? <Award className="h-5 w-5 text-amber-600" /> : <span className="font-bold text-muted-foreground">#{i + 1}</span>;
+
+  const handleScoreSubmit = async (gameType: string, score: number) => {
+    if (!currentUser) return;
+    try {
+      const { error } = await supabase.from("game_scores").insert({ user_id: currentUser.id, game_type: gameType, score });
+      if (error) throw error;
+      toast.success("Skor berhasil disimpan!");
+      fetchUserStats(); fetchTopUsers();
+    } catch (e: any) { toast.error(e.message || "Gagal menyimpan skor"); }
+  };
+
+  const allGameData: Game[] = [
+    { id: "quiz", title: "Quiz Pengetahuan", description: "Uji pengetahuan umum Anda dengan berbagai pertanyaan menantang.", category: "single", icon: <Brain className="h-6 w-6" />, component: <QuizGame onScoreSubmit={s => handleScoreSubmit("quiz", s)} /> },
+    { id: "memory", title: "Memory Match", description: "Latih daya ingat Anda dengan mencocokkan kartu secepat mungkin.", category: "single", icon: <Zap className="h-6 w-6" />, component: <MemoryGame onScoreSubmit={s => handleScoreSubmit("memory", s)} /> },
+    { id: "puzzle", title: "Number Puzzle", description: "Urutkan angka 1-8 dengan langkah sesedikit mungkin.", category: "single", icon: <Target className="h-6 w-6" />, component: <NumberPuzzle onScoreSubmit={s => handleScoreSubmit("puzzle", s)} /> },
+    { id: "reaction", title: "Reaction Game", description: "Uji refleks Anda! Klik target yang muncul secepat kilat.", category: "single", icon: <MousePointerClick className="h-6 w-6" />, component: <ReactionGame onScoreSubmit={s => handleScoreSubmit("reaction", s)} /> },
+    { id: "pattern", title: "Pattern Memory", description: "Ingat urutan pola warna dan ulangi dengan benar.", category: "single", icon: <Sparkles className="h-6 w-6" />, component: <PatternGame onScoreSubmit={s => handleScoreSubmit("pattern", s)} /> },
+    { id: "typing", title: "Typing Test", description: "Seberapa cepat Anda mengetik? Ukur WPM Anda sekarang!", category: "single", icon: <Keyboard className="h-6 w-6" />, component: <TypingTest onScoreSubmit={s => handleScoreSubmit("typing", s)} /> },
+    {
+      id: "tictactoe", title: "Tic Tac Toe", description: "Permainan klasik X dan O. Tantang teman atau AI.", category: "multi",
+      badge: { cls: "bg-emerald-500/15 ring-emerald-500/30 text-emerald-600", icon: <Hash className="h-5 w-5" /> },
+      wrapColor: "from-emerald-500/20 via-transparent to-cyan-500/20",
+      component: currentUser && <TicTacToe currentUserId={currentUser.id} onScoreSubmit={s => handleScoreSubmit("tictactoe", s)} />
+    },
+    {
+      id: "wordscramble", title: "Word Scramble", description: "Susun kembali huruf-huruf acak menjadi kata yang benar.", category: "multi",
+      badge: { cls: "bg-amber-500/15 ring-amber-500/30 text-amber-600", icon: <CaseUpper className="h-5 w-5" /> },
+      wrapColor: "from-amber-500/20 via-transparent to-rose-500/20",
+      component: currentUser && <WordScramble currentUserId={currentUser.id} onScoreSubmit={s => handleScoreSubmit("wordscramble", s)} />
+    },
+    {
+      id: "rps", title: "Rock Paper Scissors", description: "Batu, Gunting, Kertas! Menangkan pertandingan Best of 3.", category: "multi",
+      badge: { cls: "bg-indigo-500/15 ring-indigo-500/30 text-indigo-600", icon: <Scissors className="h-5 w-5" /> },
+      wrapColor: "from-indigo-500/20 via-transparent to-fuchsia-500/20",
+      component: currentUser && <RockPaperScissors currentUserId={currentUser.id} onScoreSubmit={s => handleScoreSubmit("rps", s)} />
+    },
+  ];
+
+  const filteredGames = allGameData.filter(g => 
+    g.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    g.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const { games, loading: loadingGames, hasMore, favorites, toggleFavorite, loadMore } = useGames(filteredGames);
+  const observerTarget = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -48,13 +95,30 @@ const Games = () => {
       } catch (e: any) {
         toast.error(e?.message ?? "Terjadi kesalahan saat memuat profil");
       } finally {
-        if (alive) setLoading(false);
+        if (alive) setLoadingUser(false);
       }
     })();
     return () => { alive = false; };
   }, [navigate]);
 
   useEffect(() => { if (currentUser) { fetchUserStats(); fetchTopUsers(); } }, [currentUser?.id]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore && !loadingGames) {
+          loadMore();
+        }
+      },
+      { threshold: 1.0 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, loadingGames, loadMore]);
 
   const fetchUserStats = async () => {
     if (!currentUser) return;
@@ -94,150 +158,104 @@ const Games = () => {
     finally { setLoadingTop(false); }
   };
 
-  const handleScoreSubmit = async (gameType: string, score: number) => {
-    if (!currentUser) return;
-    try {
-      const { error } = await supabase.from("game_scores").insert({ user_id: currentUser.id, game_type: gameType, score });
-      if (error) throw error;
-      toast.success("Skor berhasil disimpan!");
-      fetchUserStats(); fetchTopUsers();
-    } catch (e: any) { toast.error(e.message || "Gagal menyimpan skor"); }
-  };
-
-  if (loading) return (
+  if (loadingUser) return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto" />
-        <p className="mt-4 text-muted-foreground">Memuat games...</p>
+        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+        <p className="mt-4 text-muted-foreground">Memuat profil...</p>
       </div>
     </div>
   );
 
-  const singlePlayer = [
-    { title: "Quiz Pengetahuan", desc: "Uji pengetahuan umum Anda", icon: <Brain className="h-5 w-5 text-primary" />, node: <QuizGame onScoreSubmit={s => handleScoreSubmit("quiz", s)} /> },
-    { title: "Memory Match", desc: "Cocokkan kartu dengan cepat", icon: <Zap className="h-5 w-5 text-accent" />, node: <MemoryGame onScoreSubmit={s => handleScoreSubmit("memory", s)} /> },
-    { title: "Number Puzzle", desc: "Susun angka 1-8 berurutan", icon: <Target className="h-5 w-5 text-primary" />, node: <NumberPuzzle onScoreSubmit={s => handleScoreSubmit("puzzle", s)} /> },
-    { title: "Reaction Game", desc: "Klik target secepat mungkin!", icon: <MousePointerClick className="h-5 w-5 text-primary" />, node: <ReactionGame onScoreSubmit={s => handleScoreSubmit("reaction", s)} /> },
-    { title: "Pattern Memory", desc: "Ingat dan ulangi pola warna", icon: <Sparkles className="h-5 w-5 text-accent" />, node: <PatternGame onScoreSubmit={s => handleScoreSubmit("pattern", s)} /> },
-    { title: "Typing Test", desc: "Ukur kecepatan WPM-mu!", icon: <Keyboard className="h-5 w-5 text-primary" />, node: <TypingTest onScoreSubmit={s => handleScoreSubmit("typing", s)} /> },
-  ];
-
-  const multiplayer = [
-    {
-      title: "Tic Tac Toe", desc: "Lawan pemain lain",
-      wrap: "from-emerald-500/10 via-transparent to-cyan-500/10",
-      badge: { cls: "bg-emerald-500/15 ring-emerald-500/30", icon: <Hash className="h-4 w-4 text-emerald-700 dark:text-emerald-400" /> },
-      node: currentUser && <TicTacToe currentUserId={currentUser.id} onScoreSubmit={s => handleScoreSubmit("tictactoe", s)} />
-    },
-    {
-      title: "Word Scramble", desc: "Tebak kata acak",
-      wrap: "from-amber-500/10 via-transparent to-rose-500/10",
-      badge: { cls: "bg-amber-500/15 ring-amber-500/30", icon: <CaseUpper className="h-4 w-4 text-amber-700 dark:text-amber-400" /> },
-      node: currentUser && <WordScramble currentUserId={currentUser.id} onScoreSubmit={s => handleScoreSubmit("wordscramble", s)} />
-    },
-    {
-      title: "Rock Paper Scissors", desc: "Best of 3",
-      wrap: "from-indigo-500/10 via-transparent to-fuchsia-500/10",
-      badge: { cls: "bg-indigo-500/15 ring-indigo-500/30", icon: <Scissors className="h-4 w-4 text-indigo-700 dark:text-indigo-400" /> },
-      node: currentUser && <RockPaperScissors currentUserId={currentUser.id} onScoreSubmit={s => handleScoreSubmit("rps", s)} />
-    },
-  ];
-
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-card border-b border-border shadow-lg">
-        <div className="container mx-auto px-4 py-4">
+    <div className="space-y-6 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="h-5 w-5" /></Button>
+            <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="rounded-xl"><ArrowLeft className="h-5 w-5" /></Button>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center"><Trophy className="w-6 h-6 text-primary-foreground" /></div>
-              <div><h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Mini-Games</h1><p className="text-sm text-muted-foreground">Asah otak sambil bersenang-senang</p></div>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
+                    <Gamepad2 className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <div>
+                    <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Arcade Zone</h1>
+                    <p className="text-xs text-muted-foreground">Mainkan, Bersaing, dan Menangkan!</p>
+                </div>
             </div>
           </div>
-        </div>
-      </header>
+          
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+                placeholder="Cari game..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 rounded-xl bg-card/50 border-border focus:ring-primary/20"
+            />
+          </div>
+      </div>
 
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="space-y-6">
         <Tabs defaultValue="games" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6 bg-muted/60 p-1 h-auto rounded-xl">
-            <TabsTrigger value="games" className="gap-2 rounded-lg data-[state=active]:bg-card data-[state=active]:text-accent-foreground data-[state=active]:shadow-md"><Target className="h-4 w-4" />Games</TabsTrigger>
-            <TabsTrigger value="leaderboard" className="gap-2 rounded-lg data-[state=active]:bg-card data-[state=active]:text-accent-foreground data-[state=active]:shadow-md"><Trophy className="h-4 w-4" />Leaderboard</TabsTrigger>
+            <TabsTrigger value="games" className="gap-2 rounded-lg py-2 data-[state=active]:bg-card data-[state=active]:text-accent-foreground data-[state=active]:shadow-md transition-all"><Target className="h-4 w-4" />Games Library</TabsTrigger>
+            <TabsTrigger value="leaderboard" className="gap-2 rounded-lg py-2 data-[state=active]:bg-card data-[state=active]:text-accent-foreground data-[state=active]:shadow-md transition-all"><Trophy className="h-4 w-4" />Leaderboard</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="games" className="space-y-8">
-            <h3 className="text-xl font-semibold text-muted-foreground tracking-tight">Single Player</h3>
-            <div className="grid md:grid-cols-3 gap-6">
-              {singlePlayer.map((g, i) => (
-                <Card key={i} className="bg-card border-border shadow-sm hover:shadow-lg transition-shadow">
-                  <CardHeader><CardTitle className="flex items-center gap-2">{g.icon}{g.title}</CardTitle><CardDescription>{g.desc}</CardDescription></CardHeader>
-                  <CardContent>{g.node}</CardContent>
-                </Card>
-              ))}
-            </div>
-
-            <h3 className="text-xl font-semibold text-muted-foreground tracking-tight">Multiplayer (vs)</h3>
-            {currentUser ? (
-              <div className="grid md:grid-cols-3 gap-6">
-                {multiplayer.map((g, i) => (
-                  <Card key={i} className="relative overflow-hidden bg-card text-foreground ring-1 ring-border shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-                    <div className={`pointer-events-none absolute inset-0 opacity-50 bg-gradient-to-br ${g.wrap}`} />
-                    <CardHeader className="relative">
-                      <CardTitle className="flex items-center gap-2">
-                        <span className={`inline-flex h-8 w-8 items-center justify-center rounded-lg ${g.badge.cls}`}>
-                          {g.badge.icon}
-                        </span>
-                        {g.title}
-                      </CardTitle>
-                      <CardDescription className="text-muted-foreground">{g.desc}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="relative">{g.node}</CardContent>
-                  </Card>
+          <TabsContent value="games" className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-2 duration-500">
+            {games.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {games.map((game) => (
+                    <GameCard 
+                        key={game.id} 
+                        game={game} 
+                        isFavorite={favorites.includes(game.id)}
+                        onToggleFavorite={toggleFavorite}
+                    />
                 ))}
-              </div>
+                </div>
             ) : (
-              <div className="grid md:grid-cols-3 gap-6">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Card key={i} className="bg-muted/50 ring-1 ring-border border-none">
-                    <CardHeader><CardTitle className="h-6 w-40 bg-muted rounded" /><CardDescription className="h-4 w-52 bg-muted rounded mt-2" /></CardHeader>
-                    <CardContent><div className="h-24 w-full bg-muted rounded" /></CardContent>
-                  </Card>
-                ))}
-              </div>
+                <div className="text-center py-12 text-muted-foreground bg-card/30 rounded-2xl border border-dashed border-border">
+                    <p>Tidak ada game yang ditemukan.</p>
+                </div>
             )}
 
-            <Card className="bg-card border-border" aria-busy={loadingTop}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Medal className="h-5 w-5 text-primary" />Top 5 Pemain (Skor Rata-rata)</CardTitle>
-                <CardDescription>Pemain dengan rata-rata skor tertinggi di semua game</CardDescription>
+            { }
+            <div ref={observerTarget} className="h-10 flex items-center justify-center">
+                {loadingGames && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+            </div>
+
+            { }
+            <Card className="bg-card border-border shadow-sm overflow-hidden" aria-busy={loadingTop}>
+              <CardHeader className="bg-muted/30 pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg"><Medal className="h-5 w-5 text-primary" />Hall of Fame</CardTitle>
+                <CardDescription>Top 5 pemain dengan rata-rata skor tertinggi</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-4">
                 {loadingTop ? (
                   <div className="space-y-3">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <div key={i} className="flex items-center gap-4 p-3 bg-muted/60 rounded-lg">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10" />
-                        <Skeleton className="h-10 w-10 rounded-full" />
-                        <div className="flex-1 min-w-0 space-y-2"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-3 w-1/3" /></div>
-                        <div className="text-right"><Skeleton className="h-6 w-12 rounded-md" /><Skeleton className="mt-1 h-3 w-10 rounded" /></div>
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="flex items-center gap-4 p-3 bg-muted/60 rounded-xl animate-pulse">
+                        <div className="w-8 h-8 rounded-full bg-muted" />
+                        <div className="flex-1 space-y-2"><div className="h-4 w-1/3 bg-muted rounded" /><div className="h-3 w-1/4 bg-muted rounded" /></div>
                       </div>
                     ))}
                   </div>
                 ) : topUsers.length > 0 ? (
                   <div className="space-y-3">
                     {topUsers.map(u => (
-                      <Link key={u.userId} to={`/profile/${u.userId}`} className="flex items-center gap-4 p-3 bg-muted/60 rounded-lg hover:bg-muted/80 transition-colors">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10">{rankIcon(u.rank - 1)}</div>
-                        <Avatar className="h-10 w-10">
+                      <Link key={u.userId} to={`/profile/${u.userId}`} className="flex items-center gap-4 p-3 bg-card hover:bg-accent/5 border border-transparent hover:border-accent/20 rounded-xl transition-all group">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">{rankIcon(u.rank - 1)}</div>
+                        <Avatar className="h-10 w-10 ring-2 ring-transparent group-hover:ring-primary/30 transition-all">
                           <AvatarImage src={u.avatar_url || undefined} alt={u.full_name} />
                           <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">{initials(u.full_name)}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-foreground truncate">{u.full_name}</p>
-                          <p className="text-sm text-muted-foreground">{u.totalGames} game{u.totalGames > 1 ? "s" : ""}</p>
+                          <p className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">{u.full_name}</p>
+                          <p className="text-xs text-muted-foreground">{u.totalGames} games played</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-xl font-bold text-accent">{u.average}</p>
-                          <p className="text-xs text-muted-foreground">Rata-rata</p>
+                          <p className="text-lg font-bold text-accent">{u.average}</p>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Avg Score</p>
                         </div>
                       </Link>
                     ))}
