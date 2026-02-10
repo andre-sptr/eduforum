@@ -176,124 +176,157 @@ const Settings = () => {
   const isDefaultAvatar = !profile?.avatar_url && !avatarFile;
 
   return (
-    <div className="container max-w-5xl mx-auto py-6 space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Pengaturan</h1>
+    <div className="container max-w-5xl mx-auto py-8 space-y-8">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">Pengaturan</h1>
         <p className="text-muted-foreground">Kelola profil, preferensi akun, dan tampilan aplikasi Anda.</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-8">
-        { }
         <aside className="md:w-64 flex-shrink-0">
-          <nav className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
-            <Button
-              variant={activeTab === "profile" ? "secondary" : "ghost"}
-              className="justify-start"
-              onClick={() => setActiveTab("profile")}
-            >
-              <User className="mr-2 h-4 w-4" /> Profil
-            </Button>
-            <Button
-              variant={activeTab === "account" ? "secondary" : "ghost"}
-              className="justify-start"
-              onClick={() => setActiveTab("account")}
-            >
-              <Shield className="mr-2 h-4 w-4" /> Akun
-            </Button>
-            <Button
-              variant={activeTab === "appearance" ? "secondary" : "ghost"}
-              className="justify-start"
-              onClick={() => setActiveTab("appearance")}
-            >
-              <Palette className="mr-2 h-4 w-4" /> Tampilan
-            </Button>
-            <Separator className="my-2 hidden md:block" />
-            <Button
-              variant="ghost"
-              className="justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
-              onClick={handleLogout}
-            >
-              <LogOut className="mr-2 h-4 w-4" /> Keluar
-            </Button>
-          </nav>
+          <div className="sticky top-24 space-y-1">
+            <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-visible pb-2 md:pb-0 p-1">
+              {[
+                { id: "profile", label: "Profil", icon: User },
+                { id: "account", label: "Akun", icon: Shield },
+                { id: "appearance", label: "Tampilan", icon: Palette },
+              ].map((tab) => (
+                <Button
+                  key={tab.id}
+                  variant={activeTab === tab.id ? "secondary" : "ghost"}
+                  className={`justify-start w-full transition-all duration-200 ${
+                    activeTab === tab.id 
+                      ? "bg-primary/10 text-primary hover:bg-primary/15 font-medium shadow-sm" 
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  <tab.icon className={`mr-2.5 h-4 w-4 ${activeTab === tab.id ? "text-primary" : "text-muted-foreground"}`} /> 
+                  {tab.label}
+                </Button>
+              ))}
+              
+              <Separator className="my-3 hidden md:block opacity-50" />
+              
+              <Button
+                variant="ghost"
+                className="justify-start w-full text-destructive/80 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                onClick={handleLogout}
+              >
+                <LogOut className="mr-2.5 h-4 w-4" /> Keluar
+              </Button>
+            </nav>
+          </div>
         </aside>
 
-        { }
-        <div className="flex-1 space-y-6">
-          
-          { }
+        <div className="flex-1 space-y-6 min-h-[500px]">
           {activeTab === "profile" && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <Card>
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
+              <Card className="border-none shadow-sm bg-card/50 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle>Profil Publik</CardTitle>
-                  <CardDescription>Informasi ini akan ditampilkan secara publik di profil Anda.</CardDescription>
+                  <CardDescription></CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleProfileSubmit} className="space-y-8">
-                    <div className="flex flex-col sm:flex-row items-start gap-6">
-                      <div className="flex flex-col items-center gap-3">
+                    <div className="flex flex-col sm:flex-row items-start gap-8">
+                      <div className="flex flex-col items-center gap-4">
                         <div className="relative group">
                           <button
                             type="button"
                             onClick={() => !isDefaultAvatar && setViewerOpen(true)}
-                            className={`relative overflow-hidden rounded-full ring-4 ring-background shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-accent ${isDefaultAvatar ? "cursor-default" : "cursor-zoom-in"}`}
+                            className={`relative overflow-hidden rounded-full ring-4 ring-background shadow-xl transition-all duration-300 hover:scale-105 hover:ring-primary/20 focus:outline-none focus:ring-primary ${isDefaultAvatar ? "cursor-default" : "cursor-zoom-in"}`}
                           >
                             <Avatar className="h-32 w-32">
                               <AvatarImage src={avatarPreview} className="object-cover" />
-                              <AvatarFallback className="text-3xl bg-primary text-primary-foreground font-bold">
+                              <AvatarFallback className="text-4xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold">
                                 {getInitials(fullName)}
                               </AvatarFallback>
                             </Avatar>
                             {!isDefaultAvatar && (
-                                <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Maximize2 className="h-6 w-6 text-white" />
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <Maximize2 className="h-8 w-8 text-white drop-shadow-md" />
                                 </div>
                             )}
                           </button>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
-                            <Button type="button" size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                                <Upload className="h-3.5 w-3.5 mr-2" /> Ubah
-                            </Button>
-                            {!isDefaultAvatar && (
-                                <Button type="button" size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10" onClick={handleDeleteAvatar} disabled={deletingAvatar}>
-                                    {deletingAvatar ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                          
+                          <div className="absolute -bottom-2 -right-2 flex gap-1">
+                             <Button 
+                                type="button" 
+                                size="icon" 
+                                variant="secondary" 
+                                className="h-9 w-9 rounded-full shadow-md hover:bg-primary hover:text-primary-foreground transition-colors"
+                                onClick={() => fileInputRef.current?.click()}
+                             >
+                                <Upload className="h-4 w-4" />
+                                <span className="sr-only">Upload avatar</span>
+                             </Button>
+                             {!isDefaultAvatar && (
+                                <Button 
+                                    type="button" 
+                                    size="icon" 
+                                    variant="destructive" 
+                                    className="h-9 w-9 rounded-full shadow-md"
+                                    onClick={handleDeleteAvatar} 
+                                    disabled={deletingAvatar}
+                                >
+                                    {deletingAvatar ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                    <span className="sr-only">Delete avatar</span>
                                 </Button>
-                            )}
+                             )}
+                          </div>
+                          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
                         </div>
+                        <p className="text-xs text-muted-foreground font-medium">
+                            JPG atau PNG (5MB)
+                        </p>
                       </div>
 
-                      <div className="flex-1 space-y-4 w-full">
-                        <div className="grid gap-2">
-                          <Label htmlFor="fullName">Nama Lengkap</Label>
-                          <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+                      <div className="flex-1 space-y-5 w-full">
+                        <div className="grid gap-2.5">
+                          <Label htmlFor="fullName" className="text-sm font-medium">Nama Lengkap</Label>
+                          <Input 
+                            id="fullName" 
+                            value={fullName} 
+                            onChange={(e) => setFullName(e.target.value)} 
+                            required 
+                            className="bg-background/50 focus:bg-background transition-colors"
+                          />
                         </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="role">Role</Label>
+                        <div className="grid gap-2.5">
+                          <Label htmlFor="role" className="text-sm font-medium">Role</Label>
                           <div className="flex items-center gap-2">
-                             <Input id="role" disabled value={profile.role?.toUpperCase()} className="bg-muted text-muted-foreground w-full sm:w-1/3" />
-                             <span className="text-xs text-muted-foreground">Permanen</span>
+                             <div className="relative flex-1">
+                                <Shield className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground/70" />
+                                <Input 
+                                    id="role" 
+                                    disabled 
+                                    value={profile.role?.toUpperCase()} 
+                                    className="pl-9 bg-muted/50 text-muted-foreground" 
+                                />
+                             </div>
+                             <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
+                                Permanen
+                             </span>
                           </div>
                         </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="bio">Bio</Label>
+                        <div className="grid gap-2.5">
+                          <Label htmlFor="bio" className="text-sm font-medium">Bio</Label>
                           <Textarea
                             id="bio"
                             value={bio}
                             onChange={(e) => setBio(e.target.value)}
                             placeholder="Ceritakan sedikit tentang diri Anda..."
-                            className="min-h-[120px] resize-none"
+                            className="min-h-[120px] resize-none bg-background/50 focus:bg-background transition-colors"
                           />
-                          <p className="text-xs text-muted-foreground text-right">{bio.length}/500</p>
+                          <p className="text-xs text-muted-foreground text-right tabular-nums">{bio.length}/500</p>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex justify-end pt-4 border-t">
-                        <Button type="submit" disabled={loading} className="min-w-[120px]">
-                            {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Menyimpan</> : "Simpan Perubahan"}
+                    <div className="flex justify-end pt-6 border-t border-border/50">
+                        <Button type="submit" disabled={loading} className="min-w-[140px] shadow-sm">
+                            {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Menyimpan</> : "Simpan"}
                         </Button>
                     </div>
                   </form>
@@ -302,97 +335,117 @@ const Settings = () => {
             </div>
           )}
 
-          { }
           {activeTab === "account" && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <Card>
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
+              <Card className="border-none shadow-sm bg-card/50 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle>Keamanan Akun</CardTitle>
-                  <CardDescription>Kelola email dan password akun Anda.</CardDescription>
+                  <CardDescription></CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                    <div className="space-y-1">
-                        <Label>Email</Label>
+                <CardContent className="space-y-8">
+                    <div className="space-y-2">
+                        <Label className="text-sm font-medium">Email</Label>
                         <div className="flex items-center gap-3">
                             <div className="relative flex-1">
                                 <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input value={currentUser?.email} disabled className="pl-9 bg-muted" />
+                                <Input value={currentUser?.email} disabled className="pl-9 bg-muted/50 font-medium" />
                             </div>
-                            <Button variant="outline" disabled>Ubah</Button>
+                            <Button variant="outline" disabled className="bg-background/50">Ubah</Button>
                         </div>
-                        <p className="text-[11px] text-muted-foreground">Email tidak dapat diubah saat ini.</p>
+                        <p className="text-[11px] text-muted-foreground">Email tidak dapat diubah.</p>
                     </div>
 
-                    <Separator />
+                    <Separator className="opacity-50" />
 
-                    <form onSubmit={handlePasswordUpdate} className="space-y-4">
-                        <h3 className="text-sm font-medium">Ganti Password</h3>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <div className="space-y-2">
+                    <form onSubmit={handlePasswordUpdate} className="space-y-5">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                            <Lock className="h-4 w-4 text-primary" />
+                            Ganti Password
+                        </h3>
+                        <div className="grid gap-5 sm:grid-cols-2">
+                            <div className="space-y-2.5">
                                 <Label htmlFor="password">Password Baru</Label>
                                 <div className="relative">
-                                    <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input id="password" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} className="pl-9" placeholder="••••••••" />
+                                    <Input 
+                                        id="password" 
+                                        type="password" 
+                                        value={password} 
+                                        onChange={(e)=>setPassword(e.target.value)} 
+                                        className="bg-background/50 focus:bg-background transition-colors"
+                                        placeholder="••••••••" 
+                                    />
                                 </div>
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-2.5">
                                 <Label htmlFor="confirmPassword">Konfirmasi Password</Label>
                                 <div className="relative">
-                                    <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e)=>setConfirmPassword(e.target.value)} className="pl-9" placeholder="••••••••" />
+                                    <Input 
+                                        id="confirmPassword" 
+                                        type="password" 
+                                        value={confirmPassword} 
+                                        onChange={(e)=>setConfirmPassword(e.target.value)} 
+                                        className="bg-background/50 focus:bg-background transition-colors"
+                                        placeholder="••••••••" 
+                                    />
                                 </div>
                             </div>
                         </div>
-                        <div className="flex justify-end">
-                            <Button type="submit" disabled={!password || passwordLoading}>
-                                {passwordLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update Password"}
+                        <div className="flex justify-end pt-2">
+                            <Button type="submit" disabled={!password || passwordLoading} className="min-w-[140px] shadow-sm">
+                                {passwordLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update"}
                             </Button>
                         </div>
                     </form>
                 </CardContent>
               </Card>
 
-              <Card className="border-destructive/30 bg-destructive/5">
+              <Card className="border border-destructive/20 bg-destructive/5 overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-destructive/50" />
                 <CardHeader>
-                  <CardTitle className="text-destructive flex items-center gap-2">
+                  <CardTitle className="text-destructive flex items-center gap-2 text-lg">
                       <AlertTriangle className="h-5 w-5" /> Danger Zone
                   </CardTitle>
-                  <CardDescription>Tindakan ini tidak dapat dibatalkan.</CardDescription>
+                  <CardDescription></CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border border-destructive/20 rounded-lg bg-card/50">
-                        <div className="space-y-1">
-                            <h4 className="font-medium text-destructive">Hapus Akun</h4>
-                            <p className="text-sm text-muted-foreground">Menghapus akun Anda dan semua datanya secara permanen.</p>
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-6 p-4 rounded-lg bg-background/50 border border-destructive/10">
+                        <div className="space-y-1 text-center sm:text-left">
+                            <h4 className="font-semibold text-destructive">Hapus Akun</h4>
+                            <p className="text-sm text-muted-foreground max-w-md">
+                                Menghapus akun Anda akan menghapus semua data profil, postingan, dan aktivitas Anda secara permanen.
+                            </p>
                         </div>
                         <Dialog>
-                            <DialogContent>
+                            <DialogContent className="sm:max-w-[425px]">
                                 <DialogHeader>
-                                    <DialogTitle>Apakah Anda yakin?</DialogTitle>
-                                    <DialogDescription>
-                                        Tindakan ini tidak dapat dibatalkan. Ini akan menghapus akun Anda secara permanen dan menghapus data Anda dari server kami.
-                                        <br/><br/>
-                                        Ketik <strong>DELETE</strong> untuk mengonfirmasi.
+                                    <DialogTitle className="text-destructive flex items-center gap-2">
+                                        <AlertTriangle className="h-5 w-5" /> Hapus Akun Permanen
+                                    </DialogTitle>
+                                    <DialogDescription className="pt-2">
+                                        Apakah Anda yakin? Tindakan ini tidak dapat dibatalkan. Semua data Anda akan dihapus dari server kami selamanya.
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div className="space-y-4 py-4">
+                                    <div className="p-3 bg-destructive/10 rounded-md text-sm text-destructive font-medium">
+                                        Ketik <strong>DELETE</strong> untuk mengonfirmasi penghapusan.
+                                    </div>
                                     <Input 
                                         value={deleteConfirm} 
                                         onChange={(e) => setDeleteConfirm(e.target.value)} 
-                                        placeholder="Ketik DELETE"
-                                        className="border-destructive/50 focus-visible:ring-destructive"
+                                        placeholder="DELETE"
+                                        className="border-destructive/30 focus-visible:ring-destructive bg-background"
                                     />
                                     <Button 
                                         variant="destructive" 
-                                        className="w-full" 
+                                        className="w-full shadow-md hover:bg-destructive/90" 
                                         disabled={deleteConfirm !== "DELETE" || deletingAccount}
                                         onClick={handleDeleteAccount}
                                     >
-                                        {deletingAccount ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Hapus Akun Permanen"}
+                                        {deletingAccount ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Hapus Akun Saya"}
                                     </Button>
                                 </div>
                             </DialogContent>
-                            <Button variant="destructive">Hapus Akun</Button>
+                            <Button variant="destructive" className="w-full sm:w-auto shadow-sm">Hapus Akun</Button>
                         </Dialog>
                     </div>
                 </CardContent>
@@ -400,56 +453,48 @@ const Settings = () => {
             </div>
           )}
 
-          { }
           {activeTab === "appearance" && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <Card>
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
+              <Card className="border-none shadow-sm bg-card/50 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle>Tampilan Aplikasi</CardTitle>
-                  <CardDescription>Sesuaikan tampilan EduForum sesuai preferensi Anda.</CardDescription>
+                  <CardDescription></CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-6">
+                  <div className="space-y-6">
                     <div className="space-y-4">
-                        <Label className="text-base">Tema</Label>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <button
-                                onClick={() => setTheme("light")}
-                                className={`group relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${theme === "light" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
-                            >
-                                <div className="h-20 w-full rounded-lg bg-[#f0f0f0] border border-gray-200 flex items-center justify-center overflow-hidden">
-                                    <div className="space-y-2 w-3/4 opacity-50">
-                                        <div className="h-2 w-full bg-white rounded-md shadow-sm" />
-                                        <div className="h-2 w-2/3 bg-white rounded-md shadow-sm" />
+                        <Label className="text-base font-medium">Tema</Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                            {[
+                                { id: "light", label: "Terang", icon: Sun, bg: "bg-[#f4f4f5]", border: "border-gray-200" },
+                                { id: "dark", label: "Gelap", icon: Moon, bg: "bg-[#18181b]", border: "border-gray-800" },
+                                { id: "system", label: "System", icon: Monitor, bg: "bg-gradient-to-r from-[#f4f4f5] to-[#18181b]", border: "border-gray-200" }
+                            ].map((item) => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => setTheme(item.id as "light" | "dark" | "system")}
+                                    className={`group relative flex flex-col items-center gap-3 p-1 rounded-xl transition-all duration-200 focus:outline-none ${
+                                        theme === item.id 
+                                            ? "ring-2 ring-primary ring-offset-2 ring-offset-background" 
+                                            : "hover:opacity-80"
+                                    }`}
+                                >
+                                    <div className={`w-full aspect-video rounded-lg ${item.bg} ${item.border} border shadow-sm flex items-center justify-center overflow-hidden relative`}>
+                                        <div className="space-y-2 w-3/4 opacity-40">
+                                            <div className={`h-2 w-full rounded-md ${item.id === 'dark' ? 'bg-gray-700' : 'bg-gray-300'}`} />
+                                            <div className={`h-2 w-2/3 rounded-md ${item.id === 'dark' ? 'bg-gray-700' : 'bg-gray-300'}`} />
+                                        </div>
+                                        <div className={`absolute inset-0 flex items-center justify-center bg-black/5 transition-opacity ${theme === item.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                                             <div className={`p-2 rounded-full shadow-lg backdrop-blur-sm ${theme === item.id ? 'bg-primary text-primary-foreground' : 'bg-background/80 text-foreground'}`}>
+                                                 <item.icon className="h-5 w-5" />
+                                             </div>
+                                        </div>
                                     </div>
-                                    <Sun className={`absolute h-6 w-6 text-orange-500 ${theme === "light" ? "scale-110" : "scale-100"}`} />
-                                </div>
-                                <span className="text-sm font-medium">Terang</span>
-                            </button>
-
-                            <button
-                                onClick={() => setTheme("dark")}
-                                className={`group relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${theme === "dark" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
-                            >
-                                <div className="h-20 w-full rounded-lg bg-[#1a1a1a] border border-gray-800 flex items-center justify-center overflow-hidden">
-                                    <div className="space-y-2 w-3/4 opacity-50">
-                                        <div className="h-2 w-full bg-gray-800 rounded-md" />
-                                        <div className="h-2 w-2/3 bg-gray-800 rounded-md" />
-                                    </div>
-                                    <Moon className={`absolute h-6 w-6 text-blue-400 ${theme === "dark" ? "scale-110" : "scale-100"}`} />
-                                </div>
-                                <span className="text-sm font-medium">Gelap</span>
-                            </button>
-
-                            <button
-                                onClick={() => setTheme("system")}
-                                className={`group relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${theme === "system" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
-                            >
-                                <div className="h-20 w-full rounded-lg bg-gradient-to-r from-[#f0f0f0] to-[#1a1a1a] border border-gray-200 flex items-center justify-center overflow-hidden">
-                                     <Monitor className={`absolute h-6 w-6 text-foreground ${theme === "system" ? "scale-110" : "scale-100"}`} />
-                                </div>
-                                <span className="text-sm font-medium">System</span>
-                            </button>
+                                    <span className={`text-sm font-medium ${theme === item.id ? "text-primary" : "text-muted-foreground"}`}>
+                                        {item.label}
+                                    </span>
+                                </button>
+                            ))}
                         </div>
                     </div>
                   </div>
@@ -464,12 +509,16 @@ const Settings = () => {
       <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden bg-transparent border-none shadow-none">
           <DialogTitle className="sr-only">Foto Profil</DialogTitle>
-          <div className="relative w-full h-full flex items-center justify-center">
-             <img src={avatarPreview || profile.avatar_url || ""} alt="Avatar" className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
+          <div className="relative w-full h-full flex items-center justify-center p-4">
+             <img 
+                src={avatarPreview || profile.avatar_url || ""} 
+                alt="Avatar" 
+                className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-300" 
+             />
              <Button 
                 variant="secondary" 
                 size="icon" 
-                className="absolute top-2 right-2 rounded-full opacity-70 hover:opacity-100" 
+                className="absolute top-6 right-6 rounded-full shadow-lg bg-background/80 hover:bg-background backdrop-blur-sm" 
                 onClick={() => setViewerOpen(false)}
              >
                 <X className="h-4 w-4" />
