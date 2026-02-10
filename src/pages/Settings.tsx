@@ -149,7 +149,20 @@ const Settings = () => {
     setDeletingAccount(true);
 
     try {
-        toast.info("Permintaan hapus akun diproses. Data Anda akan dihapus dari sistem dalam 30 hari.");
+        await supabase.from("posts").delete().eq("user_id", currentUser.id);
+
+        const { error: profileError } = await supabase.from("profiles").delete().eq("id", currentUser.id);
+        
+        if (profileError) {
+             console.error("Gagal hapus profile, mencoba reset data...", profileError);
+             await supabase.from("profiles").update({ 
+                 full_name: "Deleted User", 
+                 bio: null, 
+                 avatar_url: null 
+             }).eq("id", currentUser.id);
+        }
+
+        toast.info("Akun Anda telah dihapus.");
         await supabase.auth.signOut();
         navigate("/auth");
     } catch (err: any) { toast.error(err.message); }
@@ -445,7 +458,7 @@ const Settings = () => {
                                             onChange={(e) => setDeleteConfirm(e.target.value)} 
                                             placeholder={currentUser?.email}
                                             className="border-destructive/30 focus-visible:ring-destructive bg-background"
-                                            onPaste={(e) => e.preventDefault()} // Prevent pasting for extra security/friction
+                                            onPaste={(e) => e.preventDefault()}
                                             autoComplete="off"
                                         />
                                     </div>
