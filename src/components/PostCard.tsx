@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Repeat2, Share2, MoreVertical, Pencil, Trash2, ChevronLeft, ChevronRight, GraduationCap, Shield, BookOpen, Music, Loader2 } from "lucide-react";
+import { Repeat2, Share2, MoreVertical, Pencil, Trash2, ChevronLeft, ChevronRight, GraduationCap, Shield, BookOpen, Music, Loader2, FileText, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { id } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
@@ -334,6 +334,20 @@ const PostCard = ({
                       <div className="flex flex-col items-center gap-8 p-8 text-white w-full">
                         <Music className={`h-48 w-48 text-accent transition-all duration-300 ${isAudioPlaying ? "animate-pulse-music" : "scale-95 opacity-60"}`} />
                         <audio src={urls[idx]} controls autoPlay onPlay={() => setIsAudioPlaying(true)} onPause={() => setIsAudioPlaying(false)} onEnded={() => setIsAudioPlaying(false)} className="w-full max-w-lg" />
+                      </div>
+                    ) : types[idx] === "document" ? (
+                      <div className="flex flex-col items-center gap-6 p-8 text-white w-full text-center">
+                        <div className="rounded-3xl bg-white/5 p-12 ring-1 ring-white/10 backdrop-blur-md">
+                           <FileText className="h-32 w-32 text-orange-500" />
+                        </div>
+                        <h3 className="text-2xl font-bold">Dokumen PDF</h3>
+                        <Button 
+                            size="lg"
+                            className="gap-2 text-lg h-12 px-8"
+                            onClick={() => window.open(urls[idx], '_blank')}
+                        >
+                            <ExternalLink className="h-5 w-5" /> Buka Dokumen
+                        </Button>
                       </div>
                     ) : (
                       <img src={urls[idx]} alt="" className="max-h-[80vh] max-w-[95vw] rounded-lg object-contain" />

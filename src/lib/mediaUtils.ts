@@ -7,6 +7,15 @@ export interface MediaFile {
   type: "image" | "video" | "audio";
 }
 
+export interface DocumentFile {
+  file: File;
+  preview: string;
+  type: "document";
+  name: string;
+  size: number;
+  mime: string;
+}
+
 const MB = 1024 * 1024;
 export const MAX_IMAGE = 15 * MB;
 export const MAX_VIDEO = 15 * MB;

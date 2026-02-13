@@ -153,7 +153,6 @@ export const SpotifySearchModal = ({
               Cari Lagu Spotify
             </DrawerTitle>
             <DrawerDescription className="text-muted-foreground">
-              Tambahkan soundtrack ke postingan Anda.
             </DrawerDescription>
           </DrawerHeader>
           <div className="p-4 pt-0">
@@ -173,7 +172,6 @@ export const SpotifySearchModal = ({
             Cari Lagu Spotify
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Tambahkan soundtrack ke postingan Anda untuk membuatnya lebih hidup.
           </DialogDescription>
         </DialogHeader>
         {Content}

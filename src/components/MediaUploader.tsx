@@ -1,15 +1,14 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { X, Image, Video, Music, FileText } from "lucide-react";
-import { MediaFile, getMediaType, validateMediaFile } from "@/lib/mediaUtils";
+import { MediaFile, DocumentFile, getMediaType, validateMediaFile } from "@/lib/mediaUtils";
 import { toast } from "sonner";
 
-type DocumentFile={file:File;preview:string;type:"document";name:string;size:number;mime:string};
-interface MediaUploaderProps{onMediaChange:(f:MediaFile[])=>void;onDocumentChange?:(f:DocumentFile[])=>void;acceptDocs?:string;maxDocSizeMB?:number}
+interface MediaUploaderProps{onMediaChange:(f:MediaFile[])=>void;onDocumentChange?:(f:DocumentFile[])=>void;acceptDocs?:string;maxDocSizeMB?:number;onSpotifyClick?:()=>void}
 const DEFAULT_DOC_ACCEPT="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain";
 const DEFAULT_DOC_MAX_MB=15;
 
-const MediaUploader=({onMediaChange,onDocumentChange,acceptDocs=DEFAULT_DOC_ACCEPT,maxDocSizeMB=DEFAULT_DOC_MAX_MB}:MediaUploaderProps)=>{
+const MediaUploader=({onMediaChange,onDocumentChange,acceptDocs=DEFAULT_DOC_ACCEPT,maxDocSizeMB=DEFAULT_DOC_MAX_MB,onSpotifyClick}:MediaUploaderProps)=>{
   const [mediaFiles,setMediaFiles]=useState<MediaFile[]>([]);
   const [documentFiles,setDocumentFiles]=useState<DocumentFile[]>([]);
   const imageInputRef=useRef<HTMLInputElement>(null);
@@ -68,6 +67,11 @@ const MediaUploader=({onMediaChange,onDocumentChange,acceptDocs=DEFAULT_DOC_ACCE
 
   const formatBytes=(b:number)=>b<1024?`${b} B`:b<1048576?`${(b/1024).toFixed(1)} KB`:`${(b/1048576).toFixed(1)} MB`;
 
+  const hasImages = mediaFiles.some(f => f.type === "image");
+  const hasVideos = mediaFiles.some(f => f.type === "video");
+  const hasAudios = mediaFiles.some(f => f.type === "audio");
+  const hasDocuments = documentFiles.length > 0;
+
   return(
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
@@ -78,6 +82,7 @@ const MediaUploader=({onMediaChange,onDocumentChange,acceptDocs=DEFAULT_DOC_ACCE
             size="sm" 
             className="rounded-xl bg-white/5 hover:bg-blue-500/10 hover:text-blue-500 border border-white/5 transition-all gap-2 h-9 px-3" 
             onClick={()=>imageInputRef.current?.click()}
+            disabled={hasVideos || hasAudios || hasDocuments}
         >
             <Image className="h-4 w-4"/> 
             <span className="text-xs font-medium">Foto</span>
@@ -90,6 +95,7 @@ const MediaUploader=({onMediaChange,onDocumentChange,acceptDocs=DEFAULT_DOC_ACCE
             size="sm" 
             className="rounded-xl bg-white/5 hover:bg-pink-500/10 hover:text-pink-500 border border-white/5 transition-all gap-2 h-9 px-3" 
             onClick={()=>videoInputRef.current?.click()}
+            disabled={hasImages || hasAudios || hasDocuments}
         >
             <Video className="h-4 w-4"/> 
             <span className="text-xs font-medium">Video</span>
@@ -102,6 +108,7 @@ const MediaUploader=({onMediaChange,onDocumentChange,acceptDocs=DEFAULT_DOC_ACCE
             size="sm" 
             className="rounded-xl bg-white/5 hover:bg-purple-500/10 hover:text-purple-500 border border-white/5 transition-all gap-2 h-9 px-3" 
             onClick={()=>audioInputRef.current?.click()}
+            disabled={hasImages || hasVideos || hasDocuments}
         >
             <Music className="h-4 w-4"/> 
             <span className="text-xs font-medium">Musik</span>
@@ -114,10 +121,25 @@ const MediaUploader=({onMediaChange,onDocumentChange,acceptDocs=DEFAULT_DOC_ACCE
             size="sm" 
             className="rounded-xl bg-white/5 hover:bg-orange-500/10 hover:text-orange-500 border border-white/5 transition-all gap-2 h-9 px-3" 
             onClick={()=>documentInputRef.current?.click()}
+            disabled={hasImages || hasVideos || hasAudios}
         >
             <FileText className="h-4 w-4"/> 
             <span className="text-xs font-medium">Dokumen</span>
         </Button>
+        
+        {onSpotifyClick && (
+            <Button 
+                type="button" 
+                variant="ghost" 
+                size="sm" 
+                className="rounded-xl bg-white/5 hover:bg-green-500/10 hover:text-green-500 border border-white/5 transition-all gap-2 h-9 px-3" 
+                onClick={onSpotifyClick}
+                disabled={hasImages || hasVideos || hasAudios || hasDocuments}
+            >
+                <Music className="h-4 w-4"/> 
+                <span className="text-xs font-medium">Spotify</span>
+            </Button>
+        )}
       </div>
 
       {mediaFiles.length>0&&(

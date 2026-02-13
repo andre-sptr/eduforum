@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Music } from "lucide-react";
+import { ChevronLeft, ChevronRight, Music, FileText, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -81,6 +81,25 @@ const MediaCarousel = ({ mediaUrls, mediaTypes }: MediaCarouselProps) => {
                         <Music className="h-16 w-16 text-primary animate-pulse" />
                     </div>
                     <audio src={mediaUrls[currentIndex]} controls className="w-full max-w-md [&::-webkit-media-controls-panel]:bg-white/10 [&::-webkit-media-controls-panel]:backdrop-blur-md" />
+                </div>
+            )}
+            {mediaTypes[currentIndex] === "document" && (
+                <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-black p-8 text-white text-center">
+                    <div className="mb-6 rounded-2xl bg-white/5 p-8 ring-1 ring-white/10 backdrop-blur-md group-hover:scale-110 transition-transform duration-500">
+                        <FileText className="h-20 w-20 text-orange-500" />
+                    </div>
+                    <h3 className="mb-2 text-xl font-semibold">Dokumen PDF</h3>
+                    <p className="mb-6 text-sm text-gray-400 max-w-xs truncate">Klik untuk membuka dokumen</p>
+                    <Button 
+                        variant="secondary" 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(mediaUrls[currentIndex], '_blank');
+                        }}
+                        className="gap-2"
+                    >
+                        <ExternalLink className="h-4 w-4" /> Buka Dokumen
+                    </Button>
                 </div>
             )}
           </motion.div>

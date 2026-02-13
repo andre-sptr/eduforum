@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import MediaUploader from "./MediaUploader";
-import { MediaFile, compressImage } from "@/lib/mediaUtils";
+import { MediaFile, DocumentFile, compressImage } from "@/lib/mediaUtils";
 import { z } from "zod";
 import { MentionInput } from "./MentionInput";
 import { Music, X } from "lucide-react";
@@ -20,6 +20,7 @@ interface CreatePostProps { currentUser:{ id:string; full_name:string; avatar_ur
 
 const CreatePost = ({ currentUser, onPostCreated }: CreatePostProps) => {
   const [content, setContent] = useState(""); const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  const [documentFiles, setDocumentFiles] = useState<DocumentFile[]>([]);
   const [loading, setLoading] = useState(false); const [mediaKey, setMediaKey] = useState(0);
   const [showSpotifySearch, setShowSpotifySearch] = useState(false);
   const [spotifyTrack, setSpotifyTrack] = useState<any>(null);
@@ -34,12 +35,14 @@ const CreatePost = ({ currentUser, onPostCreated }: CreatePostProps) => {
   };
 
   const handleSubmit = async () => {
-    if (mediaFiles.length===0) { try { postSchema.parse({ content }); } catch (e:any){ if (e instanceof z.ZodError) toast.error(e.errors[0].message); return; } }
+    if (mediaFiles.length===0 && documentFiles.length===0) { try { postSchema.parse({ content }); } catch (e:any){ if (e instanceof z.ZodError) toast.error(e.errors[0].message); return; } }
     else if (!content.trim()) {}
     setLoading(true);
     try {
       const mediaUrls:string[]=[]; const mediaTypes:string[]=[];
       for (const m of mediaFiles) { const url=await uploadMedia(m.file,currentUser.id,m.type); mediaUrls.push(url); mediaTypes.push(m.type); }
+      for (const d of documentFiles) { const url=await uploadMedia(d.file,currentUser.id,"document"); mediaUrls.push(url); mediaTypes.push("document"); }
+      
       const { error } = await supabase.from("posts").insert({
         user_id: currentUser.id,
         content: content.trim() || "",
@@ -52,6 +55,7 @@ const CreatePost = ({ currentUser, onPostCreated }: CreatePostProps) => {
       toast.success("Postingan berhasil dibuat!"); 
       setContent(""); 
       setMediaFiles([]); 
+      setDocumentFiles([]);
       setSpotifyTrack(null);
       setMediaKey(v => v + 1); 
       onPostCreated();
@@ -89,26 +93,17 @@ const CreatePost = ({ currentUser, onPostCreated }: CreatePostProps) => {
             )}
           </div>
 
-          <MediaUploader key={mediaKey} onMediaChange={setMediaFiles} />
+          <div className={spotifyTrack ? "pointer-events-none opacity-50 grayscale transition-all duration-300" : "transition-all duration-300"}>
+            <MediaUploader key={mediaKey} onMediaChange={setMediaFiles} onDocumentChange={setDocumentFiles} onSpotifyClick={() => setShowSpotifySearch(true)} />
+          </div>
           
           <div className="flex items-center justify-between pt-2">
             <div className="flex gap-2">
-                <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="sm" 
-                    className="rounded-xl bg-white/5 hover:bg-green-500/10 hover:text-green-500 border border-white/5 transition-all gap-2 h-11 px-4" 
-                    onClick={() => setShowSpotifySearch(true)}
-                    disabled={!!spotifyTrack}
-                >
-                    <Music className="h-5 w-5"/> 
-                    <span className="text-sm font-medium">Spotify</span>
-                </Button>
             </div>
 
             <Button 
                 onClick={handleSubmit} 
-                disabled={loading || (!content.trim() && mediaFiles.length === 0 && !spotifyTrack)} 
+                disabled={loading || (!content.trim() && mediaFiles.length === 0 && documentFiles.length === 0 && !spotifyTrack)} 
                 className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 px-6 h-11 font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 {loading ? "Memposting..." : "Posting"}
