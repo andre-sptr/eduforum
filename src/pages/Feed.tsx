@@ -7,7 +7,6 @@ import CreatePost from "@/components/CreatePost";
 import PostCard from "@/components/PostCard";
 import PostSkeleton from "@/components/PostSkeleton";
 import { toast } from "sonner";
-import { StoryReel } from "@/components/StoryReel";
 import { useLeaderboardData } from "@/hooks/useLeaderboardData";
 
 const Feed = () => {
@@ -117,7 +116,6 @@ const Feed = () => {
 
   return (
     <div className="space-y-6">
-      {profile && <StoryReel currentUser={profile} />}
       
       {profile && <div className="rounded-2xl bg-card shadow-xl border border-border p-2"><CreatePost currentUser={profile} onPostCreated={refreshPosts} /></div>}
       <div className="rounded-2xl bg-card shadow-xl border border-border">

@@ -674,73 +674,6 @@ export type Database = {
           },
         ]
       }
-      stories: {
-        Row: {
-          content: string | null
-          created_at: string
-          id: string
-          media_type: string
-          media_url: string
-          spotify_track_id: string | null
-          user_id: string
-        }
-        Insert: {
-          content?: string | null
-          created_at?: string
-          id?: string
-          media_type: string
-          media_url: string
-          spotify_track_id?: string | null
-          user_id: string
-        }
-        Update: {
-          content?: string | null
-          created_at?: string
-          id?: string
-          media_type?: string
-          media_url?: string
-          spotify_track_id?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "stories_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      story_views: {
-        Row: {
-          id: string
-          story_id: string
-          user_id: string
-          viewed_at: string | null
-        }
-        Insert: {
-          id?: string
-          story_id: string
-          user_id: string
-          viewed_at?: string | null
-        }
-        Update: {
-          id?: string
-          story_id?: string
-          user_id?: string
-          viewed_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "story_views_story_id_fkey"
-            columns: ["story_id"]
-            isOneToOne: false
-            referencedRelation: "stories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -788,34 +721,6 @@ export type Database = {
         Returns: string
       }
       delete_group_cascade: { Args: { p_group_id: string }; Returns: undefined }
-      get_recent_stories: {
-        Args: never
-        Returns: {
-          content: string | null
-          created_at: string
-          id: string
-          media_type: string
-          media_url: string
-          spotify_track_id: string | null
-          user_id: string
-        }[]
-        SetofOptions: {
-          from: "*"
-          to: "stories"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
-      get_recent_stories_grouped: {
-        Args: { p_user_id: string }
-        Returns: {
-          all_viewed: boolean
-          avatar_url: string
-          full_name: string
-          stories: Json
-          user_id: string
-        }[]
-      }
       get_top_5_followers: {
         Args: never
         Returns: {
