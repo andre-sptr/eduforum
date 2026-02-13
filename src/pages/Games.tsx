@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, Brain, Zap, Target, ArrowLeft, Medal, Award, Hash, CaseUpper, Scissors, Keyboard, MousePointerClick, Sparkles, Loader2, Gamepad2, Search } from "lucide-react";
+import { Trophy, Brain, Zap, Target, ArrowLeft, Medal, Award, Hash, CaseUpper, Scissors, Keyboard, MousePointerClick, Sparkles, Loader2, Gamepad2, Search, CircleDashed, Car } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -15,6 +14,12 @@ import GameLeaderboard from "@/components/GameLeaderboard";
 import ReactionGame from "@/components/games/ReactionGame";
 import PatternGame from "@/components/games/PatternGame";
 import TypingTest from "@/components/games/TypingTest";
+import Game2048 from "@/components/games/Game2048";
+import SnakeGame from "@/components/games/SnakeGame";
+import MinesweeperGame from "@/components/games/MinesweeperGame";
+import FlappyBird from "@/components/games/FlappyBird";
+import PongGame from "@/components/games/PongGame";
+import RacingGame from "@/components/games/RacingGame";
 import { useGames, Game } from "@/hooks/useGames";
 import { GameCard } from "@/components/GameCard";
 
@@ -52,14 +57,28 @@ const Games = () => {
     { id: "reaction", title: "Reaction Game", description: "Uji refleks Anda! Klik target yang muncul secepat kilat.", category: "single", icon: <MousePointerClick className="h-6 w-6" />, component: <ReactionGame onScoreSubmit={s => handleScoreSubmit("reaction", s)} /> },
     { id: "pattern", title: "Pattern Memory", description: "Ingat urutan pola warna dan ulangi dengan benar.", category: "single", icon: <Sparkles className="h-6 w-6" />, component: <PatternGame onScoreSubmit={s => handleScoreSubmit("pattern", s)} /> },
     { id: "typing", title: "Typing Test", description: "Seberapa cepat Anda mengetik? Ukur WPM Anda sekarang!", category: "single", icon: <Keyboard className="h-6 w-6" />, component: <TypingTest onScoreSubmit={s => handleScoreSubmit("typing", s)} /> },
+    { id: "2048", title: "2048", description: "Gabungkan angka hingga mencapai 2048!", category: "single", icon: <Hash className="h-6 w-6" />, component: <Game2048 onScoreSubmit={s => handleScoreSubmit("2048", s)} /> },
+    { id: "snake", title: "Snake Classic", description: "Game ular klasik. Makan dan tumbuh panjang!", category: "single", icon: <Gamepad2 className="h-6 w-6" />, component: <SnakeGame onScoreSubmit={s => handleScoreSubmit("snake", s)} /> },
+    { id: "minesweeper", title: "Minesweeper", description: "Temukan semua ranjau tanpa meledak.", category: "single", icon: <Target className="h-6 w-6" />, component: <MinesweeperGame onScoreSubmit={s => handleScoreSubmit("minesweeper", s)} /> },
+    { id: "flappy", title: "Flappy Bird", description: "Terbang melewati pipa tanpa menabrak!", category: "single", icon: <Zap className="h-6 w-6" />, component: <FlappyBird onScoreSubmit={s => handleScoreSubmit("flappy", s)} /> },
+    { id: "pong", title: "Pong Single", description: "Pantulkan bola dan jangan biarkan jatuh!", category: "single", icon: <CircleDashed className="h-6 w-6" />, component: <PongGame onScoreSubmit={s => handleScoreSubmit("pong", s)} /> },
+    { id: "racing", title: "Speed Racer", description: "Hindari rintangan dan capai skor tertinggi!", category: "single", icon: <Car className="h-6 w-6" />, component: <RacingGame onScoreSubmit={s => handleScoreSubmit("racing", s)} /> },
   ];
 
-  const filteredGames = allGameData.filter(g => 
-    g.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    g.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const { games, loading: loadingGames, hasMore, favorites, toggleFavorite, loadMore } = useGames(filteredGames);
+  const { games, loading: loadingGames, hasMore, favorites, toggleFavorite, loadMore } = useGames(allGameData);
+  
+  const filteredGames = games
+    .filter(g => 
+      g.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      g.description.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      const isAFav = favorites.includes(a.id);
+      const isBFav = favorites.includes(b.id);
+      if (isAFav && !isBFav) return -1;
+      if (!isAFav && isBFav) return 1;
+      return 0;
+    });
   const observerTarget = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -177,9 +196,9 @@ const Games = () => {
             </TabsList>
 
             <TabsContent value="games" className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2 duration-500">
-              {games.length > 0 ? (
+              {filteredGames.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {games.map((game) => (
+                  {filteredGames.map((game) => (
                       <GameCard 
                           key={game.id} 
                           game={game} 

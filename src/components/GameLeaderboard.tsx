@@ -23,6 +23,12 @@ const GAME_CONFIG: { value: string; label: string }[] = [
   { value: "reaction", label: "Reaction" },
   { value: "pattern", label: "Pattern" },
   { value: "typing", label: "Typing" },
+  { value: "2048", label: "2048" },
+  { value: "snake", label: "Snake" },
+  { value: "minesweeper", label: "Minesweeper" },
+  { value: "flappy", label: "Flappy Bird" },
+  { value: "pong", label: "Pong" },
+  { value: "racing", label: "Racing" },
 ];
 
 const SUPPORTED_TYPES = GAME_CONFIG.map((g) => g.value);
@@ -183,7 +189,7 @@ const GameLeaderboard = () => {
   };
 
   return (
-    <Card className="border-white/10 bg-card/40 backdrop-blur-md shadow-xl rounded-3xl overflow-hidden">
+    <Card className="border-white/10 bg-card/40 backdrop-blur-md shadow-xl rounded-3xl overflow-hidden max-w-[80vw]">
       <CardHeader className="pb-6 border-b border-white/5 bg-white/5">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-3 text-xl">
@@ -199,20 +205,25 @@ const GameLeaderboard = () => {
       </CardHeader>
       <CardContent className="pt-6">
         <Tabs defaultValue="quiz" className="w-full">
-          <ScrollArea className="w-full whitespace-nowrap rounded-2xl bg-muted/30 border border-white/5 p-1.5 mb-6">
-            <TabsList className="flex w-max space-x-1 bg-transparent p-0">
-              {GAME_CONFIG.map((g) => (
-                <TabsTrigger
-                  key={g.value}
-                  value={g.value}
-                  className="rounded-xl px-4 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
-                >
-                  {g.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            <ScrollBar orientation="horizontal" className="h-2" />
-          </ScrollArea>
+            <div className="relative mb-6">
+                <ScrollArea className="w-full whitespace-nowrap rounded-2xl bg-muted/30 border border-white/5 p-1.5">
+                    <TabsList className="flex w-max space-x-1 bg-transparent p-0">
+                    {GAME_CONFIG.map((g) => (
+                        <TabsTrigger
+                        key={g.value}
+                        value={g.value}
+                        className="rounded-xl px-4 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all"
+                        >
+                        {g.label}
+                        </TabsTrigger>
+                    ))}
+                    </TabsList>
+                    <ScrollBar orientation="horizontal" className="invisible sm:visible" />
+                </ScrollArea>
+                {/* Visual hint for scroll */}
+                <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-background/80 to-transparent pointer-events-none md:hidden" />
+            </div>
+
           {GAME_CONFIG.map((g) => (
             <TabsContent
               key={g.value}
