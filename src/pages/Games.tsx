@@ -12,9 +12,6 @@ import QuizGame from "@/components/games/QuizGame";
 import MemoryGame from "@/components/games/MemoryGame";
 import NumberPuzzle from "@/components/games/NumberPuzzle";
 import GameLeaderboard from "@/components/GameLeaderboard";
-import TicTacToe from "@/components/games/TicTacToe";
-import WordScramble from "@/components/games/WordScramble";
-import RockPaperScissors from "@/components/games/RockPaperScissors";
 import ReactionGame from "@/components/games/ReactionGame";
 import PatternGame from "@/components/games/PatternGame";
 import TypingTest from "@/components/games/TypingTest";
@@ -55,24 +52,6 @@ const Games = () => {
     { id: "reaction", title: "Reaction Game", description: "Uji refleks Anda! Klik target yang muncul secepat kilat.", category: "single", icon: <MousePointerClick className="h-6 w-6" />, component: <ReactionGame onScoreSubmit={s => handleScoreSubmit("reaction", s)} /> },
     { id: "pattern", title: "Pattern Memory", description: "Ingat urutan pola warna dan ulangi dengan benar.", category: "single", icon: <Sparkles className="h-6 w-6" />, component: <PatternGame onScoreSubmit={s => handleScoreSubmit("pattern", s)} /> },
     { id: "typing", title: "Typing Test", description: "Seberapa cepat Anda mengetik? Ukur WPM Anda sekarang!", category: "single", icon: <Keyboard className="h-6 w-6" />, component: <TypingTest onScoreSubmit={s => handleScoreSubmit("typing", s)} /> },
-    {
-      id: "tictactoe", title: "Tic Tac Toe", description: "Permainan klasik X dan O. Tantang teman atau AI.", category: "multi",
-      badge: { cls: "bg-emerald-500/15 ring-emerald-500/30 text-emerald-600", icon: <Hash className="h-5 w-5" /> },
-      wrapColor: "from-emerald-500/20 via-transparent to-cyan-500/20",
-      component: currentUser && <TicTacToe currentUserId={currentUser.id} onScoreSubmit={s => handleScoreSubmit("tictactoe", s)} />
-    },
-    {
-      id: "wordscramble", title: "Word Scramble", description: "Susun kembali huruf-huruf acak menjadi kata yang benar.", category: "multi",
-      badge: { cls: "bg-amber-500/15 ring-amber-500/30 text-amber-600", icon: <CaseUpper className="h-5 w-5" /> },
-      wrapColor: "from-amber-500/20 via-transparent to-rose-500/20",
-      component: currentUser && <WordScramble currentUserId={currentUser.id} onScoreSubmit={s => handleScoreSubmit("wordscramble", s)} />
-    },
-    {
-      id: "rps", title: "Rock Paper Scissors", description: "Batu, Gunting, Kertas! Menangkan pertandingan Best of 3.", category: "multi",
-      badge: { cls: "bg-indigo-500/15 ring-indigo-500/30 text-indigo-600", icon: <Scissors className="h-5 w-5" /> },
-      wrapColor: "from-indigo-500/20 via-transparent to-fuchsia-500/20",
-      component: currentUser && <RockPaperScissors currentUserId={currentUser.id} onScoreSubmit={s => handleScoreSubmit("rps", s)} />
-    },
   ];
 
   const filteredGames = allGameData.filter(g => 
@@ -159,128 +138,121 @@ const Games = () => {
   };
 
   if (loadingUser) return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+    <div className="min-h-screen grid place-items-center bg-gradient-to-b from-background to-muted/40">
+      <div className="text-center rounded-2xl bg-card p-8 shadow-2xl">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto" />
         <p className="mt-4 text-muted-foreground">Memuat profil...</p>
       </div>
     </div>
   );
 
   return (
-    <div className="space-y-8 pb-20">
-      <div className="flex flex-col md:flex-row md:items-center gap-6 justify-between bg-card/30 backdrop-blur-md p-6 rounded-3xl border border-white/10 shadow-sm">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="rounded-xl hover:bg-primary/10"><ArrowLeft className="h-5 w-5" /></Button>
-            <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center shadow-lg shadow-primary/20 ring-1 ring-white/20">
-                    <Gamepad2 className="w-7 h-7 text-white" />
-                </div>
-                <div>
-                    <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">Arcade Zone</h1>
-                    <p className="text-sm text-muted-foreground">Mainkan, Bersaing, dan Menangkan!</p>
-                </div>
-            </div>
-          </div>
-          
-          <div className="relative w-full md:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/70" />
-            <Input 
+    <div className="space-y-6">
+      {currentUser && (
+        <Card className="rounded-2xl bg-card shadow-xl border border-border p-4">
+          <div className="flex gap-4 items-center">
+            <Avatar className="h-10 w-10 ring-2 ring-border/50">
+              <AvatarImage src={currentUser.avatar_url || undefined} />
+              <AvatarFallback>{initials(currentUser.full_name)}</AvatarFallback>
+            </Avatar>
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
                 placeholder="Cari game seru..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-11 rounded-xl bg-background/50 border-white/10 focus:bg-background focus:ring-2 focus:ring-primary/20 transition-all backdrop-blur-sm"
-            />
-          </div>
-      </div>
-
-      <div className="space-y-6">
-        <Tabs defaultValue="games" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8 bg-muted/30 p-1.5 h-auto rounded-2xl backdrop-blur-sm border border-white/5">
-            <TabsTrigger value="games" className="gap-2.5 rounded-xl py-3 text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-lg transition-all"><Target className="h-4 w-4" />Games Library</TabsTrigger>
-            <TabsTrigger value="leaderboard" className="gap-2.5 rounded-xl py-3 text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-lg transition-all"><Trophy className="h-4 w-4" />Global Leaderboard</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="games" className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-4 duration-700">
-            {games.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {games.map((game) => (
-                    <GameCard 
-                        key={game.id} 
-                        game={game} 
-                        isFavorite={favorites.includes(game.id)}
-                        onToggleFavorite={toggleFavorite}
-                    />
-                ))}
-                </div>
-            ) : (
-                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground bg-card/20 backdrop-blur-sm rounded-3xl border border-dashed border-white/10">
-                    <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-4">
-                        <Gamepad2 className="h-8 w-8 opacity-50" />
-                    </div>
-                    <p className="text-lg font-medium">Tidak ada game yang ditemukan</p>
-                    <p className="text-sm opacity-70">Coba kata kunci lain atau lihat semua game</p>
-                </div>
-            )}
-
-            {}
-            <div ref={observerTarget} className="h-10 flex items-center justify-center">
-                {loadingGames && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+                className="pl-10 h-11 rounded-xl bg-muted/50 border-muted focus:bg-background transition-all"
+              />
             </div>
+          </div>
+        </Card>
+      )}
 
-            {}
-            <Card className="bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-md border-white/10 shadow-xl overflow-hidden rounded-3xl">
-              <CardHeader className="bg-white/5 pb-6 border-b border-white/5">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <CardTitle className="flex items-center gap-3 text-xl">
-                            <span className="p-2 rounded-lg bg-yellow-500/10 text-yellow-500"><Trophy className="h-6 w-6" /></span>
-                            Hall of Fame
-                        </CardTitle>
-                        <CardDescription className="mt-1 ml-11">Top 5 pemain legendaris dengan rata-rata skor tertinggi</CardDescription>
-                    </div>
-                    <Sparkles className="h-12 w-12 text-yellow-500/20" />
-                </div>
-              </CardHeader>
-              <CardContent className="pt-6">
-                {loadingTop ? (
-                  <div className="space-y-3">
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <div key={i} className="flex items-center gap-4 p-3 bg-muted/60 rounded-xl animate-pulse">
-                        <div className="w-8 h-8 rounded-full bg-muted" />
-                        <div className="flex-1 space-y-2"><div className="h-4 w-1/3 bg-muted rounded" /><div className="h-3 w-1/4 bg-muted rounded" /></div>
+      <div className="rounded-2xl bg-card shadow-xl border border-border">
+        <div className="p-3 sm:p-4 space-y-4">
+          <Tabs defaultValue="games" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6 bg-muted/50 p-1 h-auto rounded-xl">
+              <TabsTrigger value="games" className="gap-2 rounded-lg py-2.5 text-sm font-medium transition-all"><Target className="h-4 w-4" />Games Library</TabsTrigger>
+              <TabsTrigger value="leaderboard" className="gap-2 rounded-lg py-2.5 text-sm font-medium transition-all"><Trophy className="h-4 w-4" />Global Leaderboard</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="games" className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2 duration-500">
+              {games.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {games.map((game) => (
+                      <GameCard 
+                          key={game.id} 
+                          game={game} 
+                          isFavorite={favorites.includes(game.id)}
+                          onToggleFavorite={toggleFavorite}
+                      />
+                  ))}
+                  </div>
+              ) : (
+                  <div className="text-center py-12">
+                      <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mx-auto mb-4">
+                          <Gamepad2 className="h-8 w-8 text-muted-foreground/50" />
                       </div>
-                    ))}
+                      <p className="text-muted-foreground">Tidak ada game yang ditemukan</p>
                   </div>
-                ) : topUsers.length > 0 ? (
-                  <div className="space-y-3">
-                    {topUsers.map(u => (
-                      <Link key={u.userId} to={`/profile/${u.userId}`} className="flex items-center gap-4 p-3 bg-card hover:bg-accent/5 border border-transparent hover:border-accent/20 rounded-xl transition-all group">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">{rankIcon(u.rank - 1)}</div>
-                        <Avatar className="h-10 w-10 ring-2 ring-transparent group-hover:ring-primary/30 transition-all">
-                          <AvatarImage src={u.avatar_url || undefined} alt={u.full_name} />
-                          <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">{initials(u.full_name)}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">{u.full_name}</p>
-                          <p className="text-xs text-muted-foreground">{u.totalGames} games played</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-accent">{u.average}</p>
-                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Avg Score</p>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">Belum ada data leaderboard</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+              )}
 
-          <TabsContent value="leaderboard"><GameLeaderboard /></TabsContent>
-        </Tabs>
+              <div ref={observerTarget} className="h-8 flex items-center justify-center">
+                  {loadingGames && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />}
+              </div>
+
+              <Card className="bg-gradient-to-br from-card to-muted/20 border-border shadow-sm overflow-hidden rounded-xl">
+                <CardHeader className="pb-4 border-b border-border/50">
+                  <div className="flex items-center justify-between">
+                      <div>
+                          <CardTitle className="flex items-center gap-2 text-lg">
+                              <Trophy className="h-5 w-5 text-yellow-500" />
+                              Hall of Fame
+                          </CardTitle>
+                          <CardDescription>Top 5 pemain legendaris</CardDescription>
+                      </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  {loadingTop ? (
+                    <div className="space-y-3">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="flex items-center gap-4 p-3 bg-muted/40 rounded-lg animate-pulse">
+                          <div className="w-8 h-8 rounded-full bg-muted" />
+                          <div className="flex-1 space-y-2"><div className="h-4 w-1/3 bg-muted rounded" /><div className="h-3 w-1/4 bg-muted rounded" /></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : topUsers.length > 0 ? (
+                    <div className="space-y-2">
+                      {topUsers.map(u => (
+                        <Link key={u.userId} to={`/profile/${u.userId}`} className="flex items-center gap-3 p-2 hover:bg-muted/50 rounded-lg transition-colors group">
+                          <div className="flex items-center justify-center w-6 h-6">{rankIcon(u.rank - 1)}</div>
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={u.avatar_url || undefined} alt={u.full_name} />
+                            <AvatarFallback>{initials(u.full_name)}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{u.full_name}</p>
+                            <p className="text-xs text-muted-foreground">{u.totalGames} games</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-sm">{u.average}</p>
+                            <p className="text-[10px] text-muted-foreground">Avg</p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-muted-foreground text-sm py-4">Belum ada data</p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="leaderboard"><GameLeaderboard /></TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   );

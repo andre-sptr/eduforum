@@ -23,9 +23,6 @@ const GAME_CONFIG: { value: string; label: string }[] = [
   { value: "reaction", label: "Reaction" },
   { value: "pattern", label: "Pattern" },
   { value: "typing", label: "Typing" },
-  { value: "tictactoe", label: "TicTacToe" },
-  { value: "wordscramble", label: "Scramble" },
-  { value: "rps", label: "RPS" },
 ];
 
 const SUPPORTED_TYPES = GAME_CONFIG.map((g) => g.value);
