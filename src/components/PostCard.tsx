@@ -17,6 +17,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { RankBadge } from "@/components/RankBadge";
 import { ContentRenderer } from "@/components/ContentRenderer";
 import { LikeButton } from "@/components/ui/LikeButton";
+import { RepostButton } from "@/components/ui/RepostButton";
+import { ShareButton } from "@/components/ui/ShareButton";
 
 interface PostCardProps {
   post: {
@@ -373,21 +375,16 @@ const PostCard = ({
             <LikeButton isLiked={isLiked} likeCount={likeCount} onClick={handleLike} />
 
             {postType === "global" && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className={`gap-2 ${isReposted ? "text-green-500" : "text-muted-foreground"} ${!isOwnPost ? "hover:text-green-500" : ""}`} disabled={isOwnPost} title={isOwnPost ? "Tidak dapat me-repost postingan sendiri" : "Repost"}>
-                    <Repeat2 className="h-5 w-5" />
-                    {repostCount > 0 && <span>{repostCount}</span>}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={handleSimpleRepost}><Repeat2 className="mr-2 h-4 w-4" />{isReposted ? "Batal Repost" : "Repost"}</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setShowQuoteModal(true)}><Pencil className="mr-2 h-4 w-4" />Quote Repost</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <RepostButton
+                isReposted={isReposted}
+                repostCount={repostCount}
+                onRepost={handleSimpleRepost}
+                onQuote={() => setShowQuoteModal(true)}
+                isOwnPost={isOwnPost}
+              />
             )}
 
-            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-accent" onClick={handleShare}><Share2 className="h-5 w-5" /></Button>
+            <ShareButton onClick={handleShare} />
           </div>
 
           <CommentSection postId={post.id} currentUserId={currentUserId} postType={postType} allowedUserIds={allowedUserIds}/>

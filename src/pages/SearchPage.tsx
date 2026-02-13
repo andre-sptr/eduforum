@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Search, User, FileText, History, X, Clock, Loader2, Filter } from "lucide-react";
 import PostCard from "@/components/PostCard";
 import PostSkeleton from "@/components/PostSkeleton";
+import UserSkeleton from "@/components/UserSkeleton";
 import { RankBadge } from "@/components/RankBadge";
 import { useLeaderboardData } from "@/hooks/useLeaderboardData";
 import { useSearch } from "@/hooks/useSearch";
@@ -213,41 +214,49 @@ const SearchPage = () => {
 
       <div className="space-y-8">
         { }
-        {users.length > 0 && (
+        {(users.length > 0 || (loading && posts.length === 0)) && (
             <section className="animate-in slide-in-from-bottom-4 duration-500 delay-100">
             <div className="flex items-center gap-2 mb-4 px-1">
                 <User className="h-4 w-4 text-primary" />
                 <h2 className="text-sm font-bold tracking-wide uppercase text-muted-foreground">Pengguna</h2>
-                <Badge variant="secondary" className="ml-auto text-xs">{users.length} ditemukan</Badge>
+                {users.length > 0 && <Badge variant="secondary" className="ml-auto text-xs">{users.length} ditemukan</Badge>}
             </div>
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {users.map(u => (
-                <Card 
-                    key={u.id} 
-                    onClick={() => navigate(`/profile/${u.id}`)} 
-                    className="cursor-pointer rounded-2xl border-white/5 bg-card/40 backdrop-blur-sm hover:bg-card/60 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group overflow-hidden"
-                >
-                    <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                        <Avatar className="h-12 w-12 ring-2 ring-border/50 group-hover:ring-primary/50 transition-all shadow-sm">
-                        <AvatarImage src={u.avatar_url || undefined} className="object-cover" />
-                        <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-bold">
-                            {getInitials(u.full_name)}
-                        </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                            <p className="font-semibold truncate group-hover:text-primary transition-colors">{u.full_name}</p>
-                            <RankBadge rank={followerRankMap.get(u.id)} type="follower" />
-                            <RankBadge rank={likerRankMap.get(u.id)} type="like" />
+                {loading && users.length === 0 ? (
+                    <>
+                        <UserSkeleton />
+                        <UserSkeleton />
+                        <UserSkeleton />
+                    </>
+                ) : (
+                    users.map(u => (
+                    <Card 
+                        key={u.id} 
+                        onClick={() => navigate(`/profile/${u.id}`)} 
+                        className="cursor-pointer rounded-2xl border-white/5 bg-card/40 backdrop-blur-sm hover:bg-card/60 hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group overflow-hidden"
+                    >
+                        <CardContent className="p-4">
+                        <div className="flex items-center gap-4">
+                            <Avatar className="h-12 w-12 ring-2 ring-border/50 group-hover:ring-primary/50 transition-all shadow-sm">
+                            <AvatarImage src={u.avatar_url || undefined} className="object-cover" />
+                            <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary font-bold">
+                                {getInitials(u.full_name)}
+                            </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                                <p className="font-semibold truncate group-hover:text-primary transition-colors">{u.full_name}</p>
+                                <RankBadge rank={followerRankMap.get(u.id)} type="follower" />
+                                <RankBadge rank={likerRankMap.get(u.id)} type="like" />
+                            </div>
+                            {u.bio && <p className="text-sm text-muted-foreground truncate">{u.bio}</p>}
+                            </div>
                         </div>
-                        {u.bio && <p className="text-sm text-muted-foreground truncate">{u.bio}</p>}
-                        </div>
-                    </div>
-                    </CardContent>
-                </Card>
-                ))}
+                        </CardContent>
+                    </Card>
+                    ))
+                )}
             </div>
             </section>
         )}
@@ -293,8 +302,14 @@ const SearchPage = () => {
                 </div>
                 {query ? (
                     <div className="space-y-2 max-w-md">
-                        <h3 className="text-lg font-semibold text-foreground">Tidak ada hasil ditemukan</h3>
-                        <p className="text-muted-foreground">Kami tidak dapat menemukan apa pun untuk "{query}". Coba kata kunci lain atau periksa ejaan Anda.</p>
+                        <h3 className="text-lg font-semibold text-foreground">
+                            {users.length > 0 ? "Tidak ada postingan ditemukan" : "Tidak ada hasil ditemukan"}
+                        </h3>
+                        <p className="text-muted-foreground">
+                            {users.length > 0 
+                                ? `Kami tidak dapat menemukan postingan untuk "${query}".` 
+                                : `Kami tidak dapat menemukan apa pun untuk "${query}". Coba kata kunci lain atau periksa ejaan Anda.`}
+                        </p>
                     </div>
                 ) : (
                     <div className="space-y-2 max-w-md">

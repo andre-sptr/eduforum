@@ -131,6 +131,8 @@ export function useSearch({ initialQuery = '', initialMode = 'OR', debounceDelay
   useEffect(() => {
     if (debouncedQuery.trim()) {
         setPage(0);
+        setPosts([]);
+        setUsers([]);
         search(debouncedQuery, mode, 0);
     } else {
         setPosts([]);
