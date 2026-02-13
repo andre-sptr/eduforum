@@ -148,8 +148,8 @@ const Messages=()=> {
           <TabsTrigger value="groups" className="rounded-lg px-6">Grup Chat</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="global" className="h-[calc(100vh-200px)]">
-           <Card className="flex-1 border-border bg-card/60 backdrop-blur rounded-2xl flex flex-col h-full">
+        <TabsContent value="global" className="h-[525px]">
+        <Card className="flex-1 border-border bg-card shadow-xl rounded-2xl flex flex-col h-full overflow-hidden">
           <div ref={messagesViewportRef} className="flex-1 overflow-y-auto p-4">
             <div className="space-y-4">
               {messages.length===0?(<div className="text-center py-10 text-muted-foreground">Belum ada pesan. Mulai percakapan!</div>):messages.map(m=>{
@@ -157,31 +157,31 @@ const Messages=()=> {
                 return (
                   <div key={m.id} className={`flex gap-3 ${own?"flex-row-reverse":"flex-row"}`}>
                     <Link to={`/profile/${m.user_id}`} className="shrink-0" onClick={(e)=>e.stopPropagation()}>
-                      <Avatar className="h-8 w-8"><AvatarImage src={m.profiles?.avatar_url||undefined}/><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(m.profiles?.full_name||"U")}</AvatarFallback></Avatar>
+                      <Avatar className="h-8 w-8 ring-2 ring-border/50"><AvatarImage src={m.profiles?.avatar_url||undefined}/><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(m.profiles?.full_name||"U")}</AvatarFallback></Avatar>
                     </Link>
                     <div className={`flex flex-col max-w-[70%] ${own?"items-end":"items-start"}`}>
-                      <div className="flex items-center flex-wrap gap-2 mb-1">
-                        <Link to={`/profile/${m.user_id}`} className="text-sm font-medium" onClick={(e) => e.stopPropagation()}>{m.profiles?.full_name}</Link>
+                      <div className={`flex items-center flex-wrap gap-2 mb-1 ${own ? "flex-row-reverse" : ""}`}>
+                        <Link to={`/profile/${m.user_id}`} className="text-sm font-bold hover:text-primary transition-colors" onClick={(e) => e.stopPropagation()}>{m.profiles?.full_name}</Link>
                         <RankBadge rank={followerRankMap.get(m.user_id)} type="follower" />
                         <RankBadge rank={likerRankMap.get(m.user_id)} type="like" />
                         <span className="text-xs text-muted-foreground">{m.profiles?.role}</span>
                       </div>
                       {editing?(
-                        <div className="flex gap-2 w-full">
-                          <Input value={editContent} onChange={e=>setEditContent(e.target.value)} className="flex-1" autoFocus onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleEditMessage(m.id); } if(e.key==="Escape") cancelEdit(); }}/>
-                          <Button size="sm" onClick={()=>handleEditMessage(m.id)}>Simpan</Button>
-                          <Button size="sm" variant="ghost" onClick={cancelEdit}>Batal</Button>
+                        <div className={`flex gap-2 w-full ${own?"flex-row-reverse":""}`}>
+                          <Input value={editContent} onChange={e=>setEditContent(e.target.value)} className="flex-1 bg-muted/50 border-muted rounded-xl" autoFocus onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleEditMessage(m.id); } if(e.key==="Escape") cancelEdit(); }}/>
+                          <Button size="sm" onClick={()=>handleEditMessage(m.id)} className="rounded-lg bg-primary text-primary-foreground">Simpan</Button>
+                          <Button size="sm" variant="ghost" onClick={cancelEdit} className="rounded-lg">Batal</Button>
                         </div>
                       ):(
                         <div className="flex items-start gap-2">
-                          <div className={`rounded-2xl px-4 py-2 shadow-sm ${own?"bg-accent text-accent-foreground":"bg-muted/70 text-foreground"}`}>
-                            <ContentRenderer content={m.content} className="text-sm whitespace-pre-wrap break-words" />
-                            {m.edited_at&&<span className="text-xs opacity-70 italic">diedit</span>}
+                          <div className={`rounded-2xl px-4 py-2 shadow-sm border transition-all ${own?"bg-primary text-primary-foreground border-primary rounded-tr-sm":"bg-muted/30 text-foreground border-border rounded-tl-sm hover:bg-muted/50"}`}>
+                            <ContentRenderer content={m.content} className={`text-sm whitespace-pre-wrap break-words ${own ? "text-primary-foreground/95" : "text-foreground/90"}`} />
+                            {m.edited_at&&<span className="text-[10px] opacity-70 italic flex items-center gap-0.5 mt-1"><Pencil className="h-2 w-2"/> diedit</span>}
                           </div>
                           {own&&(
                             <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
+                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-muted"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="bg-card border-border shadow-xl">
                                 <DropdownMenuItem onClick={()=>startEdit(m)}><Pencil className="h-4 w-4 mr-2"/>Edit</DropdownMenuItem>
                                 <DropdownMenuItem onClick={()=>handleDeleteMessage(m.id)} className="text-destructive"><Trash2 className="h-4 w-4 mr-2"/>Hapus</DropdownMenuItem>
                               </DropdownMenuContent>
@@ -189,7 +189,7 @@ const Messages=()=> {
                           )}
                         </div>
                       )}
-                      <span className="text-xs text-muted-foreground mt-1">{formatTime(m.created_at)}</span>
+                      <span className="text-[10px] text-muted-foreground mt-1">{formatTime(m.created_at)}</span>
                     </div>
                   </div>
                 );
@@ -197,29 +197,29 @@ const Messages=()=> {
             </div>
           </div>
 
-          <form onSubmit={handleSendMessage} className="border-t border-border p-4 bg-card/70 backdrop-blur">
+          <form onSubmit={handleSendMessage} className="border-t border-border p-4 bg-card">
             <div className="flex gap-2">
-              <MentionInput value={newMessage} onChange={setNewMessage} placeholder="Ketik pesan..." className="flex-1 bg-input/60 border-border rounded-xl" disabled={sending} currentUserId={currentUser?.id} onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleSendMessage(e as any);} }}/>
-              <Button type="submit" size="icon" disabled={sending||!newMessage.trim()} className="rounded-xl bg-accent text-accent-foreground hover:bg-accent/90"><Send className="h-5 w-5"/></Button>
+              <MentionInput value={newMessage} onChange={setNewMessage} placeholder="Ketik pesan..." className="flex-1 bg-muted/50 border-muted rounded-xl focus:bg-background transition-all" disabled={sending} currentUserId={currentUser?.id} onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleSendMessage(e as any);} }}/>
+              <Button type="submit" size="icon" disabled={sending||!newMessage.trim()} className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"><Send className="h-5 w-5"/></Button>
             </div>
           </form>
         </Card>
         </TabsContent>
 
         <TabsContent value="direct">
-          <Card className="p-4 border-border bg-card/60 backdrop-blur rounded-2xl">
+          <Card className="p-4 border-border bg-card shadow-xl rounded-2xl">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-semibold flex items-center gap-2"><MessageCircle className="h-4 w-4"/>User yang Diikuti</h3>
             </div>
             <div className="relative mb-3">
               <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
-              <Input value={followQuery} onChange={e=>setFollowQuery(e.target.value)} placeholder="Cari pengguna..." className="pl-9 h-9 bg-input/60 border-border rounded-xl"/>
+              <Input value={followQuery} onChange={e=>setFollowQuery(e.target.value)} placeholder="Cari pengguna..." className="pl-9 h-9 bg-muted/50 border-muted rounded-xl focus:bg-background transition-all"/>
             </div>
-            <ScrollArea className="h-[60vh]">
+            <ScrollArea className="h-[408px]">
               <div className="space-y-2 pr-2">
                 {filteredFollowed.length===0?(<p className="text-sm text-muted-foreground text-center py-4">Tidak ada hasil</p>):filteredFollowed.map(u=>(
-                  <div key={u.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/10 cursor-pointer transition-colors" onClick={()=>createDirectChat(u.id)}>
-                    <Avatar className="h-8 w-8"><AvatarImage src={u.avatar_url||undefined}/><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(u.full_name||"U")}</AvatarFallback></Avatar>
+                  <div key={u.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors" onClick={()=>createDirectChat(u.id)}>
+                    <Avatar className="h-8 w-8 ring-1 ring-border"><AvatarImage src={u.avatar_url||undefined}/><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(u.full_name||"U")}</AvatarFallback></Avatar>
                     <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{u.full_name}</p><p className="text-xs text-muted-foreground">{u.role}</p></div>
                   </div>
                 ))}
@@ -229,13 +229,13 @@ const Messages=()=> {
         </TabsContent>
 
         <TabsContent value="groups">
-          <Card className="p-4 border-border bg-card/60 backdrop-blur rounded-2xl">
+          <Card className="p-4 border-border bg-card shadow-xl rounded-2xl">
             <h3 className="font-semibold mb-4 flex items-center gap-2"><Users className="h-4 w-4"/>Grup Chat</h3>
-            <ScrollArea className="h-[60vh]">
+            <ScrollArea className="h-[452px]">
               <div className="space-y-2 pr-2">
                 {userGroups.length===0?(<p className="text-sm text-muted-foreground text-center py-4">Belum bergabung grup</p>):userGroups.map(g=>(
-                  <div key={g.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/10 cursor-pointer transition-colors" onClick={()=>createGroupChat(g.id)}>
-                    <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center shrink-0 overflow-hidden">{g.cover_image?(<img src={g.cover_image} alt={g.name} className="h-full w-full object-cover"/>):(<Users className="h-4 w-4 text-accent-foreground"/>)}</div>
+                  <div key={g.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors" onClick={()=>createGroupChat(g.id)}>
+                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0 overflow-hidden ring-1 ring-border">{g.cover_image?(<img src={g.cover_image} alt={g.name} className="h-full w-full object-cover"/>):(<Users className="h-4 w-4 text-muted-foreground"/>)}</div>
                     <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{g.name}</p></div>
                   </div>
                 ))}
