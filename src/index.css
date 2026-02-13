@@ -108,6 +108,9 @@
 }
 
 @layer utilities {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
     height: 6px;

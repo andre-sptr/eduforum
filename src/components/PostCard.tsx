@@ -36,6 +36,7 @@ interface PostCardProps {
   topFollowers?: any[];
   topLiked?: any[];
   allowedUserIds?: string[];
+  isDetailView?: boolean;
 }
 
 interface QuotedPostProps {
@@ -73,7 +74,18 @@ const QuotedPostCard = ({ post }: QuotedPostProps) => {
   );
 };
 
-const PostCard = ({ post, postType = "global", currentUserId, onLike, onPostUpdated, onPostDeleted, topFollowers, topLiked, allowedUserIds }: PostCardProps) => {
+const PostCard = ({ 
+  post, 
+  postType = "global", 
+  currentUserId, 
+  onLike, 
+  onPostUpdated, 
+  onPostDeleted, 
+  topFollowers = [], 
+  topLiked = [], 
+  allowedUserIds,
+  isDetailView = false
+}: PostCardProps) => {
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [isReposted, setIsReposted] = useState(false);
@@ -109,6 +121,15 @@ const PostCard = ({ post, postType = "global", currentUserId, onLike, onPostUpda
   const urls = post.media_urls || [];
   const types = post.media_types || [];
   const total = urls.length;
+
+  const [showComments, setShowComments] = useState(false);
+  
+  
+  useEffect(() => {
+    if (isDetailView && showComments === false) {
+      setShowComments(true);
+    }
+  }, [isDetailView]);
 
   useEffect(() => {
     if (currentUserId) {
@@ -217,7 +238,7 @@ const PostCard = ({ post, postType = "global", currentUserId, onLike, onPostUpda
   const prev = () => setIdx((i) => (i - 1 + total) % total);
 
   return (
-    <Card className="rounded-2xl border border-border bg-card/80 p-4 shadow hover:shadow-lg transition">
+    <Card className="rounded-2xl border border-border bg-card/80 p-3 sm:p-4 shadow hover:shadow-lg transition">
       {post.reposted_by_user && (
         <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
           <Repeat2 className="h-4 w-4" />

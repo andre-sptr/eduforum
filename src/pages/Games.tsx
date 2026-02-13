@@ -168,40 +168,40 @@ const Games = () => {
   );
 
   return (
-    <div className="space-y-6 pb-20">
-      <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
+    <div className="space-y-8 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center gap-6 justify-between bg-card/30 backdrop-blur-md p-6 rounded-3xl border border-white/10 shadow-sm">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="rounded-xl"><ArrowLeft className="h-5 w-5" /></Button>
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
-                    <Gamepad2 className="w-6 h-6 text-primary-foreground" />
+            <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="rounded-xl hover:bg-primary/10"><ArrowLeft className="h-5 w-5" /></Button>
+            <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center shadow-lg shadow-primary/20 ring-1 ring-white/20">
+                    <Gamepad2 className="w-7 h-7 text-white" />
                 </div>
                 <div>
-                    <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Arcade Zone</h1>
-                    <p className="text-xs text-muted-foreground">Mainkan, Bersaing, dan Menangkan!</p>
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">Arcade Zone</h1>
+                    <p className="text-sm text-muted-foreground">Mainkan, Bersaing, dan Menangkan!</p>
                 </div>
             </div>
           </div>
           
-          <div className="relative w-full md:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <div className="relative w-full md:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/70" />
             <Input 
-                placeholder="Cari game..." 
+                placeholder="Cari game seru..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 rounded-xl bg-card/50 border-border focus:ring-primary/20"
+                className="pl-10 h-11 rounded-xl bg-background/50 border-white/10 focus:bg-background focus:ring-2 focus:ring-primary/20 transition-all backdrop-blur-sm"
             />
           </div>
       </div>
 
       <div className="space-y-6">
         <Tabs defaultValue="games" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6 bg-muted/60 p-1 h-auto rounded-xl">
-            <TabsTrigger value="games" className="gap-2 rounded-lg py-2 data-[state=active]:bg-card data-[state=active]:text-accent-foreground data-[state=active]:shadow-md transition-all"><Target className="h-4 w-4" />Games Library</TabsTrigger>
-            <TabsTrigger value="leaderboard" className="gap-2 rounded-lg py-2 data-[state=active]:bg-card data-[state=active]:text-accent-foreground data-[state=active]:shadow-md transition-all"><Trophy className="h-4 w-4" />Leaderboard</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 mb-8 bg-muted/30 p-1.5 h-auto rounded-2xl backdrop-blur-sm border border-white/5">
+            <TabsTrigger value="games" className="gap-2.5 rounded-xl py-3 text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-lg transition-all"><Target className="h-4 w-4" />Games Library</TabsTrigger>
+            <TabsTrigger value="leaderboard" className="gap-2.5 rounded-xl py-3 text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-lg transition-all"><Trophy className="h-4 w-4" />Global Leaderboard</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="games" className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-2 duration-500">
+          <TabsContent value="games" className="space-y-8 animate-in fade-in-50 slide-in-from-bottom-4 duration-700">
             {games.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {games.map((game) => (
@@ -214,23 +214,35 @@ const Games = () => {
                 ))}
                 </div>
             ) : (
-                <div className="text-center py-12 text-muted-foreground bg-card/30 rounded-2xl border border-dashed border-border">
-                    <p>Tidak ada game yang ditemukan.</p>
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground bg-card/20 backdrop-blur-sm rounded-3xl border border-dashed border-white/10">
+                    <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-4">
+                        <Gamepad2 className="h-8 w-8 opacity-50" />
+                    </div>
+                    <p className="text-lg font-medium">Tidak ada game yang ditemukan</p>
+                    <p className="text-sm opacity-70">Coba kata kunci lain atau lihat semua game</p>
                 </div>
             )}
 
-            { }
+            {}
             <div ref={observerTarget} className="h-10 flex items-center justify-center">
                 {loadingGames && <Loader2 className="h-6 w-6 animate-spin text-primary" />}
             </div>
 
-            { }
-            <Card className="bg-card border-border shadow-sm overflow-hidden" aria-busy={loadingTop}>
-              <CardHeader className="bg-muted/30 pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg"><Medal className="h-5 w-5 text-primary" />Hall of Fame</CardTitle>
-                <CardDescription>Top 5 pemain dengan rata-rata skor tertinggi</CardDescription>
+            {}
+            <Card className="bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-md border-white/10 shadow-xl overflow-hidden rounded-3xl">
+              <CardHeader className="bg-white/5 pb-6 border-b border-white/5">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle className="flex items-center gap-3 text-xl">
+                            <span className="p-2 rounded-lg bg-yellow-500/10 text-yellow-500"><Trophy className="h-6 w-6" /></span>
+                            Hall of Fame
+                        </CardTitle>
+                        <CardDescription className="mt-1 ml-11">Top 5 pemain legendaris dengan rata-rata skor tertinggi</CardDescription>
+                    </div>
+                    <Sparkles className="h-12 w-12 text-yellow-500/20" />
+                </div>
               </CardHeader>
-              <CardContent className="pt-4">
+              <CardContent className="pt-6">
                 {loadingTop ? (
                   <div className="space-y-3">
                     {Array.from({ length: 3 }).map((_, i) => (

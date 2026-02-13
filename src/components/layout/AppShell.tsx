@@ -16,7 +16,7 @@ export default function AppShell() {
         <Sidebar />
         
         <main className={cn(
-          "flex-1 w-full min-h-screen border-x border-border/50 pb-16 lg:pb-0 transition-all duration-300",
+          "flex-1 w-full min-h-screen border-x border-border/50 pb-24 lg:pb-0 transition-all duration-300",
           isHomePage ? "max-w-2xl" : "max-w-7xl"
         )}>
             { }

@@ -121,7 +121,7 @@ const Feed = () => {
       
       {profile && <div className="rounded-2xl bg-card shadow-xl border border-border p-2"><CreatePost currentUser={profile} onPostCreated={refreshPosts} /></div>}
       <div className="rounded-2xl bg-card shadow-xl border border-border">
-        <div className="p-4 space-y-4">
+        <div className="p-3 sm:p-4 space-y-4">
           {loading ? (
             <>
               <PostSkeleton /><PostSkeleton /><PostSkeleton />

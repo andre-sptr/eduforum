@@ -68,63 +68,63 @@ export function Notifications({ userId }: { userId: string }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative rounded-2xl ring-1 ring-border hover:ring-accent/50">
+        <Button variant="ghost" size="icon" className="relative h-11 w-11 rounded-2xl ring-1 ring-white/10 hover:ring-white/20 bg-white/5 hover:bg-white/10 transition-all">
           <Bell className="h-5 w-5" />
           {unreadCount>0&&(
-            <Badge className="absolute -top-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-accent p-0 text-[11px] font-medium text-accent-foreground shadow">
+            <Badge className="absolute -top-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-primary p-0 text-[11px] font-medium text-primary-foreground shadow-sm ring-2 ring-background">
               {unreadCount>9?"9+":unreadCount}
             </Badge>
           )}
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-80 overflow-hidden rounded-2xl p-0">
-        <div className="flex items-center justify-between border-b border-border bg-card/80 px-4 py-2">
+      <DropdownMenuContent align="end" className="w-80 overflow-hidden rounded-2xl p-0 bg-card/90 backdrop-blur-xl border-white/10 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 bg-white/5 px-4 py-3">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold">Notifikasi</h3>
-            <Button variant="link" size="sm" className="h-auto p-0 text-xs text-muted-foreground" onClick={() => navigate("/notifications")}>
+            <h3 className="text-sm font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Notifikasi</h3>
+            <Button variant="link" size="sm" className="h-auto p-0 text-[10px] text-primary hover:text-primary/80 font-medium" onClick={() => navigate("/notifications")}>
                 Lihat Semua
             </Button>
           </div>
           {unreadCount>0&&(
-            <Button variant="ghost" size="sm" onClick={markAll} disabled={markingAll} className="h-7 rounded-full px-2 text-xs text-accent hover:text-accent/80">
-              {markingAll?"Memproses...":"Tandai semua dibaca"}
+            <Button variant="ghost" size="sm" onClick={markAll} disabled={markingAll} className="h-6 rounded-full px-2 text-[10px] text-muted-foreground hover:text-primary hover:bg-primary/10">
+              {markingAll?"Memproses...":"Tandai dibaca"}
             </Button>
           )}
         </div>
 
         <ScrollArea className="h-[420px]">
           {notifications.length===0?(
-            <div className="grid place-items-center gap-1 py-10 text-center">
-              <div className="grid h-10 w-10 place-items-center rounded-xl ring-1 ring-border">
-                <Bell className="h-5 w-5 text-muted-foreground" />
+            <div className="grid place-items-center gap-2 py-12 text-center">
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/5 ring-1 ring-white/10">
+                <Bell className="h-6 w-6 text-muted-foreground/50" />
               </div>
-              <p className="text-sm text-muted-foreground">Tidak ada notifikasi</p>
+              <p className="text-sm font-medium text-muted-foreground">Tidak ada notifikasi baru</p>
             </div>
           ):(
-            <div className="divide-y divide-border/80">
+            <div className="divide-y divide-white/5">
               {notifications.map(n=>{
                 const Icon=(typeIcon as any)[n.type]??Info;
                 const chip=(typeStyle as any)[n.type]??typeStyle.default;
                 return (
                   <DropdownMenuItem
                     key={n.id}
-                    className={`cursor-pointer rounded-none px-4 py-3 data-[highlighted]:bg-accent/10 ${!n.read?"bg-accent/5":""}`}
+                    className={`cursor-pointer rounded-none px-4 py-3.5 focus:bg-white/5 data-[highlighted]:bg-white/5 transition-colors ${!n.read?"bg-primary/5":""}`}
                     onClick={()=>handleClick(n)}
                   >
-                    <div className="flex w-full items-start gap-3">
-                      <div className={`mt-0.5 grid h-9 w-9 place-items-center rounded-xl ${chip}`}>
+                    <div className="flex w-full items-start gap-3.5">
+                      <div className={`mt-0.5 grid h-9 w-9 flex-shrink-0 place-items-center rounded-xl shadow-sm ${chip}`}>
                         <Icon className="h-4.5 w-4.5" />
                       </div>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-start justify-between gap-2">
-                          <p className={`truncate text-sm font-medium ${!n.read?"text-foreground":"text-muted-foreground"}`}>{n.title}</p>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 -mr-1 text-muted-foreground hover:text-foreground" onClick={(e)=>remove(n.id,e)}>
-                            <X className="h-3.5 w-3.5" />
+                          <p className={`truncate text-sm font-semibold ${!n.read?"text-foreground":"text-muted-foreground"}`}>{n.title}</p>
+                          <Button variant="ghost" size="icon" className="h-5 w-5 -mr-1.5 text-muted-foreground/50 hover:text-red-400 hover:bg-red-400/10 rounded-full transition-colors" onClick={(e)=>remove(n.id,e)}>
+                            <X className="h-3 w-3" />
                           </Button>
                         </div>
-                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{n.message}</p>
-                        <p className="mt-1 text-[11px] text-muted-foreground/80">{formatDistanceToNow(new Date(n.created_at),{addSuffix:true,locale:id})}</p>
+                        <p className="line-clamp-2 text-xs text-muted-foreground leading-relaxed">{n.message}</p>
+                        <p className="text-[10px] font-medium text-muted-foreground/60">{formatDistanceToNow(new Date(n.created_at),{addSuffix:true,locale:id})}</p>
                       </div>
                     </div>
                   </DropdownMenuItem>

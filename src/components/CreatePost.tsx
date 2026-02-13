@@ -63,50 +63,78 @@ const CreatePost = ({ currentUser, onPostCreated }: CreatePostProps) => {
   };
 
   return (
-    <Card className="rounded-2xl border border-border shadow-xl bg-card p-5">
-      <div className="flex gap-4">
-        <Avatar className="h-12 w-12 ring-1 ring-border">
+    <Card className="rounded-3xl border border-white/10 shadow-xl bg-card/40 backdrop-blur-xl p-4 sm:p-6 relative overflow-hidden group">
+      {}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+
+      <div className="flex gap-4 relative z-10">
+        <Avatar className="h-12 w-12 ring-2 ring-white/10 shadow-lg">
           <AvatarImage src={currentUser.avatar_url} />
-          <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(currentUser.full_name)}</AvatarFallback>
+          <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-bold">{getInitials(currentUser.full_name)}</AvatarFallback>
         </Avatar>
         <div className="flex-1 space-y-4">
-          <MentionInput value={content} onChange={setContent} placeholder="Apa yang Anda pikirkan?" className="min-h-[110px] resize-none rounded-xl bg-input/60 border-border focus-visible:ring-2 focus-visible:ring-accent" multiline currentUserId={currentUser.id} />
-          <MediaUploader key={mediaKey} onMediaChange={setMediaFiles} />
-          <Button 
-            type="button" 
-            variant="ghost" 
-            size="sm" 
-            className="rounded-xl ring-1 ring-border hover:ring-accent/60 gap-2" 
-            onClick={() => setShowSpotifySearch(true)}
-            disabled={!!spotifyTrack}
-          >
-            <Music className="h-4 w-4"/> Spotify
-          </Button>
+          <div className="relative">
+            <MentionInput 
+                value={content} 
+                onChange={setContent} 
+                placeholder="Apa yang Anda pikirkan?" 
+                className="min-h-[120px] resize-none rounded-2xl bg-white/5 border-white/10 focus:bg-white/10 focus-visible:ring-1 focus-visible:ring-primary/30 text-base p-4 shadow-inner transition-all placeholder:text-muted-foreground/50" 
+                multiline 
+                currentUserId={currentUser.id} 
+            />
+            {content.length > 4000 && (
+                <span className={`absolute bottom-2 right-2 text-xs font-medium ${content.length > 5000 ? "text-red-500" : "text-yellow-500"}`}>
+                    {content.length}/5000
+                </span>
+            )}
+          </div>
 
-          {spotifyTrack && (
-            <UiCard className="p-2 flex items-center gap-3 relative">
-              <UiAvatar className="h-8 w-8 rounded-sm">
-                <UiAvatarImage src={spotifyTrack.albumArtUrl || ""} />
-                <UiAvatarFallback><Music className="h-4 w-4" /></UiAvatarFallback>
-              </UiAvatar>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">{spotifyTrack.trackName}</p>
-                <p className="text-xs text-muted-foreground truncate">{spotifyTrack.artistName}</p>
-              </div>
-              <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSpotifyTrack(null)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </UiCard>
-          )}
-          <div className="flex items-center justify-end">
+          <MediaUploader key={mediaKey} onMediaChange={setMediaFiles} />
+          
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex gap-2">
+                <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    className="rounded-xl bg-white/5 hover:bg-green-500/10 hover:text-green-500 border border-white/5 transition-all gap-2 h-11 px-4" 
+                    onClick={() => setShowSpotifySearch(true)}
+                    disabled={!!spotifyTrack}
+                >
+                    <Music className="h-5 w-5"/> 
+                    <span className="text-sm font-medium">Spotify</span>
+                </Button>
+            </div>
+
             <Button 
-              onClick={handleSubmit} 
-              disabled={loading || (!content.trim() && mediaFiles.length === 0 && !spotifyTrack)} 
-              className="..."
+                onClick={handleSubmit} 
+                disabled={loading || (!content.trim() && mediaFiles.length === 0 && !spotifyTrack)} 
+                className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 px-6 h-11 font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Memposting..." : "Posting"}
+                {loading ? "Memposting..." : "Posting"}
             </Button>
           </div>
+
+          {spotifyTrack && (
+            <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                <UiCard className="p-2.5 flex items-center gap-3 relative bg-black/20 border-white/5 rounded-xl backdrop-blur-md">
+                <UiAvatar className="h-10 w-10 rounded-lg shadow-sm">
+                    <UiAvatarImage src={spotifyTrack.albumArtUrl || ""} className="object-cover" />
+                    <UiAvatarFallback className="rounded-lg bg-white/10"><Music className="h-5 w-5 text-green-500" /></UiAvatarFallback>
+                </UiAvatar>
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold truncate text-foreground/90">{spotifyTrack.trackName}</p>
+                    <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                        {spotifyTrack.artistName}
+                    </p>
+                </div>
+                <Button type="button" variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-white/10 hover:text-red-400 transition-colors" onClick={() => setSpotifyTrack(null)}>
+                    <X className="h-4 w-4" />
+                </Button>
+                </UiCard>
+            </div>
+          )}
 
           <SpotifySearchModal
             open={showSpotifySearch}

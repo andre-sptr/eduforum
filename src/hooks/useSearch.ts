@@ -97,7 +97,12 @@ export function useSearch({ initialQuery = '', initialMode = 'OR', debounceDelay
       if (postsError) throw postsError;
 
       if (pageNum === 0) {
-         let userQuery = supabase.from("profiles").select("*").limit(10);
+         let userQuery = supabase
+           .from("profiles")
+           .select("*")
+           .neq("full_name", "Deleted User")
+           .limit(10);
+
          if (terms.length > 0) {
              const userOrClause = terms.map(t => `full_name.ilike.%${t}%`).join(',');
              if (userOrClause) userQuery = userQuery.or(userOrClause);

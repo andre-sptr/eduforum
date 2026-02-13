@@ -86,60 +86,60 @@ export function ChatNotifications({ userId }: { userId: string }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative rounded-xl ring-1 ring-border hover:ring-accent/50">
+        <Button variant="ghost" size="icon" className="relative h-11 w-11 rounded-2xl ring-1 ring-white/10 hover:ring-white/20 bg-white/5 hover:bg-white/10 transition-all">
           <MessageCircle className="h-5 w-5" />
           {unreadCount>0&&(
-            <span className="absolute -top-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-accent text-[11px] font-medium text-accent-foreground shadow">
+            <span className="absolute -top-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-primary text-[11px] font-medium text-primary-foreground shadow-sm ring-2 ring-background">
               {unreadCount>9?"9+":unreadCount}
             </span>
           )}
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-80 overflow-hidden rounded-2xl p-0">
-        <div className="flex items-center justify-between border-b border-border bg-card/80 px-4 py-2">
-          <h3 className="text-sm font-semibold">Pesan</h3>
+      <DropdownMenuContent align="end" className="w-80 overflow-hidden rounded-2xl p-0 bg-card/90 backdrop-blur-xl border-white/10 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 bg-white/5 px-4 py-3">
+          <h3 className="text-sm font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Pesan</h3>
           {unreadCount>0&&(
             <Button
               variant="ghost" size="sm" onClick={markAllAsRead} disabled={markingAll}
-              className="h-7 rounded-full px-2 text-xs text-accent hover:text-accent/80"
+              className="h-6 rounded-full px-2 text-[10px] text-muted-foreground hover:text-primary hover:bg-primary/10"
             >
-              {markingAll?"Memproses...":"Tandai semua dibaca"}
+              {markingAll?"Memproses...":"Tandai dibaca"}
             </Button>
           )}
         </div>
 
         <ScrollArea className="h-[420px]">
           {notifications.length===0?(
-            <div className="grid place-items-center gap-1 py-10 text-center">
-              <div className="grid h-10 w-10 place-items-center rounded-full ring-1 ring-border">
-                <MessageCircle className="h-5 w-5 text-muted-foreground" />
+            <div className="grid place-items-center gap-2 py-12 text-center">
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/5 ring-1 ring-white/10">
+                <MessageCircle className="h-6 w-6 text-muted-foreground/50" />
               </div>
-              <p className="text-sm text-muted-foreground">Tidak ada pesan</p>
+              <p className="text-sm font-medium text-muted-foreground">Tidak ada pesan baru</p>
             </div>
           ):(
-            <div className="divide-y divide-border/80">
+            <div className="divide-y divide-white/5">
               {notifications.map(n=>(
                 <DropdownMenuItem
                   key={n.id}
-                  className={`group cursor-pointer rounded-none px-4 py-3 focus:bg-accent/10 data-[highlighted]:bg-accent/10 ${!n.read?"bg-accent/5":""}`}
+                  className={`group cursor-pointer rounded-none px-4 py-3.5 focus:bg-white/5 data-[highlighted]:bg-white/5 transition-colors ${!n.read?"bg-primary/5":""}`}
                   onClick={()=>handleNotificationClick(n)}
                 >
-                  <div className="flex w-full items-start gap-3">
-                    <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${n.read?"bg-transparent ring-1 ring-border":"bg-accent"}`} />
-                    <div className="min-w-0 flex-1">
+                  <div className="flex w-full items-start gap-3.5">
+                    <span className={`mt-2 h-2 w-2 flex-shrink-0 rounded-full shadow-sm ${n.read?"bg-transparent ring-1 ring-white/20":"bg-primary"}`} />
+                    <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-start justify-between gap-2">
-                        <p className={`truncate text-sm font-medium ${!n.read?"text-foreground":"text-muted-foreground"}`}>{n.title}</p>
+                        <p className={`truncate text-sm font-semibold ${!n.read?"text-foreground":"text-muted-foreground"}`}>{n.title}</p>
                         <Button
                           variant="ghost" size="icon"
-                          className="h-6 w-6 -mr-1 text-muted-foreground hover:text-foreground"
+                          className="h-5 w-5 -mr-1.5 text-muted-foreground/50 hover:text-red-400 hover:bg-red-400/10 rounded-full transition-colors opacity-0 group-hover:opacity-100"
                           onClick={(e)=>deleteNotification(n.id,e)}
                         >
-                          <X className="h-3.5 w-3.5" />
+                          <X className="h-3 w-3" />
                         </Button>
                       </div>
-                      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{n.message}</p>
-                      <p className="mt-1 text-[11px] text-muted-foreground/80">
+                      <p className="line-clamp-2 text-xs text-muted-foreground leading-relaxed">{n.message}</p>
+                      <p className="text-[10px] font-medium text-muted-foreground/60">
                         {formatDistanceToNow(new Date(n.created_at),{addSuffix:true,locale:id})}
                       </p>
                     </div>

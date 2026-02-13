@@ -57,70 +57,74 @@ const Auth = () => {
     } finally { setLoading(false); }
   };
 
-  const inputCls = "bg-input/60 border-border focus-visible:ring-2 focus-visible:ring-primary/50 rounded-xl";
-  const btnCls = "w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg rounded-xl font-semibold";
+  const inputCls = "bg-white/5 border-white/10 focus-visible:ring-2 focus-visible:ring-primary/50 rounded-xl h-11 backdrop-blur-sm transition-all hover:bg-white/10";
+  const btnCls = "w-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 rounded-xl font-semibold h-11 transition-all hover:scale-[1.02] active:scale-[0.98]";
 
   return (
-    <div className="min-h-screen grid place-items-center bg-background p-4">
-      <div className="w-full max-w-md">
-        <Card className="rounded-3xl shadow-2xl border border-border/60 backdrop-blur-sm bg-card/50">
-          <CardHeader className="text-center space-y-4">
-            <div className="flex justify-center">
-               <div className="p-3 bg-primary/10 rounded-2xl">
-                 <img src="/favicon.ico" alt="Logo EduForum" className="w-12 h-12 rounded-xl shadow-sm" />
+    <div className="min-h-screen grid place-items-center bg-background p-4 relative overflow-hidden">
+      {}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent/20 rounded-full blur-[120px] pointer-events-none" />
+      
+      <div className="w-full max-w-md relative z-10">
+        <Card className="rounded-3xl shadow-2xl border-white/10 backdrop-blur-xl bg-card/30 overflow-hidden">
+          <CardHeader className="text-center space-y-6 pb-2 pt-8">
+            <div className="flex justify-center relative">
+               <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full scale-150 animate-pulse" />
+               <div className="relative p-4 bg-gradient-to-br from-card/50 to-card/10 border border-white/10 rounded-2xl shadow-xl backdrop-blur-md">
+                 <img src="/favicon.ico" alt="Logo EduForum" className="w-12 h-12 object-contain" />
                </div>
             </div>
-            <div className="space-y-1">
-               <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">EduForum</CardTitle>
-               <CardDescription className="text-base">Komunitas Digital MAN IC Siak</CardDescription>
+            <div className="space-y-2">
+               <CardTitle className="text-3xl font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent tracking-tight">EduForum</CardTitle>
+               <CardDescription className="text-base font-medium text-muted-foreground/80">Komunitas Digital MAN IC Siak</CardDescription>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6 sm:p-8">
             <Tabs value={tab} onValueChange={setTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 rounded-xl p-1 bg-muted/50">
-                <TabsTrigger value="login" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">Masuk</TabsTrigger>
-                <TabsTrigger value="register" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">Daftar</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 rounded-2xl p-1.5 bg-black/20 backdrop-blur-md border border-white/5 mb-8">
+                <TabsTrigger value="login" className="rounded-xl py-2.5 font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-300">Masuk</TabsTrigger>
+                <TabsTrigger value="register" className="rounded-xl py-2.5 font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-300">Daftar</TabsTrigger>
               </TabsList>
               
-              <div className="mt-6">
-                <TabsContent value="login" className="mt-0">
-                  <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
-                    <Input id="login-email" type="email" placeholder="nama@gmail.com" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputCls} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
-                    <Input id="login-password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className={inputCls} />
-                  </div>
-                  <Button type="submit" className={btnCls} disabled={loading}>
-                    {loading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Memproses...</>) : "Masuk"}
-                  </Button>
-                  <div className="text-center">
-                    <a href="/reset-password" className="text-sm text-accent hover:underline">Lupa Password?</a>
-                  </div>
-                </form>
+              <TabsContent value="login" className="space-y-6 mt-0 animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
+                  <form onSubmit={handleLogin} className="space-y-5">
+                    <div className="space-y-2">
+                        <Label htmlFor="login-email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground ml-1">Email</Label>
+                        <Input id="login-email" type="email" placeholder="nama@sekolah.sch.id" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputCls} />
+                    </div>
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="login-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground ml-1">Password</Label>
+                            <a href="/reset-password" className="text-xs font-medium text-primary hover:text-primary/80 transition-colors">Lupa Password?</a>
+                        </div>
+                        <Input id="login-password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className={inputCls} />
+                    </div>
+                    <Button type="submit" className={btnCls} disabled={loading}>
+                        {loading ? (<><Loader2 className="mr-2 h-5 w-5 animate-spin" />Memproses...</>) : "Masuk Sekarang"}
+                    </Button>
+                  </form>
               </TabsContent>
 
-              <TabsContent value="register">
-                <form onSubmit={handleSignup} className="space-y-4 mt-4">
+              <TabsContent value="register" className="space-y-6 mt-0 animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
+                <form onSubmit={handleSignup} className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="register-name">Nama Lengkap</Label>
-                    <Input id="register-name" type="text" placeholder="Nama Lengkap" value={fullName} onChange={(e) => setFullName(e.target.value)} required className={inputCls} />
+                    <Label htmlFor="register-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground ml-1">Nama Lengkap</Label>
+                    <Input id="register-name" type="text" placeholder="Nama Lengkap Anda" value={fullName} onChange={(e) => setFullName(e.target.value)} required className={inputCls} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="register-email">Email</Label>
-                    <Input id="register-email" type="email" placeholder="nama@gmail.com" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputCls} />
+                    <Label htmlFor="register-email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground ml-1">Email</Label>
+                    <Input id="register-email" type="email" placeholder="nama@sekolah.sch.id" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputCls} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="register-password">Password</Label>
+                    <Label htmlFor="register-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground ml-1">Password</Label>
                     <Input id="register-password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className={inputCls} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="register-role">Role</Label>
+                    <Label htmlFor="register-role" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground ml-1">Status</Label>
                     <Select value={role} onValueChange={setRole} required>
-                      <SelectTrigger className={inputCls}><SelectValue placeholder="Pilih Role" /></SelectTrigger>
-                      <SelectContent className="bg-popover border-border">
+                      <SelectTrigger className={inputCls}><SelectValue placeholder="Pilih Status Anda" /></SelectTrigger>
+                      <SelectContent className="bg-card/95 backdrop-blur-xl border-white/10">
                         <SelectItem value="siswa">Siswa</SelectItem>
                         <SelectItem value="guru">Guru</SelectItem>
                         <SelectItem value="alumni">Alumni</SelectItem>
@@ -128,13 +132,17 @@ const Auth = () => {
                     </Select>
                   </div>
                   <Button type="submit" className={btnCls} disabled={loading}>
-                    {loading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Memproses...</>) : "Daftar"}
+                    {loading ? (<><Loader2 className="mr-2 h-5 w-5 animate-spin" />Mendaftar...</>) : "Buat Akun Baru"}
                   </Button>
                 </form>
               </TabsContent>
-              </div>
             </Tabs>
           </CardContent>
+          <div className="p-6 text-center border-t border-white/5 bg-black/10 backdrop-blur-md">
+            <p className="text-xs text-muted-foreground">
+                Dengan masuk, Anda menyetujui <a href="#" className="text-primary hover:underline">Syarat & Ketentuan</a> kami.
+            </p>
+          </div>
         </Card>
       </div>
     </div>

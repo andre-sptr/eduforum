@@ -251,83 +251,97 @@ const Profile=()=> {
   };
 
   return (
-    <div className="space-y-6">
-      <Card className="bg-card border-border p-8 mb-6 relative">
+    <div className="space-y-8 pb-20">
+      <Card className="border-white/10 bg-card/40 backdrop-blur-xl p-8 rounded-3xl overflow-hidden relative shadow-xl">
+          {}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 pointer-events-none" />
+          
           {isOwnProfile && (
-            <div className="absolute top-4 right-4 flex gap-2">
-              <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} className="rounded-xl"><Settings className="h-5 w-5" /></Button>
+            <div className="absolute top-4 right-4 flex gap-2 z-20">
+              <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} className="rounded-xl hover:bg-white/10 text-muted-foreground hover:text-foreground"><Settings className="h-5 w-5" /></Button>
               <Button variant="ghost" size="icon" onClick={handleLogout} className="rounded-xl text-destructive hover:bg-destructive/10"><LogOut className="h-5 w-5" /></Button>
             </div>
           )}
-          <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
+          
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-8 relative z-10">
             <button
               type="button"
               onClick={() => { if (canMaximize) setViewerOpen(true); }}
               title={canMaximize ? "Lihat foto ukuran penuh" : "Belum ada foto profil"}
-              className={`relative group rounded-full focus:outline-none ${canMaximize ? "focus:ring-2 focus:ring-accent/40 cursor-zoom-in" : "cursor-default"}`}
+              className={`relative group rounded-full focus:outline-none ${canMaximize ? "cursor-zoom-in" : "cursor-default"}`}
             >
-              <Avatar className="h-32 w-32 border-4 border-card shadow-xl">
+              <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+              <Avatar className="h-32 w-32 border-4 border-card/50 shadow-2xl relative z-10 ring-4 ring-white/5">
                 <AvatarImage src={profile.avatar_url || undefined} className="object-cover" />
-                <AvatarFallback className="text-4xl bg-primary text-primary-foreground font-bold">
+                <AvatarFallback className="text-4xl bg-gradient-to-br from-primary to-accent text-primary-foreground font-bold">
                   {getInitials(profile.full_name)}
                 </AvatarFallback>
               </Avatar>
               {canMaximize && (
-                <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Maximize2 className="h-8 w-8 text-white" />
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Maximize2 className="h-8 w-8 text-white drop-shadow-md" />
                 </div>
               )}
             </button>
 
-            <div className="flex-1 text-center md:text-left space-y-4">
+            <div className="flex-1 text-center md:text-left space-y-5">
               <div>
-                <h1 className="text-3xl font-bold">{profile.full_name}</h1>
-                <p className="text-muted-foreground flex items-center justify-center md:justify-start gap-2 mt-1">
-                  <span className={`capitalize px-2 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(profile.role)}`}>{profile.role?.[0]?.toUpperCase()+profile.role?.slice(1)}</span>
-                </p>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">{profile.full_name}</h1>
+                <div className="flex items-center justify-center md:justify-start gap-2 mt-2">
+                  <span className={`capitalize px-2.5 py-0.5 rounded-full text-xs font-medium border border-white/5 shadow-sm ${getRoleBadgeColor(profile.role)}`}>{profile.role?.[0]?.toUpperCase()+profile.role?.slice(1)}</span>
+                </div>
               </div>
 
-              {profile.bio && <p className="text-sm max-w-lg mx-auto md:mx-0 leading-relaxed">{profile.bio}</p>}
+              {profile.bio && (
+                  <p className="text-sm text-muted-foreground leading-relaxed max-w-lg mx-auto md:mx-0 bg-muted/20 p-3 rounded-xl border border-white/5 backdrop-blur-sm">
+                      {profile.bio}
+                  </p>
+              )}
 
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-                 <div className="flex items-center gap-1 bg-muted/50 px-3 py-1.5 rounded-lg border border-border/50">
-                    <Trophy className="h-4 w-4 text-accent" />
+                 <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-xl border border-white/10 backdrop-blur-sm">
+                    <Trophy className="h-4 w-4 text-yellow-500" />
                     <span className="text-sm font-medium">{followerRank ? `#${followerRank} Follower` : "-"}</span>
                  </div>
-                 <div className="flex items-center gap-1 bg-muted/50 px-3 py-1.5 rounded-lg border border-border/50">
+                 <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-xl border border-white/10 backdrop-blur-sm">
                     <Heart className="h-4 w-4 text-red-500" />
                     <span className="text-sm font-medium">{likerRank ? `#${likerRank} Liked` : "-"}</span>
                  </div>
               </div>
 
-              <div className="flex items-center justify-center md:justify-start gap-6 text-sm">
-                <button onClick={openFollowers} className="hover:underline decoration-accent underline-offset-4">
-                  <span className="font-bold text-lg">{followerCount}</span> <span className="text-muted-foreground">Pengikut</span>
+              <div className="flex items-center justify-center md:justify-start gap-8 py-2">
+                <button onClick={openFollowers} className="group text-center md:text-left transition-all hover:scale-105">
+                  <p className="font-bold text-xl group-hover:text-primary transition-colors">{followerCount}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Pengikut</p>
                 </button>
-                <button onClick={openFollowing} className="hover:underline decoration-accent underline-offset-4">
-                  <span className="font-bold text-lg">{followingCount}</span> <span className="text-muted-foreground">Mengikuti</span>
+                <button onClick={openFollowing} className="group text-center md:text-left transition-all hover:scale-105">
+                  <p className="font-bold text-xl group-hover:text-primary transition-colors">{followingCount}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Mengikuti</p>
                 </button>
-                <div>
-                  <span className="font-bold text-lg">{postCount.all}</span> <span className="text-muted-foreground">Postingan</span>
+                <div className="text-center md:text-left">
+                  <p className="font-bold text-xl">{postCount.all}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">Postingan</p>
                 </div>
               </div>
 
               <div className="flex items-center justify-center md:justify-start gap-3 pt-2">
                 {isOwnProfile ? (
-                   <Button onClick={()=>navigate("/settings")} className="bg-accent text-accent-foreground hover:bg-accent/90"><Settings className="h-4 w-4 mr-2"/>Edit Profil</Button>
+                   <Button onClick={()=>navigate("/settings")} className="rounded-xl shadow-lg shadow-primary/20 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-6 font-medium transition-all hover:scale-105">
+                       <Settings className="h-4 w-4 mr-2"/>Edit Profil
+                   </Button>
                 ) : (
                   <>
                     <Button 
                       onClick={handleFollow} 
                       className={isFollowing 
-                        ? "rounded-xl bg-muted text-foreground hover:bg-destructive hover:text-destructive-foreground border border-border" 
-                        : "rounded-xl bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg shadow-accent/20"
+                        ? "rounded-xl bg-muted/50 text-foreground hover:bg-destructive hover:text-destructive-foreground border border-white/10 h-10 px-6 font-medium transition-all" 
+                        : "rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 h-10 px-6 font-medium transition-all hover:scale-105"
                       }
                     >
                       {isFollowing ? <UserMinus className="mr-2 h-4 w-4" /> : <UserPlus className="mr-2 h-4 w-4" />}
                       {isFollowing ? "Berhenti Mengikuti" : "Ikuti"}
                     </Button>
-                    <Button variant="outline" className="rounded-xl border-accent/50 text-accent hover:bg-accent/10" onClick={handleStartChat}>
+                    <Button variant="outline" className="rounded-xl border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 h-10 px-6 font-medium transition-all" onClick={handleStartChat}>
                       <MessageCircle className="mr-2 h-4 w-4" /> Pesan
                     </Button>
                   </>
@@ -335,39 +349,45 @@ const Profile=()=> {
               </div>
             </div>
           </div>
-        </Card>
+      </Card>
 
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Button variant={postFilter === "all" ? "default" : "outline"} onClick={() => setPostFilter("all")} className="rounded-xl">Postingan ({postCount.all})</Button>
-            <Button variant={postFilter==="text"?"default":"outline"} onClick={()=>setPostFilter("text")} className="rounded-xl">Tanpa Media ({postCount.text})</Button>
-            <Button variant={postFilter==="media"?"default":"outline"} onClick={()=>setPostFilter("media")} className="rounded-xl">Media ({postCount.media})</Button>
-            <Button variant={postFilter === "reposts" ? "default" : "outline"} onClick={() => setPostFilter("reposts")} className="rounded-xl">Reposts ({postCount.reposts})</Button>
+        <div className="space-y-6">
+          <div className="flex items-center gap-2 p-1 bg-muted/30 backdrop-blur-sm rounded-2xl w-fit border border-white/5 overflow-x-auto max-w-full no-scrollbar">
+            <Button variant={postFilter === "all" ? "default" : "ghost"} onClick={() => setPostFilter("all")} className={`rounded-xl h-9 px-4 text-sm ${postFilter === "all" ? "shadow-md" : "hover:bg-white/5"}`}>Postingan ({postCount.all})</Button>
+            <Button variant={postFilter==="text"?"default":"ghost"} onClick={()=>setPostFilter("text")} className={`rounded-xl h-9 px-4 text-sm ${postFilter === "text" ? "shadow-md" : "hover:bg-white/5"}`}>Tanpa Media ({postCount.text})</Button>
+            <Button variant={postFilter==="media"?"default":"ghost"} onClick={()=>setPostFilter("media")} className={`rounded-xl h-9 px-4 text-sm ${postFilter === "media" ? "shadow-md" : "hover:bg-white/5"}`}>Media ({postCount.media})</Button>
+            <Button variant={postFilter === "reposts" ? "default" : "ghost"} onClick={() => setPostFilter("reposts")} className={`rounded-xl h-9 px-4 text-sm ${postFilter === "reposts" ? "shadow-md" : "hover:bg-white/5"}`}>Reposts ({postCount.reposts})</Button>
           </div>
+          
           {posts.length===0&&postsLoading?(
             <div className="space-y-4"><PostSkeleton/><PostSkeleton/><PostSkeleton/></div>
           ):posts.length===0?(
-            <Card className="p-8 text-center"><p className="text-muted-foreground">Belum ada postingan</p></Card>
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground bg-card/20 backdrop-blur-sm rounded-3xl border border-dashed border-white/10">
+                <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-4">
+                    <MessageCircle className="h-8 w-8 opacity-50" />
+                </div>
+                <p className="text-lg font-medium">Belum ada postingan</p>
+            </div>
           ):(
-            <>
+            <div className="space-y-4">
               {posts.map(p=>(<PostCard key={p.id} post={p} currentUserId={currentUser?.id} 
               
               onPostUpdated={refreshPosts} onPostDeleted={refreshPosts} postType="global" topFollowers={topFollowers} topLiked={topLiked} />))}
               {postsLoading&&(<div className="space-y-4"><PostSkeleton/></div>)}
               <div ref={loadMoreRef} className="h-6"/>
-            </>
+            </div>
           )}
         </div>
 
       <Dialog open={!!openList} onOpenChange={v=>!v&&setOpenList(null)}>
-        <DialogContent className="sm:max-w-[500px] max-h-[85vh]">
+        <DialogContent className="sm:max-w-[500px] max-h-[85vh] bg-card/95 backdrop-blur-xl border-white/10">
           <DialogHeader>
             <DialogTitle>{openList==="followers"?"Pengikut":"Mengikuti"}</DialogTitle>
             <DialogDescription className="sr-only">Daftar {openList==="followers"?"pengikut":"akun yang diikuti"}.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            <Input value={dialogSearch} onChange={e=>setDialogSearch(e.target.value)} placeholder={`Cari ${openList==="followers"?"pengikut":"mengikuti"}...`} className="bg-input border-border"/>
-            <div className="h-[65vh] overflow-y-auto pr-2" onScroll={onDialogScroll}>
+          <div className="space-y-4 py-2">
+            <Input value={dialogSearch} onChange={e=>setDialogSearch(e.target.value)} placeholder={`Cari ${openList==="followers"?"pengikut":"mengikuti"}...`} className="bg-muted/50 border-white/10 rounded-xl"/>
+            <div className="h-[60vh] overflow-y-auto pr-2 custom-scrollbar" onScroll={onDialogScroll}>
               <div className="space-y-2">
                 {listLoading && (openList==="followers"?followers.length===0:following.length===0) ? (
                   <div className="py-10 text-center text-muted-foreground">Memuat...</div>
@@ -375,23 +395,23 @@ const Profile=()=> {
                   <div className="py-8 text-center text-muted-foreground">Tidak ada data</div>
                 ) : (
                   list.map(u=>(
-                    <div key={u.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/10">
+                    <div key={u.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 border border-transparent hover:border-white/5 transition-all">
                       <Link to={`/profile/${u.id}`} onClick={()=>setOpenList(null)} className="flex items-center gap-3 min-w-0">
-                        <Avatar className="h-8 w-8">
+                        <Avatar className="h-10 w-10 ring-2 ring-white/10">
                           <AvatarImage src={u.avatar_url||undefined}/>
                           <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(u.full_name||"U")}</AvatarFallback>
                         </Avatar>
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{u.full_name}</p>
-                          <p className="truncate text-xs text-muted-foreground">{u.role}</p>
+                          <p className="truncate text-sm font-semibold">{u.full_name}</p>
+                          <p className="truncate text-xs text-muted-foreground capitalize">{u.role}</p>
                         </div>
                       </Link>
                       <div className="ml-auto flex items-center gap-2">
                         {u.id!==currentUser?.id && (followingIds.has(u.id)
-                          ? <Button size="sm" onClick={()=>toggleFollowUser(u.id)} className="bg-muted text-foreground hover:bg-muted/80"><UserMinus className="h-4 w-4 mr-1"/>Unfollow</Button>
-                          : <Button size="sm" onClick={()=>toggleFollowUser(u.id)} className="bg-accent text-accent-foreground hover:bg-accent/90"><UserPlus className="h-4 w-4 mr-1"/>Follow</Button>
+                          ? <Button size="sm" onClick={()=>toggleFollowUser(u.id)} className="rounded-lg bg-muted text-foreground hover:bg-destructive hover:text-destructive-foreground border border-white/10"><UserMinus className="h-4 w-4 mr-1"/>Unfollow</Button>
+                          : <Button size="sm" onClick={()=>toggleFollowUser(u.id)} className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"><UserPlus className="h-4 w-4 mr-1"/>Follow</Button>
                         )}
-                        <Button size="sm" variant="outline" onClick={()=>startChatWith(u.id)} className="border-accent text-accent hover:bg-accent hover:text-accent-foreground"><MessageCircle className="h-4 w-4 mr-1"/>Chat</Button>
+                        <Button size="sm" variant="outline" onClick={()=>startChatWith(u.id)} className="rounded-lg border-white/10 bg-white/5 hover:bg-white/10"><MessageCircle className="h-4 w-4 mr-1"/>Chat</Button>
                       </div>
                     </div>
                   ))
@@ -405,14 +425,18 @@ const Profile=()=> {
       </Dialog>
 
       <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden">
-          <DialogHeader className="px-6 pt-6">
+        <DialogContent className="max-w-3xl p-0 overflow-hidden bg-transparent border-none shadow-none">
+          <DialogHeader className="sr-only">
             <DialogTitle>Foto Profil</DialogTitle>
-            <DialogDescription className="sr-only">Foto profil ukuran penuh</DialogDescription>
+            <DialogDescription>Foto profil ukuran penuh</DialogDescription>
           </DialogHeader>
-          <div className="p-6 pt-0">
-            <div className="rounded-xl overflow-hidden border bg-black/5">
-              <img src={profile.avatar_url||""} alt="Avatar" className="w-full h-full object-contain max-h-[70vh]" />
+          <div className="relative flex items-center justify-center" onClick={() => setViewerOpen(false)}>
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/20 bg-black/50 backdrop-blur-sm p-1" onClick={e => e.stopPropagation()}>
+              <img src={profile.avatar_url||""} alt="Avatar" className="max-w-[90vw] max-h-[80vh] object-contain rounded-xl" />
+              <Button size="icon" variant="ghost" className="absolute top-2 right-2 text-white hover:bg-black/40 rounded-full" onClick={() => setViewerOpen(false)}>
+                  <div className="sr-only">Close</div>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </Button>
             </div>
           </div>
         </DialogContent>

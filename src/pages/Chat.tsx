@@ -147,18 +147,19 @@ const Chat = () => {
 
   if(loading) return (
     <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center"><div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-accent"/><p className="mt-4 text-muted-foreground">Memuat chat...</p></div>
+      <div className="text-center"><div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-primary"/><p className="mt-4 text-muted-foreground animate-pulse">Memuat chat...</p></div>
     </div>
   );
 
   return (
-    <div className="space-y-6 h-[calc(100vh-100px)]">
-      <header className="border-b border-border bg-card/80 backdrop-blur rounded-t-xl">
-        <div className="flex items-center gap-3 px-4 py-3">
-          <Button variant="ghost" size="icon" onClick={()=>navigate("/messages")} className="rounded-xl"><ArrowLeft className="h-5 w-5"/></Button>
+    <div className="space-y-4 h-[calc(100vh-120px)] pb-10">
+      <header className="border-b border-white/10 bg-card/40 backdrop-blur-xl rounded-t-3xl shadow-sm z-20 sticky top-0">
+        <div className="flex items-center gap-4 px-6 py-4">
+          <Button variant="ghost" size="icon" onClick={()=>navigate("/messages")} className="rounded-xl hover:bg-white/10 transition-colors"><ArrowLeft className="h-5 w-5"/></Button>
           <div className="flex-1">
-            <h1 className="text-lg font-semibold">{conversation?.name||"Chat"}</h1>
-            <p className="text-xs text-muted-foreground">
+            <h1 className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">{conversation?.name||"Chat"}</h1>
+            <p className="text-xs font-medium text-muted-foreground/80 flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${conversation?.type==="global"?"bg-blue-500":conversation?.type==="group"?"bg-emerald-500":"bg-pink-500"}`} />
               {conversation?.type==="global"&&"Chat Global"}
               {conversation?.type==="group"&&"Grup Chat"}
               {conversation?.type==="direct"&&"Chat Pribadi"}
@@ -167,61 +168,74 @@ const Chat = () => {
         </div>
       </header>
 
-      <Card ref={cardRef} className="flex-1 border-border bg-card shadow-sm overflow-hidden flex flex-col h-full rounded-b-xl rounded-t-none mt-0">
-          <ScrollArea className="flex-1 p-4">
-            <div className="space-y-2">
+      <Card ref={cardRef} className="flex-1 border-white/10 bg-card/30 backdrop-blur-md shadow-2xl overflow-hidden flex flex-col h-full rounded-b-3xl rounded-t-none mt-0 relative">
+          {}
+          <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+          
+          <ScrollArea className="flex-1 p-6">
+            <div className="space-y-4 max-w-4xl mx-auto">
               {messages.length===0?(
-                <div className="py-10 text-center text-muted-foreground">Belum ada pesan. Mulai percakapan!</div>
+                <div className="py-20 text-center flex flex-col items-center justify-center opacity-60">
+                    <div className="w-16 h-16 bg-muted/30 rounded-full flex items-center justify-center mb-4">
+                        <Send className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground font-medium">Belum ada pesan. Mulai percakapan!</p>
+                </div>
               ):messages.map((m, idx)=>{
                 const mine=m.user_id===currentUser?.id;
                 const editing=editingMessageId===m.id;
                 const prev=messages[idx-1];
                 const grouped=isGrouped(prev,m);
                 return (
-                  <div key={m.id} className={`flex ${mine?"flex-row-reverse":"flex-row"} ${grouped?"mt-1":"mt-3"} gap-3`}>
+                  <div key={m.id} className={`flex ${mine?"flex-row-reverse":"flex-row"} ${grouped?"mt-1":"mt-4"} gap-4 group/msg animate-in slide-in-from-bottom-2 duration-500`}>
                     {grouped ? (
-                      <div className="h-8 w-8 opacity-0 pointer-events-none" />
+                      <div className="h-10 w-10 opacity-0 pointer-events-none" />
                     ) : (
-                      <Link to={`/profile/${m.user_id}`}>
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={m.profiles?.avatar_url||undefined}/>
-                          <AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(m.profiles?.full_name||"U")}</AvatarFallback>
+                      <Link to={`/profile/${m.user_id}`} className="transition-transform hover:scale-110">
+                        <Avatar className="h-10 w-10 ring-2 ring-white/10 shadow-md">
+                          <AvatarImage src={m.profiles?.avatar_url||undefined} className="object-cover"/>
+                          <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-bold text-xs">{getInitials(m.profiles?.full_name||"U")}</AvatarFallback>
                         </Avatar>
                       </Link>
                     )}
 
-                    <div className={`max-w-[72%] ${mine?"items-end text-right":"items-start"} flex flex-col`}>
+                    <div className={`max-w-[75%] ${mine?"items-end text-right":"items-start"} flex flex-col`}>
                       {!grouped && (
-                        <div className={`mb-1 flex items-center flex-wrap gap-2 ${mine ? "flex-row-reverse" : ""}`}>
-                          <Link to={`/profile/${m.user_id}`} className="text-sm font-medium hover:text-accent">{m.profiles?.full_name}</Link>
+                        <div className={`mb-1.5 flex items-center flex-wrap gap-2 ${mine ? "flex-row-reverse" : ""}`}>
+                          <Link to={`/profile/${m.user_id}`} className="text-sm font-bold hover:text-primary transition-colors">{m.profiles?.full_name}</Link>
                           <RankBadge rank={followerRankMap.get(m.user_id)} type="follower" />
                           <RankBadge rank={likerRankMap.get(m.user_id)} type="like" />
                         </div>
                       )}
 
                       {editing?(
-                        <div className={`flex ${mine?"flex-row-reverse":""} items-center gap-2`}>
-                          <Input value={editContent} onChange={e=>setEditContent(e.target.value)} className="h-9" autoFocus onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleEditMessage(m.id); } if(e.key==="Escape") cancelEdit(); }}/>
-                          <Button size="sm" onClick={()=>handleEditMessage(m.id)}>Simpan</Button>
-                          <Button size="sm" variant="ghost" onClick={cancelEdit}>Batal</Button>
+                        <div className={`flex ${mine?"flex-row-reverse":""} items-center gap-2 w-full`}>
+                          <Input value={editContent} onChange={e=>setEditContent(e.target.value)} className="h-10 bg-background/50 backdrop-blur-sm border-white/10 rounded-xl" autoFocus onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleEditMessage(m.id); } if(e.key==="Escape") cancelEdit(); }}/>
+                          <Button size="sm" onClick={()=>handleEditMessage(m.id)} className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 shadow-md">Simpan</Button>
+                          <Button size="sm" variant="ghost" onClick={cancelEdit} className="rounded-lg hover:bg-white/10">Batal</Button>
                         </div>
                       ):(
-                        <div className={`group relative inline-flex rounded-2xl px-4 py-2 ${mine?"bg-accent text-accent-foreground":"bg-muted/70 text-foreground"}`}>
-                          <ContentRenderer content={m.content} className="text-sm whitespace-pre-wrap break-words" />
-                          {m.edited_at&&<span className={`ml-2 self-end text-[10px] opacity-70 italic ${mine?"text-primary-foreground/70":"text-muted-foreground"}`}>diedit</span>}
+                        <div className={`group relative inline-flex flex-col rounded-2xl px-5 py-3 shadow-sm border border-white/5 transition-all ${mine?"bg-primary text-primary-foreground rounded-tr-sm":"bg-muted/40 backdrop-blur-md text-foreground rounded-tl-sm hover:bg-muted/50"}`}>
+                          <ContentRenderer content={m.content} className={`text-[15px] whitespace-pre-wrap break-words leading-relaxed ${mine ? "text-primary-foreground/95" : "text-foreground/90"}`} />
+                          
+                          <div className={`flex items-center gap-2 mt-1 ${mine ? "justify-end text-primary-foreground/70" : "text-muted-foreground/70"}`}>
+                             <span className="text-[10px] font-medium">{formatTime(m.created_at)}</span>
+                             {m.edited_at&&<span className="text-[10px] italic opacity-80 flex items-center gap-0.5"><Pencil className="h-2 w-2"/> diedit</span>}
+                          </div>
+
                           {mine&&(
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="ml-1 h-6 w-6 opacity-0 group-hover:opacity-100"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
-                              <DropdownMenuContent align={mine?"start":"end"}>
-                                <DropdownMenuItem onClick={()=>startEdit(m)}><Pencil className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                <DropdownMenuItem onClick={()=>handleDeleteMessage(m.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Hapus</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <DropdownMenu>
+                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-black/10 text-current"><MoreVertical className="h-3 w-3"/></Button></DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="bg-card/95 backdrop-blur-xl border-white/10">
+                                    <DropdownMenuItem onClick={()=>startEdit(m)} className="cursor-pointer"><Pencil className="mr-2 h-3.5 w-3.5"/>Edit</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={()=>handleDeleteMessage(m.id)} className="text-destructive cursor-pointer focus:bg-destructive/10"><Trash2 className="mr-2 h-3.5 w-3.5"/>Hapus</DropdownMenuItem>
+                                </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
                           )}
                         </div>
                       )}
-
-                      {!grouped && <span className="mt-1 text-[11px] text-muted-foreground">{formatTime(m.created_at)}</span>}
                     </div>
                   </div>
                 );
@@ -230,17 +244,17 @@ const Chat = () => {
             </div>
           </ScrollArea>
 
-          <form onSubmit={handleSendMessage} className="border-t border-border p-3">
-            <div className="flex gap-2">
+          <form onSubmit={handleSendMessage} className="border-t border-white/10 p-4 bg-card/40 backdrop-blur-xl">
+            <div className="flex gap-3 max-w-4xl mx-auto items-end">
               {conversation?.type==="direct"?(
-                <Input value={newMessage} onChange={e=>setNewMessage(e.target.value)} placeholder="Ketik pesan..." className="flex-1 rounded-xl" disabled={sending}
+                <Input value={newMessage} onChange={e=>setNewMessage(e.target.value)} placeholder="Ketik pesan..." className="flex-1 rounded-2xl bg-white/5 border-white/10 focus:bg-white/10 transition-all h-12 px-4 shadow-inner" disabled={sending}
                   onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleSendMessage(e as any); } }}/>
               ):(
-                <MentionInput value={newMessage} onChange={setNewMessage} placeholder="Ketik pesan..." className="flex-1 rounded-xl" disabled={sending}
+                <MentionInput value={newMessage} onChange={setNewMessage} placeholder="Ketik pesan (@user)..." className="flex-1 rounded-2xl bg-white/5 border-white/10 focus:bg-white/10 transition-all min-h-[48px] px-4 py-3 shadow-inner resize-none" disabled={sending}
                   currentUserId={currentUser?.id} allowedUserIds={conversation?.type==="group"?groupMembers:undefined}
                   onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleSendMessage(e as any); } }}/>
               )}
-              <Button type="submit" size="icon" disabled={sending||!newMessage.trim()} className="rounded-xl bg-accent text-accent-foreground hover:bg-accent/90"><Send className="h-5 w-5"/></Button>
+              <Button type="submit" size="icon" disabled={sending||!newMessage.trim()} className="rounded-2xl h-12 w-12 bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 hover:scale-105 transition-all flex-shrink-0"><Send className="h-5 w-5 ml-0.5"/></Button>
             </div>
           </form>
       </Card>

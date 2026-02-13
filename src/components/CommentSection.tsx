@@ -164,33 +164,77 @@ const CommentSection = ({ postId, currentUserId, postType = "global", allowedUse
   };
 
   return (
-    <div className="mt-4 border-t border-border pt-4">
-      <Button variant="outline" size="sm" className="mb-3 gap-2 rounded-full px-3 text-muted-foreground hover:text-foreground" onClick={() => setShowComments(!showComments)}>
-        <MessageCircle className="h-4 w-4" />{showComments ? "Sembunyikan" : "Tampilkan"} Komentar <span className="rounded-full bg-muted px-1.5 text-[11px]">{totalCount ?? 0}</span>
+    <div className="mt-6 border-t border-white/10 pt-6">
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        className="mb-4 gap-2 rounded-xl px-4 text-muted-foreground hover:text-foreground hover:bg-white/5 transition-all w-full justify-between group" 
+        onClick={() => setShowComments(!showComments)}
+      >
+        <div className="flex items-center gap-2">
+            <MessageCircle className="h-4 w-4 group-hover:text-primary transition-colors" />
+            <span className="font-medium">{showComments ? "Sembunyikan" : "Tampilkan"} Komentar</span>
+        </div>
+        <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs font-bold text-muted-foreground group-hover:text-primary group-hover:bg-primary/10 transition-all">
+            {totalCount ?? 0}
+        </span>
       </Button>
 
       {showComments && (
-        <>
-          <div className="space-y-2">{comments.map(c => renderComment(c))}</div>
-          <div className="mb-4">
+        <div className="animate-in fade-in slide-in-from-top-4 duration-500 space-y-6">
+          <div className="space-y-4 relative">
+             <div className="absolute left-4 top-0 bottom-0 w-px bg-white/5 -z-10" />
+             {comments.map(c => renderComment(c))}
+          </div>
+          
+          <div className="sticky bottom-0 bg-card/80 backdrop-blur-xl p-4 -mx-4 border-t border-white/5 rounded-t-2xl shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.3)]">
             {replyTo && (
-              <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-                Membalas komentar
-                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs text-accent" onClick={() => setReplyTo(null)}>Batalkan</Button>
+              <div className="mb-3 flex items-center justify-between gap-2 text-xs text-muted-foreground bg-primary/5 p-2 rounded-lg border border-primary/10">
+                <div className="flex items-center gap-2">
+                    <Reply className="h-3.5 w-3.5 text-primary" />
+                    <span>Membalas komentar...</span>
+                </div>
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setReplyTo(null)}>Batalkan</Button>
               </div>
             )}
-            <div className="flex gap-2">
-              <MentionInput value={newComment} onChange={setNewComment} placeholder="Tulis komentar..." className="min-h-[60px] flex-1 resize-none text-sm" multiline currentUserId={currentUserId} allowedUserIds={postType === "group" ? allowedUserIds : undefined}/>
-              <Button onClick={handleSubmitComment} disabled={loading || !newComment.trim()} size="icon" className="h-[60px] w-10 self-end rounded-xl bg-accent text-accent-foreground hover:bg-accent/90"><Send className="h-4 w-4" /></Button>
+            <div className="flex gap-3 items-end">
+              <div className="relative flex-1 group">
+                 <div className="absolute inset-0 bg-primary/20 blur-lg rounded-2xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
+                 <MentionInput 
+                    value={newComment} 
+                    onChange={setNewComment} 
+                    placeholder="Tulis komentar..." 
+                    className="min-h-[48px] max-h-[120px] w-full resize-none rounded-2xl bg-black/20 border-white/10 focus:bg-black/40 focus:border-primary/30 text-sm p-3 shadow-inner relative z-10 transition-all placeholder:text-muted-foreground/50" 
+                    multiline 
+                    currentUserId={currentUserId} 
+                    allowedUserIds={postType === "group" ? allowedUserIds : undefined}
+                 />
+              </div>
+              <Button 
+                onClick={handleSubmitComment} 
+                disabled={loading || !newComment.trim()} 
+                size="icon" 
+                className="h-12 w-12 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 hover:scale-105 hover:rotate-6 transition-all flex-shrink-0"
+              >
+                <Send className="h-5 w-5 ml-0.5" />
+              </Button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       <AlertDialog open={!!deleteCommentId} onOpenChange={() => setDeleteCommentId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Hapus Komentar?</AlertDialogTitle><AlertDialogDescription>Apakah Anda yakin ingin menghapus komentar ini? Tindakan ini tidak dapat dibatalkan.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel disabled={loading}>Batal</AlertDialogCancel><AlertDialogAction onClick={handleDeleteComment} disabled={loading} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Hapus</AlertDialogAction></AlertDialogFooter>
+        <AlertDialogContent className="bg-card/95 backdrop-blur-xl border-white/10 rounded-3xl shadow-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-bold text-center">Hapus Komentar?</AlertDialogTitle>
+            <AlertDialogDescription className="text-center text-muted-foreground">
+                Apakah Anda yakin ingin menghapus komentar ini? <br/>Tindakan ini tidak dapat dibatalkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-center gap-3">
+            <AlertDialogCancel disabled={loading} className="rounded-xl border-white/10 bg-white/5 hover:bg-white/10 h-11 px-6">Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteComment} disabled={loading} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-lg shadow-destructive/20 h-11 px-6">Hapus</AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

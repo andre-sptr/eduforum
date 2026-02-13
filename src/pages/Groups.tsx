@@ -134,50 +134,50 @@ const Groups = () => {
   );
 
   return (
-    <div className="space-y-6 pb-20">
-      <div className="flex flex-col md:flex-row md:items-center gap-4 justify-between">
+    <div className="space-y-8 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center gap-6 justify-between bg-card/30 backdrop-blur-md p-6 rounded-3xl border border-white/10 shadow-sm">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="rounded-xl"><ArrowLeft className="h-5 w-5" /></Button>
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/20">
-                    <Users className="w-6 h-6 text-primary-foreground" />
+            <Button variant="ghost" size="icon" onClick={() => navigate("/")} className="rounded-xl hover:bg-primary/10"><ArrowLeft className="h-5 w-5" /></Button>
+            <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center shadow-lg shadow-primary/20 ring-1 ring-white/20">
+                    <Users className="w-7 h-7 text-white" />
                 </div>
                 <div>
-                    <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Grup Diskusi</h1>
-                    <p className="text-xs text-muted-foreground">Temukan komunitas belajar Anda</p>
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">Grup Diskusi</h1>
+                    <p className="text-sm text-muted-foreground">Temukan komunitas belajar Anda</p>
                 </div>
             </div>
           </div>
           
           <Dialog open={showCreate} onOpenChange={setShowCreate}>
             <DialogTrigger asChild>
-                <Button className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-md">
-                    <Plus className="h-4 w-4 mr-2"/> Buat Grup
+                <Button className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/25 h-11 px-6 font-semibold transition-all hover:-translate-y-0.5">
+                    <Plus className="h-5 w-5 mr-2"/> Buat Grup Baru
                 </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-border sm:max-w-md">
+            <DialogContent className="bg-card/95 backdrop-blur-xl border-white/10 sm:max-w-md shadow-2xl">
               <DialogHeader>
-                  <DialogTitle>Buat Grup Baru</DialogTitle>
+                  <DialogTitle className="text-xl">Buat Grup Baru</DialogTitle>
                   <DialogDescription>Buat ruang diskusi untuk topik spesifik atau kelas Anda.</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-2">
+              <div className="space-y-5 py-4">
                 <div className="space-y-2">
-                    <Label htmlFor="gn">Nama Grup</Label>
-                    <Input id="gn" placeholder="Contoh: Matematika Kelas 12" value={newName} onChange={e => setNewName(e.target.value)} className="bg-muted/50 border-border"/>
+                    <Label htmlFor="gn" className="text-sm font-medium">Nama Grup</Label>
+                    <Input id="gn" placeholder="Contoh: Matematika Kelas 12" value={newName} onChange={e => setNewName(e.target.value)} className="bg-muted/50 border-white/10 focus:bg-background transition-colors h-10 rounded-lg"/>
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="gd">Deskripsi</Label>
-                    <Textarea id="gd" placeholder="Jelaskan tujuan grup ini..." value={newDesc} onChange={e => setNewDesc(e.target.value)} className="bg-muted/50 border-border resize-none min-h-[100px]"/>
+                    <Label htmlFor="gd" className="text-sm font-medium">Deskripsi</Label>
+                    <Textarea id="gd" placeholder="Jelaskan tujuan grup ini..." value={newDesc} onChange={e => setNewDesc(e.target.value)} className="bg-muted/50 border-white/10 focus:bg-background transition-colors resize-none min-h-[100px] rounded-lg"/>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+                <div className="flex items-center justify-between p-4 rounded-xl border border-white/10 bg-muted/30">
                     <div className="space-y-0.5">
-                        <Label htmlFor="priv" className="text-base">Grup Privat</Label>
-                        <p className="text-xs text-muted-foreground">Hanya anggota yang disetujui yang bisa bergabung dan melihat konten.</p>
+                        <Label htmlFor="priv" className="text-base font-medium">Grup Privat</Label>
+                        <p className="text-xs text-muted-foreground">Hanya anggota yang disetujui yang bisa bergabung.</p>
                     </div>
                     <Switch id="priv" checked={priv} onCheckedChange={setPriv}/>
                 </div>
-                <Button onClick={handleCreate} disabled={creating} className="w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90">
-                    {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                <Button onClick={handleCreate} disabled={creating} className="w-full h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-medium text-base shadow-md transition-all hover:shadow-lg">
+                    {creating ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                     {creating ? "Membuat..." : "Buat Grup"}
                 </Button>
               </div>
@@ -187,24 +187,24 @@ const Groups = () => {
 
       <div className="space-y-6">
         <Tabs defaultValue="all" className="w-full">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-                <TabsList className="grid grid-cols-2 w-full sm:w-[300px] h-auto p-1 bg-muted/60 rounded-xl">
-                    <TabsTrigger value="all" className="gap-2 rounded-lg py-2">Discover</TabsTrigger>
-                    <TabsTrigger value="my" className="gap-2 rounded-lg py-2">My Groups</TabsTrigger>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
+                <TabsList className="grid grid-cols-2 w-full sm:w-[320px] h-auto p-1.5 bg-muted/30 rounded-2xl backdrop-blur-sm border border-white/5">
+                    <TabsTrigger value="all" className="gap-2 rounded-xl py-2.5 text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md transition-all">Discover</TabsTrigger>
+                    <TabsTrigger value="my" className="gap-2 rounded-xl py-2.5 text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-md transition-all">My Groups</TabsTrigger>
                 </TabsList>
                 
-                <div className="relative w-full sm:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <div className="relative w-full sm:w-72">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/70" />
                     <Input 
-                        placeholder="Cari grup..." 
+                        placeholder="Cari grup diskusi..." 
                         value={q} 
                         onChange={e => setQ(e.target.value)} 
-                        className="pl-9 rounded-xl bg-card/50 border-border focus:ring-primary/20"
+                        className="pl-10 h-11 rounded-xl bg-card/40 border-white/10 focus:bg-card focus:ring-2 focus:ring-primary/20 transition-all backdrop-blur-sm shadow-sm"
                     />
                 </div>
             </div>
 
-            <TabsContent value="all" className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2 duration-500">
+            <TabsContent value="all" className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-4 duration-700">
                 {filteredAll.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredAll.map(g => (
@@ -220,15 +220,17 @@ const Groups = () => {
                         ))}
                     </div>
                 ) : (
-                    <div className="text-center py-16 bg-card/30 rounded-3xl border border-dashed border-border">
-                        <Users className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-                        <p className="text-muted-foreground font-medium">Tidak ada grup yang ditemukan</p>
-                        <p className="text-xs text-muted-foreground/70 mt-1">Coba kata kunci lain atau buat grup baru.</p>
+                    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground bg-card/20 backdrop-blur-sm rounded-3xl border border-dashed border-white/10">
+                        <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-4">
+                            <Users className="h-8 w-8 opacity-50" />
+                        </div>
+                        <p className="text-lg font-medium">Tidak ada grup yang ditemukan</p>
+                        <p className="text-sm opacity-70 mt-1">Coba kata kunci lain atau buat grup baru.</p>
                     </div>
                 )}
             </TabsContent>
 
-            <TabsContent value="my" className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-2 duration-500">
+            <TabsContent value="my" className="space-y-6 animate-in fade-in-50 slide-in-from-bottom-4 duration-700">
                 {filteredMy.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {filteredMy.map(g => (
@@ -244,10 +246,12 @@ const Groups = () => {
                         ))}
                     </div>
                 ) : (
-                    <div className="text-center py-16 bg-card/30 rounded-3xl border border-dashed border-border">
-                         <Users className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-                        <p className="text-muted-foreground font-medium">Anda belum bergabung dengan grup apapun</p>
-                        <Button variant="link" onClick={() => document.querySelector('[data-state="inactive"][value="all"]')?.dispatchEvent(new MouseEvent('click', {bubbles: true}))} className="text-primary mt-2">
+                    <div className="flex flex-col items-center justify-center py-16 text-muted-foreground bg-card/20 backdrop-blur-sm rounded-3xl border border-dashed border-white/10">
+                         <div className="w-16 h-16 rounded-full bg-muted/30 flex items-center justify-center mb-4">
+                            <Users className="h-8 w-8 opacity-50" />
+                        </div>
+                        <p className="text-lg font-medium">Anda belum bergabung dengan grup apapun</p>
+                        <Button variant="link" onClick={() => document.querySelector('[data-state="inactive"][value="all"]')?.dispatchEvent(new MouseEvent('click', {bubbles: true}))} className="text-primary mt-2 font-medium">
                             Jelajahi Grup
                         </Button>
                     </div>

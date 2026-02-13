@@ -107,35 +107,38 @@ export const StoryReel = ({ currentUser }: StoryReelProps) => {
   }, []);
 
   return (
-    <Card className="rounded-none lg:rounded-2xl border-0 lg:border border-border/60 bg-transparent lg:bg-card/30 shadow-none lg:shadow-xl p-4 mb-6">
-      <ScrollArea className="w-full whitespace-nowrap -mx-4 px-4">
-        <div className="flex w-max space-x-3 pb-3">
+    <Card className="rounded-none lg:rounded-3xl border-0 lg:border border-white/10 bg-transparent lg:bg-card/30 shadow-none lg:shadow-xl p-6 mb-8 relative overflow-hidden backdrop-blur-md">
+      {}
+      <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-accent/5 pointer-events-none" />
+      
+      <ScrollArea className="w-full whitespace-nowrap -mx-4 px-4 lg:mx-0 lg:px-0">
+        <div className="flex w-max space-x-6 pb-2 pt-1 px-1">
           
-          <div className="flex-shrink-0 w-16 text-center">
+          <div className="flex-shrink-0 w-20 text-center relative group">
             <button
               onClick={handleOpenCreateModal}
-              className="group relative h-16 w-16 rounded-full transition-transform transform active:scale-95"
+              className="relative h-20 w-20 rounded-full transition-transform transform active:scale-95 duration-300 group-hover:scale-105"
             >
-              <Avatar className="h-full w-full border-2 border-muted/60 group-hover:border-primary/70 transition-colors">
-                <AvatarImage src={currentUser.avatar_url} />
-                <AvatarFallback className="bg-muted/80">
+              <Avatar className="h-full w-full border-2 border-dashed border-white/30 group-hover:border-primary transition-colors p-1">
+                <AvatarImage src={currentUser.avatar_url} className="rounded-full object-cover" />
+                <AvatarFallback className="bg-muted/80 rounded-full">
                   {getInitials(currentUser.full_name)}
                 </AvatarFallback>
               </Avatar>
-              <div className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground ring-2 ring-card group-hover:scale-110 transition-transform">
+              <div className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-primary text-primary-foreground ring-4 ring-card group-hover:scale-110 transition-transform shadow-lg">
                 <Plus className="h-4 w-4" />
               </div>
             </button>
-            <p className="mt-1.5 truncate text-xs text-muted-foreground">
-              Tambah
+            <p className="mt-2 truncate text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">
+              Cerita Anda
             </p>
           </div>
 
           {loading &&
             Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex-shrink-0 w-16 text-center">
-                <Skeleton className="h-16 w-16 rounded-full" />
-                <Skeleton className="mt-1.5 h-3 w-12 mx-auto" />
+              <div key={i} className="flex-shrink-0 w-20 text-center animate-pulse">
+                <div className="h-20 w-20 rounded-full bg-white/5 mx-auto ring-1 ring-white/10" />
+                <div className="mt-2 h-2.5 w-14 mx-auto bg-white/5 rounded-full" />
               </div>
             ))}
 
@@ -144,33 +147,33 @@ export const StoryReel = ({ currentUser }: StoryReelProps) => {
               const isMyStory = group.user_id === currentUser.id;
               
               const ringStyle = group.all_viewed
-                ? "p-0.5 bg-muted-foreground/30"
-                : "p-0.5 bg-gradient-to-tr from-primary via-primary/70 to-accent";
+                ? "p-[2px] bg-white/20"
+                : "p-[2px] bg-gradient-to-tr from-yellow-400 via-orange-500 to-red-500 shadow-[0_0_15px_-3px_rgba(249,115,22,0.5)]";
 
               return (
                 <div
                   key={group.user_id}
-                  className="flex-shrink-0 w-16 text-center"
+                  className="flex-shrink-0 w-20 text-center group"
                 >
                   <button
                     onClick={() => handleStoryClick(group.user_id)}
-                    className={`h-16 w-16 rounded-full hover:opacity-90 transition-all transform active:scale-95 ${ringStyle}`}
+                    className={`h-20 w-20 rounded-full hover:opacity-90 transition-all transform active:scale-95 duration-300 ${ringStyle} group-hover:scale-105`}
                   >
-                    <Avatar className="h-full w-full border-2 border-card">
-                      <AvatarImage src={group.avatar_url} />
-                      <AvatarFallback className="bg-primary text-primary-foreground text-sm font-semibold">
+                    <Avatar className="h-full w-full border-4 border-card rounded-full bg-card">
+                      <AvatarImage src={group.avatar_url || undefined} className="object-cover" />
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground text-sm font-bold">
                         {getInitials(group.full_name)}
                       </AvatarFallback>
                     </Avatar>
                   </button>
-                  <p className="mt-1.5 truncate text-xs text-muted-foreground">
-                    {isMyStory ? "Anda" : group.full_name} 
+                  <p className="mt-2 truncate text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                    {isMyStory ? "Anda" : group.full_name.split(' ')[0]} 
                   </p>
                 </div>
               );
             })}
         </div>
-        <ScrollBar orientation="horizontal" className="h-1.5" />
+        <ScrollBar orientation="horizontal" className="h-2" />
       </ScrollArea>
       
       <CreateStoryModal

@@ -102,7 +102,7 @@ const Leaderboard = ({ users, likedUsers, suggestedUsers }: LeaderboardProps) =>
       <Card className="border-none shadow-sm bg-card/80 backdrop-blur-sm hover:shadow-md transition-shadow duration-300">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-yellow-500/10">
+            <div className="p-1.5 rounded-lg bg-blue-500/10">
               <TrendingUp className="h-4 w-4 text-blue-500" />
             </div>
             Top Creators
