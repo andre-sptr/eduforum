@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import CreatePost from "@/components/CreatePost";
+import { AIChatCard } from "@/components/AIChatCard";
 import PostCard from "@/components/PostCard";
 import PostSkeleton from "@/components/PostSkeleton";
 import { toast } from "sonner";
@@ -106,10 +107,13 @@ const Feed = () => {
   const refreshPosts = useCallback(async () => { setOffset(0); setHasMore(true); await loadPosts(true); }, [loadPosts]);
 
   if (loading) return (
-    <div className="min-h-screen grid place-items-center bg-gradient-to-b from-background to-muted/40">
-      <div className="text-center rounded-2xl bg-card p-8 shadow-2xl">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto" />
-        <p className="mt-4 text-muted-foreground">Memuat...</p>
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="rounded-2xl bg-card shadow-xl border border-border">
+        <div className="p-3 sm:p-4 space-y-4">
+           <PostSkeleton />
+           <PostSkeleton />
+           <PostSkeleton />
+        </div>
       </div>
     </div>
   );
@@ -117,6 +121,8 @@ const Feed = () => {
   return (
     <div className="space-y-6">
       
+      <AIChatCard />
+
       {profile && <div className="rounded-2xl bg-card shadow-xl border border-border p-2"><CreatePost currentUser={profile} onPostCreated={refreshPosts} /></div>}
       <div className="rounded-2xl bg-card shadow-xl border border-border">
         <div className="p-3 sm:p-4 space-y-4">

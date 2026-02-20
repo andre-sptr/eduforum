@@ -91,12 +91,11 @@ const Auth = () => {
                   <form onSubmit={handleLogin} className="space-y-5">
                     <div className="space-y-2">
                         <Label htmlFor="login-email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground ml-1">Email</Label>
-                        <Input id="login-email" type="email" placeholder="nama@sekolah.sch.id" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputCls} />
+                        <Input id="login-email" type="email" placeholder="nama@gmail.com" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputCls} />
                     </div>
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <Label htmlFor="login-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground ml-1">Password</Label>
-                            <a href="/reset-password" className="text-xs font-medium text-primary hover:text-primary/80 transition-colors">Lupa Password?</a>
                         </div>
                         <Input id="login-password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className={inputCls} />
                     </div>
@@ -114,7 +113,7 @@ const Auth = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="register-email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground ml-1">Email</Label>
-                    <Input id="register-email" type="email" placeholder="nama@sekolah.sch.id" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputCls} />
+                    <Input id="register-email" type="email" placeholder="nama@gmail.com" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputCls} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="register-password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground ml-1">Password</Label>
@@ -140,7 +139,7 @@ const Auth = () => {
           </CardContent>
           <div className="p-6 text-center border-t border-white/5 bg-black/10 backdrop-blur-md">
             <p className="text-xs text-muted-foreground">
-                Dengan masuk, Anda menyetujui <a href="#" className="text-primary hover:underline">Syarat & Ketentuan</a> kami.
+                Dengan masuk, Anda menyetujui <a className="text-primary">Syarat & Ketentuan</a> kami.
             </p>
           </div>
         </Card>

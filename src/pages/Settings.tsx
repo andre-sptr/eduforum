@@ -28,6 +28,8 @@ const passwordSchema = z.object({
   path: ["confirmPassword"],
 });
 
+import { Skeleton } from "@/components/ui/skeleton";
+
 const Settings = () => {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
@@ -181,8 +183,31 @@ const Settings = () => {
 
   if (!profile) {
     return (
-      <div className="min-h-[50vh] grid place-items-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="container max-w-5xl mx-auto py-8 space-y-8 animate-in fade-in duration-500">
+         <div className="flex flex-col gap-2">
+            <Skeleton className="h-10 w-48 rounded-lg" />
+            <Skeleton className="h-4 w-96 rounded-lg" />
+         </div>
+         <div className="flex flex-col md:flex-row gap-8">
+            <aside className="md:w-64 flex-shrink-0 space-y-4">
+               <Skeleton className="h-10 w-full rounded-lg" />
+               <Skeleton className="h-10 w-full rounded-lg" />
+               <Skeleton className="h-10 w-full rounded-lg" />
+            </aside>
+            <div className="flex-1 space-y-6">
+               <Card className="border-none shadow-sm bg-card/50">
+                  <div className="p-6 space-y-8">
+                     <div className="flex flex-col sm:flex-row gap-8">
+                        <Skeleton className="h-32 w-32 rounded-full" />
+                        <div className="flex-1 space-y-4">
+                           <Skeleton className="h-10 w-full rounded-lg" />
+                           <Skeleton className="h-32 w-full rounded-lg" />
+                        </div>
+                     </div>
+                  </div>
+               </Card>
+            </div>
+         </div>
       </div>
     );
   }

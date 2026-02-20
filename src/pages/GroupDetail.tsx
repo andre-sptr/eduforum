@@ -16,6 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLeaderboardData } from "@/hooks/useLeaderboardData";
 import { MentionInput } from "@/components/MentionInput";
+import GroupDetailSkeleton from "@/components/GroupDetailSkeleton";
 
 const getInitials = (n: string) => {
   const a = n.split(" ");
@@ -241,7 +242,7 @@ const GroupDetail = () => {
     } catch (e: any) { toast.error(e.message); } finally { setChatOpening(false); }
   };
 
-  if (loading) return (<div className="grid min-h-screen place-items-center bg-background"><div className="text-center"><div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-accent" /><p className="mt-4 text-muted-foreground">Memuat...</p></div></div>);
+  if (loading) return <GroupDetailSkeleton />;
   if (!group) return (<div className="grid min-h-screen place-items-center bg-background"><p className="text-muted-foreground">Grup tidak ditemukan</p></div>);
 
   const ownerId = group?.created_by; const owner = members.find(m => m.user_id === ownerId); const otherMembers = members.filter(m => m.user_id !== ownerId);

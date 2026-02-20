@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import PostCard from "@/components/PostCard";
+import PostSkeleton from "@/components/PostSkeleton";
 
 import { useLeaderboardData } from "@/hooks/useLeaderboardData";
 
@@ -51,10 +52,18 @@ const PostPage = () => {
   };
 
   if (loading) return (
-    <div className="min-h-screen grid place-items-center bg-background">
-      <div className="text-center">
-        <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-primary" />
-        <p className="mt-4 text-muted-foreground animate-pulse">Memuat postingan...</p>
+    <div className="max-w-2xl mx-auto space-y-8 pb-20">
+      <div className="flex items-center gap-4 bg-card/30 backdrop-blur-md p-4 rounded-2xl border border-white/10 sticky top-4 z-20 shadow-sm">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-xl hover:bg-primary/10 transition-colors">
+              <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+             <h1 className="text-lg font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Utas Postingan</h1>
+             <p className="text-xs text-muted-foreground">Detail diskusi dan komentar</p>
+          </div>
+      </div>
+      <div className="animate-in fade-in-50 slide-in-from-bottom-4 duration-700">
+         <PostSkeleton />
       </div>
     </div>
   );

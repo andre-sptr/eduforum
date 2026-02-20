@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MentionInput } from "@/components/MentionInput";
 import { RankBadge } from "@/components/RankBadge";
 import { ContentRenderer } from "@/components/ContentRenderer";
+import ChatSkeleton from "@/components/ChatSkeleton";
 
 import { useLeaderboardData } from "@/hooks/useLeaderboardData";
 
@@ -145,11 +146,7 @@ const Chat = () => {
     return dt >= 0 && dt <= GROUP_WINDOW_MS;
   };
 
-  if(loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center"><div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-primary"/><p className="mt-4 text-muted-foreground animate-pulse">Memuat chat...</p></div>
-    </div>
-  );
+  if(loading) return <ChatSkeleton />;
 
   return (
     <div className="space-y-4 h-[505px]">

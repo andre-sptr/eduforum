@@ -15,6 +15,7 @@ import { GroupCard } from "@/components/GroupCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import GroupSkeleton from "@/components/GroupSkeleton";
 
 const Groups = () => {
   const navigate = useNavigate();
@@ -128,14 +129,7 @@ const Groups = () => {
   const filteredAll = groups.filter(g => g.name.toLowerCase().includes(q.toLowerCase()) || g.description?.toLowerCase().includes(q.toLowerCase()));
   const filteredMy = myGroups.filter(g => g.name.toLowerCase().includes(q.toLowerCase()) || g.description?.toLowerCase().includes(q.toLowerCase()));
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-        <p className="mt-4 text-muted-foreground">Memuat grup...</p>
-      </div>
-    </div>
-  );
+  if (loading) return <GroupSkeleton />;
 
   return (
     <div className="space-y-6">

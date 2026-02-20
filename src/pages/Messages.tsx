@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLeaderboardData } from "@/hooks/useLeaderboardData";
 import { RankBadge } from "@/components/RankBadge";
 import { ContentRenderer } from "@/components/ContentRenderer";
+import MessagesSkeleton from "@/components/MessagesSkeleton";
 
 const messageSchema=z.object({content:z.string().trim().min(1,"Message cannot be empty").max(2000,"Message is too long")});
 interface Message{ id:string; user_id:string; content:string; created_at:string; edited_at?:string|null; is_deleted?:boolean; profiles?:{ full_name:string; avatar_url:string|null; role:string; }; }
@@ -35,6 +36,7 @@ const Messages=()=> {
   const [followQuery,setFollowQuery]=useState("");
   const { topFollowers, topLiked } = useLeaderboardData();
   const messagesViewportRef=useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const followerRankMap = useMemo(() =>
     new Map(topFollowers.slice(0, 3).map((u, i) => [u.id, i + 1]))
@@ -45,7 +47,17 @@ const Messages=()=> {
   , [topLiked]);
 
   useEffect(()=>{ checkUser(); },[]);
-  useEffect(()=>{ const el=messagesViewportRef.current; if(el) el.scrollTop=el.scrollHeight; },[messages]);
+  
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+    // Fallback in case of image loading
+    const timeoutId = setTimeout(scrollToBottom, 100);
+    return () => clearTimeout(timeoutId);
+  }, [messages, loading]);
 
   const checkUser=async()=>{
     const { data:{ user } }=await supabase.auth.getUser();
@@ -133,14 +145,10 @@ const Messages=()=> {
 
   const filteredFollowed=followedUsers.filter(u=>(u.full_name||"").toLowerCase().includes(followQuery.toLowerCase()));
 
-  if(loading) return (
-    <div className="min-h-screen grid place-items-center bg-gradient-to-b from-background to-background/60">
-      <div className="text-center"><div className="h-12 w-12 mx-auto animate-spin rounded-full border-2 border-border border-t-accent"/><p className="mt-4 text-muted-foreground">Memuat chat...</p></div>
-    </div>
-  );
+  if (loading) return <MessagesSkeleton />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 h-[calc(100vh-140px)] flex flex-col">
       <Tabs defaultValue="global" className="w-full">
         <TabsList className="w-full justify-start rounded-xl bg-muted/50 p-1 mb-6">
           <TabsTrigger value="global" className="rounded-lg px-6">Global Chat</TabsTrigger>
@@ -148,62 +156,94 @@ const Messages=()=> {
           <TabsTrigger value="groups" className="rounded-lg px-6">Grup Chat</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="global" className="h-[525px]">
-        <Card className="flex-1 border-border bg-card shadow-xl rounded-2xl flex flex-col h-full overflow-hidden">
-          <div ref={messagesViewportRef} className="flex-1 overflow-y-auto p-4">
-            <div className="space-y-4">
-              {messages.length===0?(<div className="text-center py-10 text-muted-foreground">Belum ada pesan. Mulai percakapan!</div>):messages.map(m=>{
-                const own=m.user_id===currentUser?.id; const editing=editingMessageId===m.id;
-                return (
-                  <div key={m.id} className={`flex gap-3 ${own?"flex-row-reverse":"flex-row"}`}>
-                    <Link to={`/profile/${m.user_id}`} className="shrink-0" onClick={(e)=>e.stopPropagation()}>
-                      <Avatar className="h-8 w-8 ring-2 ring-border/50"><AvatarImage src={m.profiles?.avatar_url||undefined}/><AvatarFallback className="bg-primary text-primary-foreground font-semibold">{getInitials(m.profiles?.full_name||"U")}</AvatarFallback></Avatar>
-                    </Link>
-                    <div className={`flex flex-col max-w-[70%] ${own?"items-end":"items-start"}`}>
-                      <div className={`flex items-center flex-wrap gap-2 mb-1 ${own ? "flex-row-reverse" : ""}`}>
-                        <Link to={`/profile/${m.user_id}`} className="text-sm font-bold hover:text-primary transition-colors" onClick={(e) => e.stopPropagation()}>{m.profiles?.full_name}</Link>
-                        <RankBadge rank={followerRankMap.get(m.user_id)} type="follower" />
-                        <RankBadge rank={likerRankMap.get(m.user_id)} type="like" />
-                        <span className="text-xs text-muted-foreground">{m.profiles?.role}</span>
-                      </div>
-                      {editing?(
-                        <div className={`flex gap-2 w-full ${own?"flex-row-reverse":""}`}>
-                          <Input value={editContent} onChange={e=>setEditContent(e.target.value)} className="flex-1 bg-muted/50 border-muted rounded-xl" autoFocus onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleEditMessage(m.id); } if(e.key==="Escape") cancelEdit(); }}/>
-                          <Button size="sm" onClick={()=>handleEditMessage(m.id)} className="rounded-lg bg-primary text-primary-foreground">Simpan</Button>
-                          <Button size="sm" variant="ghost" onClick={cancelEdit} className="rounded-lg">Batal</Button>
-                        </div>
-                      ):(
-                        <div className="flex items-start gap-2">
-                          <div className={`rounded-2xl px-4 py-2 shadow-sm border transition-all ${own?"bg-primary text-primary-foreground border-primary rounded-tr-sm":"bg-muted/30 text-foreground border-border rounded-tl-sm hover:bg-muted/50"}`}>
-                            <ContentRenderer content={m.content} className={`text-sm whitespace-pre-wrap break-words ${own ? "text-primary-foreground/95" : "text-foreground/90"}`} />
-                            {m.edited_at&&<span className="text-[10px] opacity-70 italic flex items-center gap-0.5 mt-1"><Pencil className="h-2 w-2"/> diedit</span>}
-                          </div>
-                          {own&&(
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-muted"><MoreVertical className="h-4 w-4"/></Button></DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="bg-card border-border shadow-xl">
-                                <DropdownMenuItem onClick={()=>startEdit(m)}><Pencil className="h-4 w-4 mr-2"/>Edit</DropdownMenuItem>
-                                <DropdownMenuItem onClick={()=>handleDeleteMessage(m.id)} className="text-destructive"><Trash2 className="h-4 w-4 mr-2"/>Hapus</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
-                        </div>
-                      )}
-                      <span className="text-[10px] text-muted-foreground mt-1">{formatTime(m.created_at)}</span>
+        <TabsContent value="global" className="h-[calc(100vh-183px)]">
+          <Card className="flex-1 border-border bg-card shadow-xl rounded-2xl flex flex-col h-full overflow-hidden relative">
+            <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#000000_1px,transparent_1px)] dark:bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+            <div ref={messagesViewportRef} className="flex-1 overflow-y-auto p-4 sm:p-6 z-10">
+              <div className="space-y-6">
+                {messages.length===0?(
+                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-60">
+                    <div className="w-16 h-16 bg-muted/30 rounded-full flex items-center justify-center mb-4">
+                      <MessageCircle className="h-8 w-8" />
                     </div>
+                    <p className="font-medium">Belum ada pesan. Mulai percakapan!</p>
                   </div>
-                );
-              })}
-            </div>
-          </div>
+                ):messages.map((m, idx)=>{
+                  const own=m.user_id===currentUser?.id; 
+                  const editing=editingMessageId===m.id;
+                  const prev=messages[idx-1];
+                  const isGrouped = prev && prev.user_id === m.user_id && (new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() < 5 * 60 * 1000);
 
-          <form onSubmit={handleSendMessage} className="border-t border-border p-4 bg-card">
-            <div className="flex gap-2">
-              <MentionInput value={newMessage} onChange={setNewMessage} placeholder="Ketik pesan..." className="flex-1 bg-muted/50 border-muted rounded-xl focus:bg-background transition-all" disabled={sending} currentUserId={currentUser?.id} onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleSendMessage(e as any);} }}/>
-              <Button type="submit" size="icon" disabled={sending||!newMessage.trim()} className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20"><Send className="h-5 w-5"/></Button>
+                  return (
+                    <div key={m.id} className={`flex gap-4 group/msg animate-in slide-in-from-bottom-2 duration-300 ${own?"flex-row-reverse":"flex-row"} ${isGrouped ? "mt-1" : "mt-6"}`}>
+                      {!isGrouped ? (
+                        <Link to={`/profile/${m.user_id}`} className="shrink-0 transition-transform hover:scale-105" onClick={(e)=>e.stopPropagation()}>
+                          <Avatar className="h-9 w-9 ring-2 ring-border/50 shadow-sm"><AvatarImage src={m.profiles?.avatar_url||undefined} className="object-cover"/><AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground font-bold text-xs">{getInitials(m.profiles?.full_name||"U")}</AvatarFallback></Avatar>
+                        </Link>
+                      ) : (
+                        <div className="w-9 shrink-0" />
+                      )}
+                      
+                      <div className={`flex flex-col max-w-[75%] sm:max-w-[70%] ${own?"items-end":"items-start"}`}>
+                        {!isGrouped && (
+                          <div className={`flex items-center flex-wrap gap-2 mb-1.5 ${own ? "flex-row-reverse" : ""}`}>
+                            <Link to={`/profile/${m.user_id}`} className="text-sm font-bold hover:text-primary transition-colors" onClick={(e) => e.stopPropagation()}>{m.profiles?.full_name}</Link>
+                            <RankBadge rank={followerRankMap.get(m.user_id)} type="follower" />
+                            <RankBadge rank={likerRankMap.get(m.user_id)} type="like" />
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium uppercase tracking-wide">{m.profiles?.role}</span>
+                          </div>
+                        )}
+                        
+                        {editing?(
+                          <div className={`flex gap-2 w-full ${own?"flex-row-reverse":""} animate-in fade-in zoom-in-95 duration-200`}>
+                            <Input value={editContent} onChange={e=>setEditContent(e.target.value)} className="flex-1 bg-background/50 backdrop-blur-sm border-primary/50 ring-2 ring-primary/20 rounded-xl" autoFocus onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleEditMessage(m.id); } if(e.key==="Escape") cancelEdit(); }}/>
+                            <Button size="sm" onClick={()=>handleEditMessage(m.id)} className="rounded-lg shadow-md">Simpan</Button>
+                            <Button size="sm" variant="ghost" onClick={cancelEdit} className="rounded-lg hover:bg-destructive/10 hover:text-destructive">Batal</Button>
+                          </div>
+                        ):(
+                          <div className="group relative flex items-start gap-2">
+                            <div className={`relative px-5 py-3 shadow-sm border transition-all duration-200 ${
+                              own
+                                ? "bg-primary text-primary-foreground border-primary rounded-2xl rounded-tr-sm"
+                                : "bg-card text-foreground border-border rounded-2xl rounded-tl-sm hover:border-border/80 hover:bg-accent/5"
+                            }`}>
+                              <ContentRenderer content={m.content} className={`text-[15px] whitespace-pre-wrap break-words leading-relaxed ${own ? "text-primary-foreground/95" : "text-foreground/90"}`} />
+                              <div className={`flex items-center gap-1.5 mt-1.5 ${own ? "justify-end text-primary-foreground/70" : "text-muted-foreground/60"}`}>
+                                <span className="text-[10px] font-medium">{formatTime(m.created_at)}</span>
+                                {m.edited_at && <Pencil className="h-2.5 w-2.5 opacity-70" />}
+                              </div>
+                            </div>
+                            
+                            {own&&(
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute top-0 -right-8">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-muted"><MoreVertical className="h-3.5 w-3.5 text-muted-foreground"/></Button></DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-32">
+                                    <DropdownMenuItem onClick={()=>startEdit(m)} className="cursor-pointer"><Pencil className="h-3.5 w-3.5 mr-2"/>Edit</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={()=>handleDeleteMessage(m.id)} className="text-destructive cursor-pointer focus:bg-destructive/10"><Trash2 className="h-3.5 w-3.5 mr-2"/>Hapus</DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={messagesEndRef} />
+              </div>
             </div>
-          </form>
-        </Card>
+
+            <form onSubmit={handleSendMessage} className="border-t border-border p-4 bg-card/80 backdrop-blur-sm z-20">
+              <div className="flex gap-3 items-end max-w-5xl mx-auto">
+                <div className="flex-1 relative">
+                  <MentionInput value={newMessage} onChange={setNewMessage} placeholder="Ketik pesan..." className="w-full bg-muted/50 border-transparent focus:border-primary/30 focus:bg-background rounded-2xl px-4 py-3 min-h-[48px] shadow-inner transition-all resize-none" disabled={sending} currentUserId={currentUser?.id} onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); handleSendMessage(e as any);} }}/>
+                </div>
+                <Button type="submit" size="icon" disabled={sending||!newMessage.trim()} className="h-12 w-12 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg hover:shadow-primary/25 hover:scale-105 transition-all flex-shrink-0"><Send className="h-5 w-5 ml-0.5"/></Button>
+              </div>
+            </form>
+          </Card>
         </TabsContent>
 
         <TabsContent value="direct">
@@ -215,7 +255,7 @@ const Messages=()=> {
               <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
               <Input value={followQuery} onChange={e=>setFollowQuery(e.target.value)} placeholder="Cari pengguna..." className="pl-9 h-9 bg-muted/50 border-muted rounded-xl focus:bg-background transition-all"/>
             </div>
-            <ScrollArea className="h-[408px]">
+            <ScrollArea className="h-[calc(100vh-320px)] sm:h-[calc(100vh-300px)]">
               <div className="space-y-2 pr-2">
                 {filteredFollowed.length===0?(<p className="text-sm text-muted-foreground text-center py-4">Tidak ada hasil</p>):filteredFollowed.map(u=>(
                   <div key={u.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors" onClick={()=>createDirectChat(u.id)}>
@@ -231,7 +271,7 @@ const Messages=()=> {
         <TabsContent value="groups">
           <Card className="p-4 border-border bg-card shadow-xl rounded-2xl">
             <h3 className="font-semibold mb-4 flex items-center gap-2"><Users className="h-4 w-4"/>Grup Chat</h3>
-            <ScrollArea className="h-[452px]">
+            <ScrollArea className="h-[calc(100vh-320px)] sm:h-[calc(100vh-300px)]">
               <div className="space-y-2 pr-2">
                 {userGroups.length===0?(<p className="text-sm text-muted-foreground text-center py-4">Belum bergabung grup</p>):userGroups.map(g=>(
                   <div key={g.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors" onClick={()=>createGroupChat(g.id)}>

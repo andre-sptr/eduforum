@@ -17,7 +17,6 @@ const PageLoader = () => (
 const Index = lazy(() => import("./pages/Index"));
 const Feed = lazy(() => import("./pages/Feed"));
 const Auth = lazy(() => import("./pages/Auth"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Groups = lazy(() => import("./pages/Groups"));
@@ -29,7 +28,6 @@ const Notifications = lazy(() => import("./pages/Notifications"));
 const SearchPage = lazy(() => import("./pages/SearchPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PostPage = lazy(() => import("./pages/PostPage"));
-const UpdatePassword = lazy(() => import("./pages/UpdatePassword"));
 
 const App = () => (
   <ThemeProvider defaultTheme="system" storageKey="eduforum-theme">
@@ -41,8 +39,6 @@ const App = () => (
             <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/update-password" element={<UpdatePassword />} />
 
             <Route element={<AppShell />}>
               <Route path="/home" element={<Feed />} />

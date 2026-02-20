@@ -100,6 +100,43 @@ const SearchPage = () => {
     return () => observer.disconnect();
   }, [hasMore, loading, loadMore]);
 
+  if (loading && !posts.length && !users.length) {
+    return (
+      <div className="container max-w-5xl mx-auto py-8 space-y-8 min-h-[80vh] animate-in fade-in duration-500">
+        <div className="flex flex-col gap-2 mb-4">
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">Pencarian</h1>
+          <p className="text-muted-foreground">Temukan teman baru, diskusi menarik, dan topik yang Anda sukai.</p>
+        </div>
+        
+        {/* Search Input Skeleton */}
+        <div className="w-full max-w-3xl mx-auto">
+           <div className="h-14 w-full bg-muted/20 rounded-2xl animate-pulse" />
+        </div>
+
+        <div className="space-y-8">
+            {/* Users Skeleton */}
+            <section className="space-y-4">
+               <div className="h-6 w-32 bg-muted/20 rounded-lg animate-pulse" />
+               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <UserSkeleton />
+                  <UserSkeleton />
+                  <UserSkeleton />
+               </div>
+            </section>
+
+            {/* Posts Skeleton */}
+            <section className="space-y-4">
+               <div className="h-6 w-32 bg-muted/20 rounded-lg animate-pulse" />
+               <div className="space-y-6">
+                  <PostSkeleton />
+                  <PostSkeleton />
+               </div>
+            </section>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container max-w-5xl mx-auto py-8 space-y-8 min-h-[80vh]">
       <div className="flex flex-col gap-2 mb-4">

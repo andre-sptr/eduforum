@@ -22,6 +22,7 @@ import PongGame from "@/components/games/PongGame";
 import RacingGame from "@/components/games/RacingGame";
 import { useGames, Game } from "@/hooks/useGames";
 import { GameCard } from "@/components/GameCard";
+import GameSkeleton from "@/components/GameSkeleton";
 
 type Profile = { id: string; full_name: string; avatar_url?: string | null };
 type ScoreRow = { user_id: string; score: number };
@@ -156,14 +157,7 @@ const Games = () => {
     finally { setLoadingTop(false); }
   };
 
-  if (loadingUser) return (
-    <div className="min-h-screen grid place-items-center bg-gradient-to-b from-background to-muted/40">
-      <div className="text-center rounded-2xl bg-card p-8 shadow-2xl">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto" />
-        <p className="mt-4 text-muted-foreground">Memuat profil...</p>
-      </div>
-    </div>
-  );
+  if (loadingUser) return <GameSkeleton />;
 
   return (
     <div className="space-y-6">

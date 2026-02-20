@@ -12,6 +12,8 @@ import PostCard from "@/components/PostCard";
 import PostSkeleton from "@/components/PostSkeleton";
 import { Dialog,DialogContent,DialogDescription,DialogHeader,DialogTitle } from "@/components/ui/dialog";
 import { useLeaderboardData } from "@/hooks/useLeaderboardData";
+import { RankBadge } from "@/components/RankBadge";
+import ProfileSkeleton from "@/components/ProfileSkeleton";
 
 type PostFilter = "all" | "reposts" | "media" | "text";
 const POST_SELECT = `
@@ -54,9 +56,19 @@ const Profile=()=> {
   const [followingHasMore,setFollowingHasMore]=useState(true);
   const [followingIds,setFollowingIds]=useState<Set<string>>(new Set());
   const [viewerOpen,setViewerOpen]=useState(false);
-  const [followerRank, setFollowerRank] = useState<number | null>(null);
-  const [likerRank, setLikerRank] = useState<number | null>(null);
   const { topFollowers, topLiked } = useLeaderboardData();
+
+  const followerRank = useMemo(() => {
+    if (!profile || !topFollowers.length) return null;
+    const index = topFollowers.slice(0, 3).findIndex((u: any) => u.id === profile.id);
+    return index !== -1 ? index + 1 : null;
+  }, [profile, topFollowers]);
+
+  const likerRank = useMemo(() => {
+    if (!profile || !topLiked.length) return null;
+    const index = topLiked.slice(0, 3).findIndex((u: any) => u.id === profile.id);
+    return index !== -1 ? index + 1 : null;
+  }, [profile, topLiked]);
 
   const getInitials=(n:string)=>{ const a=n.split(" "); return a.length>=2?(a[0][0]+a[1][0]).toUpperCase():n.slice(0,2).toUpperCase(); };
   const getRoleBadgeColor=(r:string)=> r==="siswa"?"bg-blue-500/20 text-blue-400":r==="guru"?"bg-green-500/20 text-green-400":r==="alumni"?"bg-purple-500/20 text-purple-400":"bg-muted text-muted-foreground";
@@ -99,14 +111,7 @@ const Profile=()=> {
       setProfile(profileData); setIsFollowing(!!followData);
       setFollowerCount(followersRes.count||0); setFollowingCount(followingRes.count||0);
       setFollowingIds(new Set((myFollowingList.data||[]).map((r:any)=>r.following_id)));
-      if (topFollowers.length > 0) {
-        const rankIndex = topFollowers.slice(0, 3).findIndex((u: any) => u.id === pid);
-        setFollowerRank(rankIndex !== -1 ? rankIndex + 1 : null);
-      }
-      if (topLiked.length > 0) {
-        const rankIndex = topLiked.slice(0, 3).findIndex((u: any) => u.id === pid);
-        setLikerRank(rankIndex !== -1 ? rankIndex + 1 : null);
-      }
+      
       await loadPostCounts(pid);
     }catch(e:any){ toast.error(e.message); }finally{ setLoading(false); }
   };
@@ -239,7 +244,7 @@ const Profile=()=> {
 
   const onDialogScroll=async(e:React.UIEvent<HTMLDivElement>)=>{ const el=e.currentTarget; const nearBottom=el.scrollTop+el.clientHeight>=el.scrollHeight-48; if(!nearBottom||listLoading||!profile) return; if(openList==="followers"&&followersHasMore) await loadFollowersPage(profile.id,followersPage+1); if(openList==="following"&&followingHasMore) await loadFollowingPage(profile.id,followingPage+1); };
 
-  if(loading) return (<div className="min-h-screen grid place-items-center bg-background"><div className="text-center"><div className="animate-spin h-12 w-12 rounded-full border-b-2 border-accent mx-auto"/><p className="mt-4 text-muted-foreground">Memuat...</p></div></div>);
+  if(loading) return <ProfileSkeleton />;
   if(!profile) return (<div className="min-h-screen grid place-items-center bg-background"><p className="text-muted-foreground">Profil tidak ditemukan</p></div>);
 
   const isOwnProfile=currentUser?.id===profile.id;
@@ -299,14 +304,8 @@ const Profile=()=> {
               )}
 
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-3">
-                 <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-xl border border-white/10 backdrop-blur-sm">
-                    <Trophy className="h-4 w-4 text-yellow-500" />
-                    <span className="text-sm font-medium">{followerRank ? `#${followerRank} Follower` : "-"}</span>
-                 </div>
-                 <div className="flex items-center gap-2 bg-muted/30 px-3 py-1.5 rounded-xl border border-white/10 backdrop-blur-sm">
-                    <Heart className="h-4 w-4 text-red-500" />
-                    <span className="text-sm font-medium">{likerRank ? `#${likerRank} Liked` : "-"}</span>
-                 </div>
+                 <RankBadge rank={followerRank} type="follower" />
+                 <RankBadge rank={likerRank} type="like" />
               </div>
 
               <div className="flex items-center justify-center md:justify-start gap-8 py-2">

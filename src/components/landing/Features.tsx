@@ -16,7 +16,7 @@ const features = [
   {
     icon: Trophy,
     title: "Leaderboard",
-    description: "Bersaing secara sehat untuk mendapatkan peringkat tertinggi dan raih prestasi akademik."
+    description: "Bersaing secara sehat untuk mendapatkan peringkat tertinggi."
   },
   {
     icon: Share2,
@@ -26,7 +26,7 @@ const features = [
   {
     icon: BookOpen,
     title: "Materi Terstruktur",
-    description: "Akses rangkuman dan materi pelajaran yang disusun rapi untuk memudahkan pemahaman."
+    description: "Akses rangkuman dan materi pelajaran yang disusun rapi."
   },
   {
     icon: ShieldCheck,

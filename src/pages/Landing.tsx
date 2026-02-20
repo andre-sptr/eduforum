@@ -66,23 +66,24 @@ const Footer = () => (
           </p>
         </div>
         <div>
-          <h3 className="font-semibold mb-4">Platform</h3>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li><a href="#" className="hover:text-foreground">Fitur</a></li>
-            <li><a href="#" className="hover:text-foreground">Tentang Kami</a></li>
-            <li><a href="#" className="hover:text-foreground">Leaderboard</a></li>
-          </ul>
         </div>
         <div>
-          <h3 className="font-semibold mb-4">Legal</h3>
+          <h3 className="font-semibold mb-4">Platform</h3>
           <ul className="space-y-2 text-sm text-muted-foreground">
-            <li><a href="#" className="hover:text-foreground">Privasi</a></li>
-            <li><a href="#" className="hover:text-foreground">Syarat & Ketentuan</a></li>
+            <li><a href="#features" className="hover:text-foreground" onClick={(e) => { e.preventDefault(); document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' }); }}>Fitur</a></li>
+            <li><a href="#" className="hover:text-foreground" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Tentang Kami</a></li>
           </ul>
         </div>
       </div>
       <div className="border-t border-border/50 pt-8 text-center text-sm text-muted-foreground">
-        © {new Date().getFullYear()} EduForum. All rights reserved.
+        <a
+          href="https://andresptr.site"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium underline-offset-4"
+        >
+          © {new Date().getFullYear()} Andre Saputra
+        </a>
       </div>
     </div>
   </footer>
